@@ -1,0 +1,636 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+
+  <title>apply concat and friends</title>
+<style>
+html {
+  background: url('pasley.jpg');
+  background-size: 200px;
+  font-family: serif;
+}
+figcaption { font-family: sans-serif; }
+main {
+  max-width: 40em;
+  padding: 1em;
+  margin: auto;
+  background: #fff;
+}
+footer { color: #aaa; }
+footer a { color: #aaf; }
+hr {
+  margin: 4em;
+  border: 0;
+  border-top: 1px #aaa solid;
+}
+p code {
+  white-space: nowrap;
+  background: #eef;
+}
+pre {
+  border-left: 4px #ccf solid;
+  padding-left: 2em;
+  background: #eaeaff;
+}
+pre.prn {
+  margin-top: -0.8em;
+  border-left: 4px #cfc solid;
+  background: #eaffea;
+  font-weight: bold;
+}
+code {
+  background: #eaeaff;
+  padding: 0 0.5ex;
+}
+.twitter-tweet {
+  clear: both;
+}
+.laziness-svg { width: 115px; height 56px; float: right;}
+.byline { text-align: right; font-style: italic; }
+.dialog td {
+  vertical-align: top;
+}
+
+.dialog td:first-child {
+  text-align: right;
+  padding-right: 1ex;
+}
+.examples td { padding: 0 1em; }
+</style>
+
+</head>
+
+<body>
+
+<main>
+
+<h1><code>apply concat</code> <em>and friends</em></h1>
+
+
+<p>The other day at work, writing a function, I typed <code>mapcat
+seq</code>...</p>
+
+<table class="dialog">
+<tr><td><b>Me: </b></td><td>Hey, are you familiar with this?</td></tr>
+<tr><td><b>Pairing partner: </b></td><td>Nope</td></tr>
+<tr><td><b>Me: </b></td><td>Ah, well <code>(mapcat seq xs)</code> is just like <code>(apply concat xs)</code></td></tr>
+<tr><td><b>Pairing partner: </b></td><td>Oh, so why not just use <code>(apply concat xs)</code>?</td></tr>
+<tr><td><b>Me: </b></td><td>...</td></tr>
+</table>
+
+<p>The first I heard of <code>mapcat seq</code> was when Christophe Grand
+mentioned it some years ago. I'm not sure what he found pleasant about it, but
+<i>I</i> love that it's shorter than <code>apply concat</code> (by two
+characters!) and I've used it ever since.</p>
+
+<blockquote class="twitter-tweet" data-lang="en"><p lang="en" dir="ltr">Just realized that (mapcat seq x) is a pleasant alternative to (apply concat x). <a href="https://twitter.com/hashtag/clojure?src=hash&amp;ref_src=twsrc%5Etfw">#clojure</a></p>&mdash; Christophe Grand (@cgrand) <a href="https://twitter.com/cgrand/status/243793887532052480?ref_src=twsrc%5Etfw">September 6, 2012</a></blockquote>
+
+<figure style="float: right; width: 286px;">
+<img alt="Cat on her back with a treasure map on her belly."
+  src="mapcat-seq.svg" onerror="this.src='mapcat-seq.jpg'"
+  style="width: 286px; height: 135px">
+<figcaption>
+<b><code>mapcat seq</code> – </b>A close cousin to <code>mapcat identity</code>,
+and my favorite for the last several years.
+</figcaption>
+</figure>
+
+<p>Two characters is of course a silly reason to choose one over the other, in
+all but the most <a href="http://www.4clojure.com/">4clojure</a> of
+circumstances. But they are very similar and there are other alternatives, so
+which is best? I decided to carefully study this question by conducting a
+rigorously controlled and scientific Twitter poll. Twenty-four hours later I had
+my answer:</p>
+
+<blockquote class="twitter-tweet" data-lang="en"><p lang="en" dir="ltr">Just because they do different things doesn&#39;t mean you can&#39;t have a favorite.</p>&mdash; Chouser (@chrishouser) <a href="https://twitter.com/chrishouser/status/1118913793512411136?ref_src=twsrc%5Etfw">April 18, 2019</a><br>
+<img src="shot-20190517-090932.png" style="width: 175px; height: 172px"
+  alt="Twitter poll results:
+  (mapcat seq xs) 9%; (mapcat identity xs) 24%; (apply concat xs) 34%; (flatten xs) 33%">
+</blockquote>
+<script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
+
+<p>I wasn't really expecting everyone to pick my favorite. More respondents
+liked <code>apply concat</code>, and I can live with that. Maybe I should
+conform for the sake of community. But what I can't abide is that it only barely
+beat out <code>flatten</code>! Unacceptable! I had no choice to but to
+immediately dawdle, procrastinate, and finally five months later write a blog
+post about it.</p>
+
+<h2>The infamous <code>flatten</code></h2>
+
+<p>The other three options in the poll are indeed very similar. In fact their
+differences are so subtle, I really doubt you will ever regret whichever one use
+choose to use. I dare not, however, make this same prediction about
+<code>flatten</code>, for I fear if you use it in innocence it will betray
+you.</p>
+
+<p>To explain why, let's first look at an example for which all four
+expressions return the same value:</p>
+
+<pre>
+(flatten [[1 2 3] [4 5 6] [7 8 9]])
+;=&gt; (1 2 3 4 5 6 7 8 9)
+</pre>
+
+<p>When you reach for any of these expressions, this is usually what you're
+thinking of: take a sequence of sequences and stitch them together into a single
+sequence. And <code>flatten</code> indeed does this, but it does a lot more.
+Let's examine its definition:</p>
+
+<pre>
+(defn flatten
+  "Takes any nested combination of sequential things (lists, vectors,
+  etc.) and returns their contents as a single, flat lazy sequence.
+  (flatten nil) returns an empty sequence."
+  {:added "1.2"
+   :static true}
+  [x]
+  (filter (complement sequential?)
+          (rest (tree-seq sequential? seq x))))
+</pre>
+
+<figure style="float: right; width: 211px;">
+<img alt="Flattened cat. Looks surprised."
+  src="flatten.svg" onerror="this.src='flatten.jpg'"
+  style="width: 211px; height: 213px;">
+<figcaption>
+  <b><code>flatten</code> – </b>Looks surprised. You will be too.
+</figcaption>
+</figure>
+
+<p>First, note the use of <code>tree-seq</code>, an amazingly powerful little
+function that can return a lazy sequence of a depth-first walk of any kind of
+tree. Its use (and the mention of "nested" in the docstring) suggest
+<code>flatten</code> is treating its input as a tree, not just a sequence of
+sequences. So whereas <code>apply concat</code> and <code>mapcat seq</code>
+<i>assume</i> their input is a sequence of seqables and stop there,
+<code>flatten</code> examines each element and may choose to descend deeper into
+the input, examining as it goes.</p>
+
+<p>Second, note that it uses <code>sequential?</code>, an infrequently used
+predicate in my experience, to choose when to descend. Would it surprise you to
+learn that persistent queues are <code>sequential?</code>, but strings, sets,
+and arrays are not? How confident are you that future maintainers of your code
+know this?</p>
+
+<p>With this knowledge we can construct a couple examples where
+<code>flatten</code> behaves differently from the alternatives in the poll.</p>
+
+<table class="examples">
+  <tr>
+    <th><i>input</i></th>
+    <th><code>flatten</code></th>
+    <th><code>apply concat</code> and others</th>
+  </tr>
+  <tr>
+    <td><code>[[1 2 3] 4 [5 6]]</code></td>
+    <td><code>(1 2 3 4 5 6)</code></td>
+    <td><i>error</i></td>
+  </tr>
+  <tr>
+    <td><code>[[1 [2 3]] [4 5 6]]</code></td>
+    <td><code>(1 2 3 4 5 6)</code></td>
+    <td><code>(1 [2 3] 4 5 6)</code></td>
+  </tr>
+  <tr>
+    <td><code>[[1 2 3] #{4 5 6}]</code></td>
+    <td><code>(1 2 3 #{4 6 5})</code></td>
+    <td><code>(1 2 3 4 6 5)</code></td>
+  </tr>
+</table>
+
+<p>So beware, <code>flatten</code> is different and more complicated than the
+alternatives. Only rarely do I have multiple levels of nested sequences that I
+want to flatten, where <code>sequential?</code> correctly defines when I want
+it to descend. I'm not alone in warning about its use. <a
+href="http://clojure-log.n01se.net/date/2012-05-01.html#19:34">Others</a> <a
+href="http://clojure-log.n01se.net/date/2014-01-10.html#11:43d">have</a> <a
+href="http://clojure-log.n01se.net/date/2016-12-09.html#02:17">mentioned</a> <a
+href="https://clojurians-log.clojureverse.org/clojure/2016-04-09/1460232281.004707#inst-2016-04-09T23:04:41.004707Z">it</a>,
+and Eric Normand wrote up a <a
+href="https://purelyfunctional.tv/issues/purelyfunctional-tv-newsletter-322-tip-avoid-flatten-when-possible/">nice
+example</a> of how it can betray you.</p> </p>
+
+<p>Now if we've ruled out <code>flatten</code> for most common use cases, what
+shall we use instead?</p>
+
+<h2>Enumerating alternatives</h2>
+
+<p>I didn't put a lot of thought into the choices to give in the Twitter poll,
+so if we want to find the best alternative, perhaps a more rigorous approach to
+finding alternatives is warranted. There are a couple projects to help find all
+Clojure functions that behave in a particular way: Michiel Borkent's somewhat
+confusingly named <a href="https://github.com/borkdude/re-find">re-find</a>
+which leverages the declared specs of functions (via <code>core.spec</code>) to
+find matches, and Anthony Grimes's <a
+href="https://github.com/Raynes/findfn">findfn</a> which tries calling all the
+functions and macros in a namespace to see which produces the desired results.
+Neither quite meets our requirements here because besides finding
+single-function solutions like <code>flatten</code>, we also want higher-order
+solutions like <code>apply concat</code>.</p>
+
+<p>So I wrote a function to specifically look for expressions of the form
+<code>(f1 f2 xs)</code> for any <i>f1</i> and <i>f2</i> that return the same
+value as <code>(mapcat seq xs)</code>.</p>
+
+<pre>
+(defn find-phrases []
+  (let [xs [[1 2 3] [4 5 6] [7 8 9]]
+        goal (mapcat seq xs)
+        vars (vals (ns-publics 'clojure.core))]
+
+    (doall
+     (for [v0 vars
+           v1 vars
+           :when (try
+                    (= goal (@v0 @v1 xs))
+                    (catch Throwable t false))]
+       (list v0 v1 'xs)))))
+</pre>
+
+<p>I don't recommend you run this since it freezes, crashes, and breaks in
+various ways. You may be surprised to find that some combinations of core
+functions are not well-behaved. But it almost works: <code>vars</code> is a
+sequence of all public vars in <code>clojure.core</code>, the <code>for</code>
+builds all pairs, and the <code>:when</code> clause tries the pair and compares
+against our <code>goal</code>.</p>
+
+<figure style="float: right; width: 240px;">
+<img alt="A very lazy cat, curled up, asleep, with a treasure map on its side"
+  src="mapcat-identity.svg" onerror="this.src='mapcat-identity.jpg'"
+  style="width: 240px; height: 156px;">
+<figcaption>
+  <b><code>mapcat identity</code> – </b>A close cousin to <code>mapcat
+  seq</code>, but lazier.
+</figcaption>
+</figure>
+
+<p>All that's left is to make it not fall apart, so I added a try/catch around
+the scary test invocation. This wasn't enough, so I also manually excluded
+several functions and a couple of combinations that caused problems and won't
+meet the goal. <a
+href="https://github.com/Chouser/apply-concat-and-friends/blob/92eed8373f1da50050a183d90c558833205791f9/src/chouser/mapcatseq.clj#L9-L18">This
+version</a> runs to completion in about 11 seconds and finds 44 equivalent
+function combinations for the tested input. Most of these use
+<code>mapcat</code>, since it turns out there are lots of functions that act
+like <code>identity</code> in limited circumstances, for example <code>mapcat
+sort</code>. But there are a few others, that look interesting: <code>reduce
+into</code>, <code>sequence cat</code>, and <code>eduction cat</code>.</p>
+
+<h2>The eagerness of <code>reduce into</code></h2>
+
+<figure style="float: right; width: 71px">
+<img alt="A much smaller cat, looking somewhat startled."
+  src="reduce-into.svg" onerror="this.src='reduce-into.jpg'"
+  style="width: 71px; height: 68px">
+<figcaption>
+  <b><code>reduce into</code> – </b> This cat has been reduced.
+</figcaption>
+</figure>
+
+<p>Most of the options mentioned above produce lazy sequences and are more or
+less lazy themselves, but not <code>reduce into</code>. When <code>reduce</code>
+is called without an <i>init</i> value it uses the first collection element
+instead, and since <code>into</code> eagerly pours its second argument into its
+first, the return value of <code>reduce into</code> is both fully eager and very
+dependant on the type of the first collection element.</p>
+
+<p>The examples in the table below demonstrate that while providing a initial
+vector will result in value similar to other alternatives (though as a vector
+instead of a sequence), with an initial list the remaining elements will be
+reversed, and with an initial set the resulting collection is a set instead of a
+sequence with a few elements in indeterminate order.</p>
+
+<table class="examples">
+  <tr>
+    <th><i>input</i></th>
+    <th><code>reduce into</code></th>
+    <th><code>apply concat</code></th>
+  </tr>
+  <tr>
+    <td><code>[ <b>[</b>1 2 3<b>]</b> [4 5 6]]</code></td>
+    <td><code><b>[</b>1 2 3 4 5 6<b>]</b></code></td>
+    <td><code><b>(</b>1 2 3 4 5 6<b>)</b></code></td>
+  </tr>
+  <tr>
+    <td><code>[<b>'(</b>1 2 3<b>)</b> [4 5 6]]</code></td>
+    <td><code>(<b>6 5 4</b> 1 2 3)</code></td>
+    <td><code>(1 2 3 <b>4 5 6</b>)</code></td>
+  </tr>
+  <tr>
+    <td><code>[<b>#{</b>1 2 3<b>}</b> [4 5 6]]</code></td>
+    <td><code><b>#{</b>1 4 6 3 2 5<b>}</b></code></td>
+    <td><code>(<b>1 3 2</b> 4 5 6)</code></td>
+  </tr>
+</table>
+
+<p>So that's <code>reduce into</code>. The other interesting combinations found both use <code>cat</code>.
+
+<h2>The <code>eduction</code> and <code>sequence</code> of <code>cat</code></h2>
+
+<figure style="float: right; width: 259px">
+<img alt="A sequence of three eager cats"
+  src="sequence-cat.svg" onerror="this.src='sequence-cat.jpg'"
+  style="width: 259px; height: 159px">
+<figcaption>
+  <b><code>sequence cat</code> – </b> Looks like a sequence of cats, but is actually a concatenation of sequences.
+</figcaption>
+</figure>
+
+<p>I wasn't familiar with the function <code>cat</code> until
+<code>find-phrases</code> found it.  Its docstring says it is a <em>transducer
+which concatenates the contents of each input, which must be a collection, into
+the reduction.</em>. The concatenation sounds exactly like what we need, so then
+it's just a matter of finding something to collect the transducer into a
+sequence. I would normally just <code>(into [] cat xs)</code>, but apparently if
+I was more familiar with the transducer-related functions, I would have known
+about <code>eduction</code> and <code>sequence</code>. Judging by their
+docstrings, a key difference between them is that <code>sequence</code> can take
+multiple collections and up to one transducer whereas <code>eduction</code> can
+take multiple transducers and one collection. But since we only have one of
+each, either <code>(eduction cat xs)</code> or <code>(sequence cat xs)</code>
+will work.</p>
+
+<p>Several of the <code>apply concat</code> alternatives we've found are so
+far indistinguishable from each other. Although <code>flatten</code> and
+<code>reduce into</code> behave differently, the rest return apparently
+identical lazy sequences, so how shall we decide which to use? One obvious
+metric would be speed, but micro-benchmarks are difficult and of questionable
+value. So why don't we look at something a bit more concrete: laziness.</p>
+
+<h2>Tools for exploring laziness</h2>
+
+<p>The laziness of a sequence is usually a bit tricky to observe. The easiest
+approach is through side effects triggered as the sequence is realized, for
+example <code>(map prn [1 2 3])</code> which returns a sequence of
+<code>nil</code>s but prints each number as it is forced. This is sometimes
+sufficient, but the input sequences we're dealing with here are nested, which
+would print confusingly intermingled elements, so let's build a couple of tools
+to make laziness easier to see.</p>
+
+<p>Clojure's built-in printer (the <i>P</i> in <i>REPL</i>) forces lazy seqs.
+But since the REPL printer, as well as <code>prn</code> and <code>pr-str</code>,
+delegate to the <code>print-method</code> multimethod, we can replace the
+implementation for <code>ISeq</code> with one that doesn't force lazy seqs. This
+is the first tool we'll need.</p>
+
+<pre>
+(def ^:dynamic *hold-the-lazy* false)
+
+(defn write-lazy-seq [space? coll w]
+  (if (and *hold-the-lazy*
+           (instance? clojure.lang.IPending coll)
+           (not (realized? coll)))
+    (.write w (str (when space? " ") "..."))
+    (when (seq coll)
+      (when space?
+        (.write w " "))
+      (.write w (pr-str (first coll)))
+      (write-lazy-seq true (rest coll) w))))
+
+(defmethod print-method clojure.lang.ISeq [coll w]
+  (.write w "(")
+  (write-lazy-seq false coll w)
+  (.write w ")"))
+</pre>
+
+<p>By default, lazy seqs will print the same as usual:</p>
+
+<pre>
+(let [xs (map inc (range 10))]
+  (prn xs))
+</pre>
+<pre class="prn">(1 2 3 4 5 6 7 8 9 10)</pre>
+
+<p>But by binding <code>*hold-the-lazy*</code> while printing, we can now see
+where there are unrealized values:</p>
+
+<pre>
+(let [xs (map inc (range 50))]
+  (binding [*hold-the-lazy* true]
+    (prn xs)))
+</pre>
+<pre class="prn">(...)</pre>
+
+<p>Or we can rebind the root value to change the default behavior:</p>
+
+<pre>
+(alter-var-root #'chouser.mapcatseq/*hold-the-lazy* (constantly true))
+(map inc (range 50))
+</pre>
+<pre class="prn">(...)</pre>
+
+<p>Calling <code>first</code> on the sequence forces the <code>map</code>
+function consume some of the <i>range</i> in order to compute the first
+<i>inc</i>. But how much computation does it actually do?</p>
+
+<pre>
+(let [xs (map inc (range 50))]
+  (first xs)
+  xs)
+</pre>
+<pre class="prn">
+(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
+21 22 23 24 25 26 27 28 29 30 31 32 ...)</pre>
+</pre>
+
+<p>Note that the <i>realization</i> of the values is a side-effect of calling
+<code>(first xs)</code>, which is why we can discard that expression's return
+value and instead print the original <code>xs</code> sequence afterward.</p>
+
+<p>Another detail to notice is that when <code>map</code> is asked to compute
+the first value, it actually computes the first 32 values, a feature called
+<i>chunking</i> that is meant to amortize the overhead of creating the new lazy
+sequence. But if we want to understand precisely how lazy our various
+expressions are, we're going to need something that doesn't chunk. Fortunately,
+section 15.3.1 of <i>Joy of Clojure</i> has just the function we need:</p>
+
+<pre>
+(defn seq1 [s]
+  (lazy-seq
+   (when-let [[x] (seq s)]
+     (cons x (seq1 (rest s))))))
+</pre>
+
+<p>This takes any seqable collection and returns an unchunked lazy seq of it:</p>
+
+<pre>
+(let [xs (seq1 (range 50))]
+  (first xs)
+  xs)
+</pre>
+<pre class="prn">(0 ...)</pre>
+
+<p>This time, calling <code>first</code> only forces the first element, so only
+<code>0</code> is printed before the ellipses.</p>
+
+<p>With these tool in our belt, we're ready to see what just how lazy our
+various flatteners are.</p>
+
+<h2>Multidimensional laziness</h2>
+
+<p>Most valid inputs to <code>apply concat</code> and friends are themselves at
+least two-dimensional.  For example, here is valid input sequence of length four
+(the first dimension), each element of which is a sequence of length three (the
+second dimension), using <code>seq1</code> to make it fully lazy:</p>
+
+<pre>
+(seq1 [(seq1 [1 2 3])
+       (seq1 [4 5 6])
+       (seq1 [7 8 9])
+       (seq1 [10 11 12])])
+</pre>
+
+<p>Using the lazy printer, we can pass this collection to each of expressions
+we've been examining to see how much of this input is forced by merely
+<i>evaluating</i> the expression, without forcing any part of the returned lazy
+sequence. This is enough to start seeing some differenced between these
+expressions:</p>
+
+<table>
+<tr><td><i>forced</i></td> <td>((1 2 3) (4 5 6) (7 8 9) (10 11 12))</td></tr>
+<tr><td>flatten</td> <td>((...) (...) (...) (...) ...)</td></tr>
+<tr><td>apply concat</td> <td>((...) (...) (...) (...) ...)</td></tr>
+<tr><td>mapcat identity</td> <td>((...) (...) (...) (...) ...)</td></tr>
+<tr><td>mapcat seq</td> <td>((1 ...) (4 ...) (7 ...) (10 ...) ...)</td></tr>
+<tr><td>reduce into</td> <td>((1 ...) (4 5 6) (7 8 9) (10 11 12))</td></tr>
+<tr><td>sequence cat</td> <td>((1 2 3) ...)</td></tr>
+<tr><td>eduction cat</td> <td>(...)</td></tr>
+</table>
+
+<p>Here we can see that <code>eduction cat</code> is the laziest of these,
+apparently not even examining its argument. Unsurprisingly, <code>mapcat
+identity</code> and <code>mapcat seq</code> are similar, realizing the first 4
+elements of the outer sequence, differing only in that <code>seq</code> realizes
+the first element of each of those (the 1, 4, 7, and 10).  However it's
+interesting to note those four realized top-level elements are shared with
+<code>apply concat</code> as well as <code>flatten</code>. So what do these have
+in common?</p>
+
+<p>To answer this, let's peek at the implementation of <code>mapcat</code>:</p>
+
+<pre>
+(defn mapcat
+  ;; ... elided for clarity ...
+  ([f & colls]
+     (<b>apply concat</b> (apply map f colls))))
+</pre>
+
+<p>When I first noticed this, I was a bit stunned. My favorite contender,
+<code>mapcat seq</code>, is built on the poll winner, <code>apply concat</code>.
+...and of course that's why their laziness profile is similar.  So what about
+<code>flatten</code>, why does it fit the same pattern? We looked at it earlier,
+and it doesn't use <code>apply</code>. It does, however, call <code>tree-seq</code>:</p>
+
+<pre>
+(defn tree-seq
+   ;; ... elided for clarity ...
+   [branch? children root]
+   (let [walk (fn walk [node]
+                (lazy-seq
+                 (cons node
+                  (when (branch? node)
+                    (<b>mapcat</b> walk (children node))))))]
+     (walk root)))
+</pre>
+
+<figure style="float: right; width: 157px">
+<img alt="A happy cat with sleepy eyes."
+  src="apply-concat.svg" onerror="this.src='apply-concat.jpg'"
+  style="width: 157px; height: 152px; float: right; background: #fff">
+<figcaption>
+  <b><code>apply concat</code> – </b> Winner of the Twitter poll. Somewhat lazy. Somewhat smug.
+</figcaption>
+</figure>
+
+<p>And there it is, a use of <code>mapcat</code> which in turn calls <code>apply
+concat</code> and gives us our four realized elements of the top-level
+collection. It turns out <code>apply concat</code> is much more fundamental than
+I realized. My allegiance to <code>mapcat seq</code> is wavering.</p>
+
+<p>So now we've seen how of the input is forced by an expression when it is
+first evaluated, but another dimension to examine is <i>time</i>. That is, what
+happens when we start to realize parts of the <i>return value</i> of the
+expressions in question.  Here's a chart using the same input collection, but
+showing the state of its laziness after calling <code>first</code> on the
+result:</p>
+
+<table>
+<tr><td></td><td><i>forced</i></td> <td>((1 2 3) (4 5 6) (7 8 9) (10 11 12))</td></tr>
+<tr>
+  <td><img alt="" src="flatten.svg" style="width: 21px; height: 21px"></td>
+  <td>flatten</td> <td>((1 2 3) (...) (...) (...) ...)</td></tr>
+<tr>
+  <td><img alt="" src="apply-concat.svg" style="width: 15px; height: 15px"></td>
+  <td>apply concat</td> <td>((1 ...) (...) (...) (...) ...)</td>
+</tr>
+<tr>
+  <td><img alt="" src="mapcat-identity.svg" style="width: 24px; height: 15px;"></td>
+  <td>mapcat identity</td> <td>((1 ...) (...) (...) (...) ...)</td></tr>
+<tr>
+  <td><img alt="" src="mapcat-seq.svg" style="width: 28px; height: 13px"></td>
+  <td>mapcat seq</td> <td>((1 ...) (4 ...) (7 ...) (10 ...) ...)</td>
+</tr>
+<tr>
+  <td><img alt="" src="reduce-into.svg" style="width: 7px; height: 7px"></td>
+  <td>reduce into</td> <td>((1 ...) (4 5 6) (7 8 9) (10 11 12))</td>
+</tr>
+<tr>
+  <td><img alt="" src="sequence-cat.svg" style="width: 26px; height: 16px"></td>
+  <td>sequence cat</td> <td>((1 2 3) (4 5 6) (7 8 9) (10 11 12))</td>
+</tr>
+<tr><td></td><td>eduction cat</td> <td>((1 2 3) (4 5 6) (7 8 9) (10 11 12))</td></tr>
+</table>
+
+<p>Now we can see in <code>sequence cat</code> and <code>eduction cat</code>
+the eagerness common in transducers; once forced to do some work, they do all of it. The <code>apply concat</code>-based expressions stay relatively lazy, though we can see in the <code>seq</code> in <code>mapcat seq</code> forcing the first element of each sub-collection.</p>
+
+<h2>Answering the question</h2>
+
+<p>In an attempt to answer my pairing partner's straightforward question, I
+learned several things: I learned <code>flatten</code> is more popular than it
+should be. I learned <code>eduction</code> and <code>sequence</code> are handy
+for applying transformers.  And I learned that not only is <code>apply
+concat</code> more popular than <code>mapcat seq</code>, it is also more
+fundamental.</p>
+
+<table class="dialog">
+<tr><td><b>Pairing partner: </b></td><td>Oh, so why not just use <code>(apply concat xs)</code>?</td></tr>
+<tr><td><b>Me: </b></td><td>...<br>uh, no good reason.</td></tr>
+</table>
+
+<hr>
+
+<p><i>Updates, 25 Sept 2019:</i>
+<ul>
+  <li> Mark Engelberg <a href="https://twitter.com/mark_engelberg/status/1176909671694602240">warns</a>
+    about trusting the laziness of <code>apply concat</code> and
+    <code>mapcat</code>, and suggests the use of <a href="https://github.com/weavejester/medley/blob/ca04c75b70c3c0f1c6d9887087bc3e88eb0414f6/src/medley/core.cljc#L205"><code>medley.core/join</code></a>
+    instead.
+  <li> <a href="https://twitter.com/pjstadig/status/1176984046477426688">Paul
+      Stadig</a> sometimes likes <code>(for [ys xs y ys] y)</code>, a solution
+    I completely missed and which, depending on how you count, could also shorter
+    than <code>apply concat</code>.
+  <li> Stuart Sierra <a href="https://stuartsierra.com/2019/09/25/sequences-in-flatland">has some thoughts</a>. It's like a little blogosphere!
+  <li> Also, I fixed a bunch of typos, spelling errors, and the publish date.
+</ul>
+</p>
+
+<p><i>Updates, 26 Sept 2019:</i>
+  <li> More spelling fixes
+</p>
+
+<footer>
+<p>I wrote <a
+href="https://github.com/Chouser/apply-concat-and-friends/blob/master/src/chouser/mapcatseq.clj">some
+code</a> to help explore this space. It's a bit of a mess but includes some
+generative tests I didn't use in the text and defines <code>lazier-mapcat</code>
+the laziest friend of all.</p> <p>Thanks to Anna Houser for illustrating
+<i>apply concat</i> and all her friends.</p> <p>—Chouser, 25 Sept 2019</p> </footer>
+
+</main>
+
+</body>
+</html>
