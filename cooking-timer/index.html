@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cooking Timer App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        input, select, button {
+            margin: 5px 0;
+            padding: 5px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        #eventList {
+            margin-top: 20px;
+        }
+        .event {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .event.alert {
+            animation: blink 1s linear infinite;
+        }
+        @keyframes blink {
+            50% { background-color: #ffcccc; }
+        }
+    </style>
+</head>
+<body>
+    <h1>Cooking Timer App</h1>
+    <input type="datetime-local" id="mealTime" required>
+    <input type="text" id="eventName" placeholder="Event name" required>
+    <input type="text" id="duration" placeholder="Duration (e.g. 5, 2h5m)" required>
+    <select id="relativeEvent">
+        <option value="mealTime">Meal Time</option>
+    </select>
+    <button onclick="addEvent()">Add Event</button>
+    <button onclick="startTimer()">Start Timer</button>
+    <div id="eventList"></div>
+
+    <script>
+        let events = [];
+
+        function addEvent() {
+            const name = document.getElementById('eventName').value;
+            const duration = parseDuration(document.getElementById('duration').value);
+            const relativeEvent = document.getElementById('relativeEvent').value;
+            
+            events.push({ name, duration, relativeEvent });
+            updateEventList();
+            
+            document.getElementById('eventName').value = '';
+            document.getElementById('duration').value = '';
+        }
+
+        function parseDuration(input) {
+            const regex = /^(\d+h)?(\d+m)?$/;
+            const match = input.match(regex);
+            
+            if (match) {
+                const hours = match[1] ? parseInt(match[1]) : 0;
+                const minutes = match[2] ? parseInt(match[2]) : 0;
+                return hours * 60 + minutes;
+            } else {
+                return parseInt(input);
+            }
+        }
+
+        function updateEventList() {
+            const eventList = document.getElementById('eventList');
+            eventList.innerHTML = '';
+            const select = document.getElementById('relativeEvent');
+            select.innerHTML = '<option value="mealTime">Meal Time</option>';
+            
+            events.forEach((event, index) => {
+                const div = document.createElement('div');
+                div.className = 'event';
+                div.id = `event-${index}`;
+                div.innerHTML = `
+                    <p>${event.name} - ${formatDuration(event.duration)} before ${event.relativeEvent}</p>
+                    <button onclick="editEvent(${index})">Edit</button>
+                    <button onclick="deleteEvent(${index})">Delete</button>
+                `;
+                eventList.appendChild(div);
+                
+                const option = document.createElement('option');
+                option.value = event.name;
+                option.textContent = event.name;
+                select.appendChild(option);
+            });
+        }
+
+        function formatDuration(minutes) {
+            const hours = Math.floor(minutes / 60);
+            const mins = minutes % 60;
+            return hours > 0 ? `${hours}h${mins}m` : `${mins}m`;
+        }
+
+        function editEvent(index) {
+            const event = events[index];
+            document.getElementById('eventName').value = event.name;
+            document.getElementById('duration').value = formatDuration(event.duration);
+            document.getElementById('relativeEvent').value = event.relativeEvent;
+            events.splice(index, 1);
+            updateEventList();
+        }
+
+        function deleteEvent(index) {
+            events.splice(index, 1);
+            updateEventList();
+        }
+
+        function startTimer() {
+            const mealTime = new Date(document.getElementById('mealTime').value).getTime();
+            
+            function calculateTimes(event) {
+                if (event.relativeEvent === 'mealTime') {
+                    return mealTime - event.duration * 60000;
+                } else {
+                    const relativeEvent = events.find(e => e.name === event.relativeEvent);
+                    return calculateTimes(relativeEvent) - event.duration * 60000;
+                }
+            }
+            
+            events.forEach(event => {
+                event.time = calculateTimes(event);
+            });
+            
+            events.sort((a, b) => b.time - a.time);
+            
+            function checkEvents() {
+                const now = new Date().getTime();
+                events.forEach((event, index) => {
+                    if (now >= event.time && !event.alerted) {
+                        event.alerted = true;
+                        const div = document.getElementById(`event-${index}`);
+                        div.classList.add('alert');
+                        speak(event.name);
+                    }
+                });
+            }
+            
+            setInterval(checkEvents, 1000);
+        }
+
+        function speak(text) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            speechSynthesis.speak(utterance);
+        }
+    </script>
+</body>
+</html>
