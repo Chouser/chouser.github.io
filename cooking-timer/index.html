@@ -27,26 +27,37 @@
             padding: 10px;
             cursor: pointer;
         }
-        #mealTime {
-            width: 100%;
-            padding: 10px;
+        #mealTimeContainer {
             margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+        #mealTimeContainer label {
+            margin-right: 10px;
+            white-space: nowrap;
+        }
+        #mealTime {
+            flex-grow: 1;
+            padding: 10px;
+            box-sizing: border-box;
         }
         #eventForm {
             display: flex;
             margin-bottom: 20px;
         }
+        #eventName, #eventDuration, #relativeToEvent, #addEvent {
+            padding: 5px;
+        }
         #eventName, #eventDuration, #relativeToEvent {
             flex-grow: 1;
-            padding: 10px;
             margin-right: 5px;
         }
         #addEvent {
             background-color: #4CAF50;
             color: white;
             border: none;
-            padding: 10px;
             cursor: pointer;
+            white-space: nowrap;
         }
         #eventList {
             list-style-type: none;
@@ -66,6 +77,9 @@
         @keyframes flash {
             from { background-color: #f1f1f1; }
             to { background-color: #ffeb3b; }
+        }
+        .event.completed {
+            background-color: #d4edda;
         }
         .eventName {
             font-weight: bold;
@@ -91,7 +105,10 @@
         <span id="nextEvent">Next event: None</span>
         <button id="clearAll">Clear all timers</button>
     </div>
-    <input type="datetime-local" id="mealTime" required>
+    <div id="mealTimeContainer">
+        <label for="mealTime">Meal Time:</label>
+        <input type="datetime-local" id="mealTime" required>
+    </div>
     <form id="eventForm">
         <input type="text" id="eventName" placeholder="Event name" required>
         <input type="text" id="eventDuration" placeholder="Duration (e.g. 5 or 2h5m)" required>
@@ -122,6 +139,7 @@
         }
 
         function saveEvents() {
+            events.sort((a, b) => calculateEventTime(a) - calculateEventTime(b));
             localStorage.setItem('events', JSON.stringify(events));
             updateEvents();
         }
@@ -162,10 +180,18 @@
         function updateEvents() {
             eventList.innerHTML = '';
             relativeToEventSelect.innerHTML = '<option value="mealTime">Meal Time</option>';
+            
+            // Sort events based on their calculated times
+            events.sort((a, b) => calculateEventTime(a) - calculateEventTime(b));
+
+            const now = new Date();
             events.forEach((event, index) => {
                 const li = document.createElement('li');
                 li.className = 'event';
                 const eventTime = calculateEventTime(event);
+                if (now >= eventTime) {
+                    li.classList.add('completed');
+                }
                 li.innerHTML = `
                     <div>
                         <div class="eventName">${event.name}</div>
@@ -212,13 +238,21 @@
             const now = new Date();
             events.forEach((event, index) => {
                 const eventTime = calculateEventTime(event);
-                if (Math.abs(eventTime - now) < 500) { // Within 0.5 seconds
-                    const li = eventList.children[index];
-                    li.classList.add('flash');
-                    setTimeout(() => li.classList.remove('flash'), 10000);
-                    speak(event.name);
+                const li = eventList.children[index];
+                if (now >= eventTime && !li.classList.contains('completed') && !li.classList.contains('flash')) {
+                    if (Math.abs(eventTime - now) < 500) { // Within 0.5 seconds
+                        li.classList.add('flash');
+                        speak(event.name);
+                        setTimeout(() => {
+                            li.classList.remove('flash');
+                            li.classList.add('completed');
+                        }, 10000);
+                    } else {
+                        li.classList.add('completed');
+                    }
                 }
             });
+            updateNextEvent(); // Update next event status every second
         }
 
         function speak(text) {
@@ -237,12 +271,15 @@
 
         clearAllButton.addEventListener('click', () => {
             events = [];
+            mealTime = '';
+            mealTimeInput.value = '';
+            localStorage.removeItem('events');
+            localStorage.removeItem('mealTime');
             saveEvents();
         });
 
         updateEvents();
         setInterval(checkEvents, 1000);
-        setInterval(updateNextEvent, 60000);
     </script>
 </body>
 </html>
