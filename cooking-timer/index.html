@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cooking Timer App</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -24,29 +25,64 @@
             border: 1px solid #ddd;
             padding: 10px;
             margin-bottom: 10px;
+            position: relative;
+        }
+        .event-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .event-time {
+            font-size: 0.8em;
+            color: #666;
+        }
+        .event-actions {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        .event-actions button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 5px;
+            width: auto;
         }
         .event.alert {
-            animation: blink 1s linear infinite;
+            animation: blink 1s linear 15;
         }
         @keyframes blink {
             50% { background-color: #ffcccc; }
+        }
+        #statusLine {
+            background-color: #f0f0f0;
+            padding: 10px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        #clearAll {
+            position: absolute;
+            top: 20px;
+            right: 20px;
         }
     </style>
 </head>
 <body>
     <h1>Cooking Timer App</h1>
-    <input type="datetime-local" id="mealTime" required>
+    <button id="clearAll" onclick="clearAll()">Clear all timers</button>
+    <div id="statusLine"></div>
+    <input type="datetime-local" id="mealTime" required onchange="updateTimer()">
     <input type="text" id="eventName" placeholder="Event name" required>
     <input type="text" id="duration" placeholder="Duration (e.g. 5, 2h5m)" required>
     <select id="relativeEvent">
         <option value="mealTime">Meal Time</option>
     </select>
     <button onclick="addEvent()">Add Event</button>
-    <button onclick="startTimer()">Start Timer</button>
     <div id="eventList"></div>
 
     <script>
         let events = [];
+        let timerInterval;
 
         function addEvent() {
             const name = document.getElementById('eventName').value;
@@ -55,6 +91,8 @@
             
             events.push({ name, duration, relativeEvent });
             updateEventList();
+            updateTimer();
+            saveEvents();
             
             document.getElementById('eventName').value = '';
             document.getElementById('duration').value = '';
@@ -84,9 +122,12 @@
                 div.className = 'event';
                 div.id = `event-${index}`;
                 div.innerHTML = `
-                    <p>${event.name} - ${formatDuration(event.duration)} before ${event.relativeEvent}</p>
-                    <button onclick="editEvent(${index})">Edit</button>
-                    <button onclick="deleteEvent(${index})">Delete</button>
+                    <div class="event-name">${event.name}</div>
+                    <div class="event-time">${formatDuration(event.duration)} before ${event.relativeEvent}</div>
+                    <div class="event-actions">
+                        <button onclick="editEvent(${index})"><i class="fas fa-edit"></i></button>
+                        <button onclick="deleteEvent(${index})"><i class="fas fa-trash"></i></button>
+                    </div>
                 `;
                 eventList.appendChild(div);
                 
@@ -110,50 +151,111 @@
             document.getElementById('relativeEvent').value = event.relativeEvent;
             events.splice(index, 1);
             updateEventList();
+            updateTimer();
+            saveEvents();
         }
 
         function deleteEvent(index) {
             events.splice(index, 1);
             updateEventList();
+            updateTimer();
+            saveEvents();
         }
 
-        function startTimer() {
-            const mealTime = new Date(document.getElementById('mealTime').value).getTime();
-            
-            function calculateTimes(event) {
-                if (event.relativeEvent === 'mealTime') {
-                    return mealTime - event.duration * 60000;
-                } else {
-                    const relativeEvent = events.find(e => e.name === event.relativeEvent);
-                    return calculateTimes(relativeEvent) - event.duration * 60000;
-                }
-            }
-            
-            events.forEach(event => {
-                event.time = calculateTimes(event);
-            });
-            
-            events.sort((a, b) => b.time - a.time);
-            
-            function checkEvents() {
-                const now = new Date().getTime();
-                events.forEach((event, index) => {
-                    if (now >= event.time && !event.alerted) {
-                        event.alerted = true;
-                        const div = document.getElementById(`event-${index}`);
-                        div.classList.add('alert');
-                        speak(event.name);
+        function updateTimer() {
+            clearInterval(timerInterval);
+            const mealTimeInput = document.getElementById('mealTime');
+            const statusLine = document.getElementById('statusLine');
+
+            if (mealTimeInput.value && events.length > 0) {
+                const mealTime = new Date(mealTimeInput.value).getTime();
+                
+                function calculateTimes(event) {
+                    if (event.relativeEvent === 'mealTime') {
+                        return mealTime - event.duration * 60000;
+                    } else {
+                        const relativeEvent = events.find(e => e.name === event.relativeEvent);
+                        return calculateTimes(relativeEvent) - event.duration * 60000;
                     }
+                }
+                
+                events.forEach(event => {
+                    event.time = calculateTimes(event);
                 });
+                
+                events.sort((a, b) => b.time - a.time);
+                
+                timerInterval = setInterval(() => {
+                    const now = new Date().getTime();
+                    let nextEvent = events.find(event => !event.alerted);
+                    
+                    if (nextEvent) {
+                        const timeUntilNext = nextEvent.time - now;
+                        if (timeUntilNext > 0) {
+                            statusLine.textContent = `Next event: ${nextEvent.name} in ${formatTimeUntil(timeUntilNext)}`;
+                        } else {
+                            statusLine.textContent = `Current event: ${nextEvent.name}`;
+                        }
+                    } else {
+                        statusLine.textContent = 'All events completed';
+                    }
+                    
+                    events.forEach((event, index) => {
+                        if (now >= event.time && !event.alerted) {
+                            event.alerted = true;
+                            const div = document.getElementById(`event-${index}`);
+                            div.classList.add('alert');
+                            speak(event.name);
+                            setTimeout(() => {
+                                div.classList.remove('alert');
+                            }, 15000);
+                        }
+                    });
+                }, 1000);
+            } else {
+                statusLine.textContent = 'Set meal time and add events to start timer';
             }
-            
-            setInterval(checkEvents, 1000);
+        }
+
+        function formatTimeUntil(ms) {
+            const hours = Math.floor(ms / 3600000);
+            const minutes = Math.floor((ms % 3600000) / 60000);
+            const seconds = Math.floor((ms % 60000) / 1000);
+            return `${hours}h ${minutes}m ${seconds}s`;
         }
 
         function speak(text) {
             const utterance = new SpeechSynthesisUtterance(text);
             speechSynthesis.speak(utterance);
         }
+
+        function saveEvents() {
+            localStorage.setItem('cookingEvents', JSON.stringify({
+                mealTime: document.getElementById('mealTime').value,
+                events: events
+            }));
+        }
+
+        function loadEvents() {
+            const savedData = localStorage.getItem('cookingEvents');
+            if (savedData) {
+                const parsedData = JSON.parse(savedData);
+                document.getElementById('mealTime').value = parsedData.mealTime;
+                events = parsedData.events;
+                updateEventList();
+                updateTimer();
+            }
+        }
+
+        function clearAll() {
+            events = [];
+            document.getElementById('mealTime').value = '';
+            updateEventList();
+            updateTimer();
+            localStorage.removeItem('cookingEvents');
+        }
+
+        window.onload = loadEvents;
     </script>
 </body>
 </html>
