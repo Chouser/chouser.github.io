@@ -1,0 +1,219 @@
+<svg viewBox="0 0 800 900" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      /* Make the background fill the window and center the SVG */
+      body, html {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden; /* Hide scrollbars */
+      }
+      svg {
+        width: 100%;
+        height: 100%;
+        background-color: #0a1628; /* Matches source background  */
+        display: block;
+      }
+
+      @keyframes blink {
+        0%, 100% { opacity: 0; }
+        25% { opacity: 1; }
+      }
+    </style>
+  </defs>
+  
+  <g id="treeBody" stroke="darkgreen" stroke-width="4" fill="none" stroke-linecap="round"></g>
+  
+  <g id="lights"></g>
+
+  <g id="snow" fill="white" stroke="none"></g>
+  
+  <g id="cross" transform="translate(400, 150) scale(0.8)">
+    <rect x="-3" y="-25" width="6" height="50" fill="#888800"/>
+    <rect x="-15" y="-10" width="30" height="6" fill="#888800"/>
+  </g>
+  
+  <script type="text/javascript">
+    <![CDATA[
+    const n = 50;
+    const treeBody = document.getElementById('treeBody');
+    const lightsGroup = document.getElementById('lights');
+    const snowGroup = document.getElementById('snow');
+    const lightCoordinates = [];
+
+    // Turtle graphics state
+    // x=400 is the center of our 800-unit wide viewBox 
+    let x = 400; 
+    let y = 700;
+    let angle = 90; 
+    let path = [];
+
+    function forward(distance) {
+      const radians = (angle * Math.PI) / 180;
+      const newX = x + distance * Math.cos(radians);
+      const newY = y - distance * Math.sin(radians);
+      path.push(`M ${x} ${y} L ${newX} ${newY}`); 
+      x = newX;
+      y = newY;
+    }
+    
+    function backward(distance) {
+      forward(-distance);
+    }
+    
+    function left(deg) {
+      angle += deg;
+    }
+    
+    function right(deg) {
+      angle -= deg;
+    }
+    
+    // Save position for potential light placement
+    function maybeSaveLight() {
+      if (Math.random() < 0.15) { 
+        lightCoordinates.push({ x: x, y: y });
+      }
+    }
+    
+    // Draw the tree recursively
+    function tree(d, s) {
+      if (d <= 0) {
+        maybeSaveLight();
+        return;
+      }
+      forward(s);
+      tree(d - 1, s * 0.8);
+      right(120);
+      tree(d - 3, s * 0.5);
+      right(120);
+      tree(d - 3, s * 0.5);
+      right(120);
+      backward(s);
+    }
+    
+    // Initial positioning
+    forward(3 * n);
+    backward(n * 4.8);
+    
+    // Generate path data in memory
+    tree(15, n * 2.6);
+    backward(n / 2);
+
+    // --- ANIMATION LOGIC ---
+
+    const pathElement = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    pathElement.setAttribute('d', '');
+    treeBody.appendChild(pathElement);
+
+    const totalSteps = path.length;
+    const duration = 5000; // 5 seconds
+    const intervalTime = 16; 
+    const stepsPerFrame = Math.ceil(totalSteps / (duration / intervalTime));
+    
+    let currentStep = 0;
+    let currentD = "";
+
+    function animateDraw() {
+        for (let i = 0; i < stepsPerFrame; i++) {
+            if (currentStep < totalSteps) {
+                currentD += path[currentStep] + " ";
+                currentStep++;
+            }
+        }
+        
+        pathElement.setAttribute('d', currentD);
+
+        if (currentStep < totalSteps) {
+            requestAnimationFrame(animateDraw);
+        } else {
+            startLights();
+            startSnow();
+        }
+    }
+
+    animateDraw();
+
+    // --- LIGHTS LOGIC ---
+    function startLights() {
+        const selectedLights = [];
+        while (selectedLights.length < Math.min(100, lightCoordinates.length)) {
+            const idx = Math.floor(Math.random() * lightCoordinates.length);
+            if (!selectedLights.includes(lightCoordinates[idx])) {
+                selectedLights.push(lightCoordinates[idx]);
+            }
+        }
+        
+        const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ffa500', '#ff69b4', '#ffffff'];
+        
+        selectedLights.forEach((coord, i) => {
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', coord.x);
+            circle.setAttribute('cy', coord.y);
+            circle.setAttribute('r', '4');
+            circle.setAttribute('opacity', '0');
+            lightsGroup.appendChild(circle);
+            
+            function animateLight() {
+                const randomColor = colors[Math.floor(Math.random() * colors.length)];
+                circle.setAttribute('fill', randomColor);
+                circle.setAttribute('opacity', '1');
+                
+                setTimeout(() => {
+                    circle.setAttribute('opacity', '0');
+                    const offTime = 3000 + Math.random() * 2000;
+                    setTimeout(animateLight, offTime);
+                }, 1000);
+            }
+            
+            setTimeout(animateLight, Math.random() * 4000);
+        });
+    }
+
+    // --- SNOW LOGIC ---
+    function startSnow() {
+        const flakeCount = 100;
+        const flakes = [];
+
+        for (let i = 0; i < flakeCount; i++) {
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            // Random x within the 800 logical width
+            const xPos = Math.random() * 800;
+            const yPos = Math.random() * -900; 
+            const speed = 0.5 + Math.random() * 1.5;
+            const size = 1 + Math.random() * 2;
+
+            circle.setAttribute('cx', xPos);
+            circle.setAttribute('cy', yPos);
+            circle.setAttribute('r', size);
+            circle.setAttribute('opacity', 0.8);
+            
+            snowGroup.appendChild(circle);
+            
+            flakes.push({
+                el: circle,
+                x: xPos,
+                y: yPos,
+                speed: speed
+            });
+        }
+
+        function animateSnow() {
+            flakes.forEach(flake => {
+                flake.y += flake.speed;
+                if (flake.y > 900) {
+                    flake.y = -10;
+                    flake.x = Math.random() * 800;
+                }
+                flake.el.setAttribute('cy', flake.y);
+                flake.el.setAttribute('cx', flake.x);
+            });
+            requestAnimationFrame(animateSnow);
+        }
+        
+        animateSnow();
+    }
+    ]]>
+  </script>
+</svg>
