@@ -1,0 +1,492 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#clojure – 2014-06-07</title><link rel="stylesheet" href="../style.css"></head><body>
+<header class="sh"><a class="st" href="../index.html">#clojure logs</a><nav class="dn"><a href="2014-06-06.html">&larr;</a><span>2014-06-07</span><a href="2014-06-08.html">&rarr;</a></nav></header>
+<main><p class="dh">2014-06-07</p><table class="lg"><tbody>
+<tr id="t1353A"><td><a href="#t1353A">13:53</a></td><td class="ng">arrdem</td><td>Bronsa: config-map branch is up.</td></tr>
+<tr id="t1355A" class="h"><td><a href="#t1355A">13:55</a></td><td class="nl">bobbrahms</td><td>1</td></tr>
+<tr id="t1357A" class="h"><td><a href="#t1357A">13:57</a></td><td class="nc">Bronsa</td><td>arrdem: looks fine, thanks for the docstrings :3</td></tr>
+<tr id="t1400A"><td><a href="#t1400A">14:00</a></td><td class="ng">arrdem</td><td>Bronsa: there's more where that came from :P</td></tr>
+<tr id="t1421A"><td><a href="#t1421A">14:21</a></td><td class="np">Frozenlock</td><td>Is there a :subdomain field in compojure?</td></tr>
+<tr id="t1421A" class="h r"><td><a href="#t1421A">14:21</a></td><td class="np">Frozenlock</td><td>...or do I need to parse it myself from the host?</td></tr>
+<tr id="t1431A"><td><a href="#t1431A">14:31</a></td><td class="nk">augustl</td><td>is it ok for my &quot;app instance&quot; (stuart sierra style) to have atoms, or should I go all in and have my business logic return a new version of the app instance, or something like that?</td></tr>
+<tr id="t1432A" class="h r"><td><a href="#t1432A">14:32</a></td><td class="nk">augustl</td><td>given that my app instance will be called from multiple threads (a servlet) managing that return value seems nasty..</td></tr>
+<tr id="t1439A" class="h"><td><a href="#t1439A">14:39</a></td><td class="nd">justin_smith</td><td>augustl: with concurrency, the only way to have the app instance return a new version of itself is by allowing some coordination of threads, and that is what atoms and refs are for</td></tr>
+<tr id="t1441A"><td><a href="#t1441A">14:41</a></td><td class="nk">augustl</td><td>is there a way to atomically get the value of an atom _and_ set it to a new value?</td></tr>
+<tr id="t1441A" class="h r"><td><a href="#t1441A">14:41</a></td><td class="nk">augustl</td><td>in this case it's for my app shutdown function, where I want to do stuff with an atom but ensure that no new items are added while I'm shutting down</td></tr>
+<tr id="t1441A" class="h"><td><a href="#t1441A">14:41</a></td><td class="nd">justin_smith</td><td>(doc swap!)</td></tr>
+<tr id="t1441A" class="h"><td><a href="#t1441A">14:41</a></td><td class="nl">clojurebot</td><td>&quot;([atom f] [atom f x] [atom f x y] [atom f x y &amp; ...]); Atomically swaps the value of atom to be: (apply f current-value-of-atom args). Note that f may be called multiple times, and thus should be free of side effects. Returns the value that was swapped in.&quot;</td></tr>
+<tr id="t1442A" class="h"><td><a href="#t1442A">14:42</a></td><td class="nk">augustl</td><td>I don't want the value that was swapped in, I want the value that was there before the swap :)</td></tr>
+<tr id="t1442A" class="h"><td><a href="#t1442A">14:42</a></td><td class="nd">justin_smith</td><td>augustl: your shutdown function is the arg to swap!</td></tr>
+<tr id="t1442A" class="h"><td><a href="#t1442A">14:42</a></td><td class="nk">augustl</td><td>reset! also returns the new, not the old value</td></tr>
+<tr id="t1442A" class="h r"><td><a href="#t1442A">14:42</a></td><td class="nk">augustl</td><td>justin_smith: ah, of course :)</td></tr>
+<tr id="t1443A" class="h r"><td><a href="#t1443A">14:43</a></td><td class="nk">augustl</td><td>swap! won't guarantee that my function is the last one to run, though..</td></tr>
+<tr id="t1444A" class="h"><td><a href="#t1444A">14:44</a></td><td class="nd">justin_smith</td><td>you want something else for proper locking, atoms imply that retries are OK</td></tr>
+<tr id="t1444A" class="h r"><td><a href="#t1444A">14:44</a></td><td class="nd">justin_smith</td><td>they are not a locking construct</td></tr>
+<tr id="t1444A" class="h r"><td><a href="#t1444A">14:44</a></td><td class="nd">justin_smith</td><td>(doc lock)</td></tr>
+<tr id="t1444A" class="h"><td><a href="#t1444A">14:44</a></td><td class="nl">clojurebot</td><td>Gabh mo leithscéal?</td></tr>
+<tr id="t1444A" class="h"><td><a href="#t1444A">14:44</a></td><td class="nk">augustl</td><td>justin_smith: yeah sounds like I want something else :)</td></tr>
+<tr id="t1444A" class="h"><td><a href="#t1444A">14:44</a></td><td class="nd">justin_smith</td><td>(doc locking)</td></tr>
+<tr id="t1444A" class="h"><td><a href="#t1444A">14:44</a></td><td class="nl">clojurebot</td><td>&quot;([x &amp; body]); Executes exprs in an implicit do, while holding the monitor of x. Will release the monitor of x in all circumstances.&quot;</td></tr>
+<tr id="t1444A" class="h"><td><a href="#t1444A">14:44</a></td><td class="nd">justin_smith</td><td>(locking your-atom ...) may be what you want</td></tr>
+<tr id="t1445A" class="h r"><td><a href="#t1445A">14:45</a></td><td class="nd">justin_smith</td><td>but then it is up to you to ensure there are no deadlocks, livelocks, etc.</td></tr>
+<tr id="t1445A" class="h r"><td><a href="#t1445A">14:45</a></td><td class="nd">justin_smith</td><td>it is very low level stuff</td></tr>
+<tr id="t1445A" class="h"><td><a href="#t1445A">14:45</a></td><td class="nk">augustl</td><td>what I _really_ want is for my system to not modify my app state while it's shuttting down</td></tr>
+<tr id="t1445A" class="h r"><td><a href="#t1445A">14:45</a></td><td class="nk">augustl</td><td>say shutdown is called while a thread processes a request, for example</td></tr>
+<tr id="t1445A" class="h"><td><a href="#t1445A">14:45</a></td><td class="nd">justin_smith</td><td>also it only really works if everything that uses that atom in a way you care about uses the locking statement</td></tr>
+<tr id="t1445A" class="h r"><td><a href="#t1445A">14:45</a></td><td class="nd">justin_smith</td><td>it is brittle</td></tr>
+<tr id="t1445A" class="h"><td><a href="#t1445A">14:45</a></td><td class="nc">Bronsa</td><td>augustl: I mean, you could be a really awful person and do something like user=&gt; (def a (atom 0))</td></tr>
+<tr id="t1446A" class="h r"><td><a href="#t1446A">14:46</a></td><td class="nc">Bronsa</td><td>user=&gt; (let [p (atom ∅)] (swap! a (ƒ [old p] (reset! p old) (inc old)) p) @p)</td></tr>
+<tr id="t1447A" class="h"><td><a href="#t1447A">14:47</a></td><td class="nd">justin_smith</td><td>augustl: then maybe what you really want is for shutdown to stop all the threads first</td></tr>
+<tr id="t1447A" class="h"><td><a href="#t1447A">14:47</a></td><td class="nk">augustl</td><td>I guess ideally I would like to control the executor that invokes my app, so I can poll it until there are no active threads and then shut down</td></tr>
+<tr id="t1447A" class="h"><td><a href="#t1447A">14:47</a></td><td class="nd">justin_smith</td><td>(all the other threads that is)</td></tr>
+<tr id="t1447A" class="h"><td><a href="#t1447A">14:47</a></td><td class="nk">augustl</td><td>justin_smith: yeah :)</td></tr>
+<tr id="t1447A" class="h r"><td><a href="#t1447A">14:47</a></td><td class="nk">augustl</td><td>not sure how to best handle that since this is typically done automatically by jetty/servlets</td></tr>
+<tr id="t1447A" class="h"><td><a href="#t1447A">14:47</a></td><td class="nd">justin_smith</td><td>maybe (shutdown-agents) does the trick? it should not shut down until they are all done</td></tr>
+<tr id="t1448A" class="h"><td><a href="#t1448A">14:48</a></td><td class="nk">augustl</td><td>perhaps I should have an additional executor for my own app</td></tr>
+<tr id="t1448A" class="h r"><td><a href="#t1448A">14:48</a></td><td class="nk">augustl</td><td>sounds like a lot of extra threads though</td></tr>
+<tr id="t1448A" class="h r"><td><a href="#t1448A">14:48</a></td><td class="nk">augustl</td><td>justin_smith: looking it up!</td></tr>
+<tr id="t1448A" class="h"><td><a href="#t1448A">14:48</a></td><td class="nd">justin_smith</td><td>you can use jvisualvm to look at the threads that exist in your app at runtime, and to see if shutdown-agents really stops all the ones you care about</td></tr>
+<tr id="t1449A" class="h"><td><a href="#t1449A">14:49</a></td><td class="nk">augustl</td><td>there are some operations in my system that I want to make completely serial anyway.. So perhaps taking control of the thread pools makes sense in my case</td></tr>
+<tr id="t1449A" class="h"><td><a href="#t1449A">14:49</a></td><td class="nd">justin_smith</td><td>no if ring / jetty is using it's own threadpool that shutdown-agents doesn't know about, then your back in low level land again I think</td></tr>
+<tr id="t1449A" class="h r"><td><a href="#t1449A">14:49</a></td><td class="nd">justin_smith</td><td>*now</td></tr>
+<tr id="t1449A" class="h"><td><a href="#t1449A">14:49</a></td><td class="nk">augustl</td><td>having my app support getting invoked by anyone at any time from any thread sounds like a world of coordination hurt</td></tr>
+<tr id="t1450A"><td><a href="#t1450A">14:50</a></td><td class="nd">justin_smith</td><td>augustl: maybe you want a serialization mechanism, I like java.util.concurrent.SynchronizedQueue</td></tr>
+<tr id="t1450A" class="h"><td><a href="#t1450A">14:50</a></td><td class="nk">augustl</td><td>yeah that sounds nice</td></tr>
+<tr id="t1450A" class="h"><td><a href="#t1450A">14:50</a></td><td class="nd">justin_smith</td><td>so instead of invoking things directly other code puts events on your queue</td></tr>
+<tr id="t1450A" class="h"><td><a href="#t1450A">14:50</a></td><td class="nk">augustl</td><td>I wonder how large a servlet/jetty thread pool typically is</td></tr>
+<tr id="t1451A" class="h r"><td><a href="#t1451A">14:51</a></td><td class="nk">augustl</td><td>50 or so extra threads won't hurt that much I suppose ;)</td></tr>
+<tr id="t1451A" class="h"><td><a href="#t1451A">14:51</a></td><td class="nd">justin_smith</td><td>then the thread pool you control decides how to handle events, and when to stop handling them, etc.</td></tr>
+<tr id="t1451A" class="h r"><td><a href="#t1451A">14:51</a></td><td class="nd">justin_smith</td><td>very narrow and easy to control surface of interaction</td></tr>
+<tr id="t1451A" class="h"><td><a href="#t1451A">14:51</a></td><td class="nk">augustl</td><td>yeah this sounds very pleasant :)</td></tr>
+<tr id="t1451A" class="h r"><td><a href="#t1451A">14:51</a></td><td class="nk">augustl</td><td>except from the extra threads of course, but then again that's just a gut feeling, no idea if it's a real problem</td></tr>
+<tr id="t1452A" class="h"><td><a href="#t1452A">14:52</a></td><td class="nd">justin_smith</td><td>maybe you can be more lenient and use a queue with a length other than 0 - synchronizedqueue is very strict - it blocks until the previous contents leave</td></tr>
+<tr id="t1452A" class="h r"><td><a href="#t1452A">14:52</a></td><td class="nd">justin_smith</td><td>well you decide how many threads are dispatched from the requests in the queue</td></tr>
+<tr id="t1453A" class="h r"><td><a href="#t1453A">14:53</a></td><td class="nd">justin_smith</td><td>and you can use for example agents or futures that share clojure's nicely handled thread pool and you can bind the ones you are using and manually control those</td></tr>
+<tr id="t1453A" class="h r"><td><a href="#t1453A">14:53</a></td><td class="nd">justin_smith</td><td>will still using the shared pool</td></tr>
+<tr id="t1453A" class="h r"><td><a href="#t1453A">14:53</a></td><td class="nd">justin_smith</td><td>*while</td></tr>
+<tr id="t1455A" class="h"><td><a href="#t1455A">14:55</a></td><td class="nk">augustl</td><td>making it a TODO for now, looking forward to implementing this</td></tr>
+<tr id="t1456A" class="h r"><td><a href="#t1456A">14:56</a></td><td class="nk">augustl</td><td>onwards to the actual business code for now though ;) will use an atom, and solve shutdown by taking control of threads executing my code later</td></tr>
+<tr id="t1501A"><td><a href="#t1501A">15:01</a></td><td class="nd">justin_smith</td><td>augustl: also, core.async is another paradigm for addressing these same concerns / coordination issues</td></tr>
+<tr id="t1501A" class="h"><td><a href="#t1501A">15:01</a></td><td class="nk">augustl</td><td>justin_smith: is core.async good for doing RPC? Or is it more of a queue system?</td></tr>
+<tr id="t1501A" class="h r"><td><a href="#t1501A">15:01</a></td><td class="nk">augustl</td><td>as in, get a request, return a response</td></tr>
+<tr id="t1502A" class="h"><td><a href="#t1502A">15:02</a></td><td class="nd">justin_smith</td><td>augustl: well, queues are one way to coordinate RPC (among other things they can do)</td></tr>
+<tr id="t1502A" class="h r"><td><a href="#t1502A">15:02</a></td><td class="nd">justin_smith</td><td>it is about handling and sending messages</td></tr>
+<tr id="t1502A" class="h"><td><a href="#t1502A">15:02</a></td><td class="nk">augustl</td><td>haven't done that before.. But I guess all you need is some kind of request ID</td></tr>
+<tr id="t1503A" class="h"><td><a href="#t1503A">15:03</a></td><td class="nd">justin_smith</td><td>right, you would have an intake worker, and then assorted handlers, and the request would have to include the info needed to respond</td></tr>
+<tr id="t1503A" class="h r"><td><a href="#t1503A">15:03</a></td><td class="nd">justin_smith</td><td>instead of a request ID you can pass the open socket to the client</td></tr>
+<tr id="t1503A" class="h r"><td><a href="#t1503A">15:03</a></td><td class="nd">justin_smith</td><td>*the open socket the client is connected to* I mean</td></tr>
+<tr id="t1504A" class="h"><td><a href="#t1504A">15:04</a></td><td class="nk">augustl</td><td>ah, that makes sense yeah</td></tr>
+<tr id="t1504A" class="h r"><td><a href="#t1504A">15:04</a></td><td class="nk">augustl</td><td>no need to create an id when one already exists :)</td></tr>
+<tr id="t1504A" class="h"><td><a href="#t1504A">15:04</a></td><td class="nd">justin_smith</td><td>going with that whole functional passing state to functions idea</td></tr>
+<tr id="t1504A" class="h r"><td><a href="#t1504A">15:04</a></td><td class="nd">justin_smith</td><td>right</td></tr>
+<tr id="t1511A"><td><a href="#t1511A">15:11</a></td><td class="nv">tolstoy</td><td>Does om/transact! and om/update! really take a tag, and do they really show up in the tx-listen callback? I'm not seeing them.</td></tr>
+<tr id="t1529A" class="r"><td><a href="#t1529A">15:29</a></td><td class="nv">tolstoy</td><td>Ah. transact! expects a &quot;korks&quot; argument, even if the path is the root. An arity issue, I suspect.</td></tr>
+<tr id="t1537A"><td><a href="#t1537A">15:37</a></td><td class="n2">borkdude</td><td>does anyone happen to know what merge-by is in scala?</td></tr>
+<tr id="t1539A" class="h"><td><a href="#t1539A">15:39</a></td><td class="nz">pdk</td><td>hey, when you're writing the LICENSE file for a new project</td></tr>
+<tr id="t1539A" class="h r"><td><a href="#t1539A">15:39</a></td><td class="nz">pdk</td><td>is it ok to abbreviate your name in the copyright notice</td></tr>
+<tr id="t1543A"><td><a href="#t1543A">15:43</a></td><td class="n6">Glenjamin</td><td>i'd err on the side of caution, but you're better off asking a lawyer if its important</td></tr>
+<tr id="t1543A" class="h"><td><a href="#t1543A">15:43</a></td><td class="nz">pdk</td><td>like just f.m. last vs. first middle last</td></tr>
+<tr id="t1543A" class="h"><td><a href="#t1543A">15:43</a></td><td class="nl">clojurebot</td><td>Pardon?</td></tr>
+<tr id="t1549A" class="h"><td><a href="#t1549A">15:49</a></td><td class="nz">pdk</td><td><a href="http://www.copyright.gov/title17/92chap4.html">http://www.copyright.gov/title17/92chap4.html</a></td></tr>
+<tr id="t1549A" class="h r"><td><a href="#t1549A">15:49</a></td><td class="nz">pdk</td><td>looks like a recognizable abbreviation is okj</td></tr>
+<tr id="t1601A"><td><a href="#t1601A">16:01</a></td><td class="np">Frozenlock</td><td>Copyright Frozenlock 2014</td></tr>
+<tr id="t1605A" class="h r"><td><a href="#t1605A">16:05</a></td><td class="np">Frozenlock</td><td>Btw, how does one proves his identity when using 'official' names in a copyright? It's not like there's only one John Smith in the world.</td></tr>
+<tr id="t1605A" class="h r"><td><a href="#t1605A">16:05</a></td><td class="np">Frozenlock</td><td>*prove</td></tr>
+<tr id="t1606A" class="h r"><td><a href="#t1606A">16:06</a></td><td class="np">Frozenlock</td><td>We need namespaces for names :-p</td></tr>
+<tr id="t1618A"><td><a href="#t1618A">16:18</a></td><td class="ng">arrdem</td><td>Frozenlock: you can provide a contact method and/or handle to add more bits of information to an otherwise useless name :P</td></tr>
+<tr id="t1618A" class="h r"><td><a href="#t1618A">16:18</a></td><td class="ng">arrdem</td><td>Frozenlock: most of my stuff is (c) Reid &quot;arrdem&quot; McKenzie</td></tr>
+<tr id="t1618A" class="h r"><td><a href="#t1618A">16:18</a></td><td class="ng">arrdem</td><td>where &quot;arrdem&quot; is unique to me AFAIK</td></tr>
+<tr id="t1619A" class="h"><td><a href="#t1619A">16:19</a></td><td class="np">Frozenlock</td><td>Which one is the useless one? Reid Mckenzie, or arrdem? :-p</td></tr>
+<tr id="t1620A"><td><a href="#t1620A">16:20</a></td><td class="ng">arrdem</td><td>Frozenlock: your &quot;John Smith&quot; is pretty useless :P</td></tr>
+<tr id="t1620A" class="h"><td><a href="#t1620A">16:20</a></td><td class="nv">roppongininja</td><td>light table v sublime text + sublimerepl?</td></tr>
+<tr id="t1621A" class="h r"><td><a href="#t1621A">16:21</a></td><td class="nv">roppongininja</td><td>or any other better alternatives (no time to fvck around with emacs)</td></tr>
+<tr id="t1622A" class="h"><td><a href="#t1622A">16:22</a></td><td class="np">Frozenlock</td><td>better alternatives? Emacs...  No time to fuck around emacs? Well... use Emacs and don't fuck around!</td></tr>
+<tr id="t1622A" class="h r"><td><a href="#t1622A">16:22</a></td><td class="np">Frozenlock</td><td>I'm so funny today...</td></tr>
+<tr id="t1622A" class="h"><td><a href="#t1622A">16:22</a></td><td class="ng">arrdem</td><td>then apparently you have no time to get used to the current top rated Clojure repl...</td></tr>
+<tr id="t1622A" class="h r"><td><a href="#t1622A">16:22</a></td><td class="ng">arrdem</td><td>Light Table's repl is famous for being a &quot;maybe works&quot; still in development afair.</td></tr>
+<tr id="t1622A" class="h"><td><a href="#t1622A">16:22</a></td><td class="nc">Bronsa</td><td>roppongininja: leaving emacs aside, I've heard cursiveclojure is pretty good</td></tr>
+<tr id="t1623A" class="h r"><td><a href="#t1623A">16:23</a></td><td class="nc">Bronsa</td><td>and should Just Work™</td></tr>
+<tr id="t1623A" class="h"><td><a href="#t1623A">16:23</a></td><td class="n9">yeoj___</td><td>but hey it's saturday.  thats what saturday is for.</td></tr>
+<tr id="t1624A" class="h r"><td><a href="#t1624A">16:24</a></td><td class="n9">yeoj___</td><td>actually for me cider just started deciding it didn't understand any of the classpath business going on so i'm trying to figure out what went wonky</td></tr>
+<tr id="t1624A" class="h r"><td><a href="#t1624A">16:24</a></td><td class="n9">yeoj___</td><td>then i'll get back to work</td></tr>
+<tr id="t1633A" class="r"><td><a href="#t1633A">16:33</a></td><td class="n9">yeoj___</td><td>for somereason cider connects to the repl, but gevise me &quot;class not found exceptions&quot; everywhere... i didn't have this problem yesternight.  i'm also getting &quot;Cannot decode message&quot; in emacs, something about the nrepl middleware</td></tr>
+<tr id="t1633A" class="h r"><td><a href="#t1633A">16:33</a></td><td class="n9">yeoj___</td><td>i made something borken.</td></tr>
+<tr id="t1641A"><td><a href="#t1641A">16:41</a></td><td class="no">s_kilk</td><td>Hi all, is anyone here using Clojure web servers with a SQL backend in production? I have a few questions related to handling SQL migrations.</td></tr>
+<tr id="t1645A" class="h"><td><a href="#t1645A">16:45</a></td><td class="nq">dbushenko</td><td>s_kilk, try <a href="http://flywaydb.org/">http://flywaydb.org/</a></td></tr>
+<tr id="t1650A"><td><a href="#t1650A">16:50</a></td><td class="no">s_kilk</td><td>@dbushenko, thanks, I'll look into that. do you use it?</td></tr>
+<tr id="t1652A" class="h"><td><a href="#t1652A">16:52</a></td><td class="np">Frozenlock</td><td>Eh... I wanted to activate a SSL certificate today... but Namecheap email servers are down. :-(</td></tr>
+<tr id="t1653A" class="h r"><td><a href="#t1653A">16:53</a></td><td class="np">Frozenlock</td><td>(and they send to SSL stuff to the domain email)</td></tr>
+<tr id="t1653A" class="h r"><td><a href="#t1653A">16:53</a></td><td class="np">Frozenlock</td><td>*the</td></tr>
+<tr id="t1656A" class="h"><td><a href="#t1656A">16:56</a></td><td class="nq">dbushenko</td><td>s_kilk, yes</td></tr>
+<tr id="t1659A" class="h"><td><a href="#t1659A">16:59</a></td><td class="no">s_kilk</td><td>dbushenko, thanks!</td></tr>
+<tr id="t1706A"><td><a href="#t1706A">17:06</a></td><td class="ng">_pr0t0type_</td><td>Hey Guys, so I know I can use reify to implement an interface.  however, how do implement other methods within that reify call?  When I try to, I get a &quot;java.lang.IllegalArgumentException: Can't define method not in interfaces&quot;</td></tr>
+<tr id="t1707A" class="h"><td><a href="#t1707A">17:07</a></td><td class="n6">Glenjamin</td><td>_pr0t0type_: you can implement multiple interfaces</td></tr>
+<tr id="t1709A" class="h"><td><a href="#t1709A">17:09</a></td><td class="ng">_pr0t0type_</td><td>Glenjamin: I see, so there is no way to inline a definition right in reify without another interface</td></tr>
+<tr id="t1709A" class="h"><td><a href="#t1709A">17:09</a></td><td class="n6">Glenjamin</td><td>not as far as i know</td></tr>
+<tr id="t1710A"><td><a href="#t1710A">17:10</a></td><td class="ng">_pr0t0type_</td><td>Glenjamin: thanks</td></tr>
+<tr id="t1740A"><td><a href="#t1740A">17:40</a></td><td class="nf">JokerDoomWork</td><td>Any recommendations for excellent Lispy/Clojurey books?</td></tr>
+<tr id="t1741A" class="h"><td><a href="#t1741A">17:41</a></td><td class="ny">bbloom</td><td>~book</td></tr>
+<tr id="t1741A" class="h"><td><a href="#t1741A">17:41</a></td><td class="nl">clojurebot</td><td>book is <a href="http://www.pragprog.com/titles/shcloj/programming-clojure">http://www.pragprog.com/titles/shcloj/programming-clojure</a></td></tr>
+<tr id="t1741A" class="h"><td><a href="#t1741A">17:41</a></td><td class="ny">bbloom</td><td>~books</td></tr>
+<tr id="t1741A" class="h"><td><a href="#t1741A">17:41</a></td><td class="nl">clojurebot</td><td>books is programming clojure</td></tr>
+<tr id="t1741A" class="h"><td><a href="#t1741A">17:41</a></td><td class="ny">bbloom</td><td>~onlisp</td></tr>
+<tr id="t1741A" class="h"><td><a href="#t1741A">17:41</a></td><td class="nl">clojurebot</td><td>excusez-moi</td></tr>
+<tr id="t1741A" class="h"><td><a href="#t1741A">17:41</a></td><td class="ny">bbloom</td><td>clojurebot: onlisp is <a href="http://www.paulgraham.com/onlisp.html">http://www.paulgraham.com/onlisp.html</a></td></tr>
+<tr id="t1741A" class="h"><td><a href="#t1741A">17:41</a></td><td class="nl">clojurebot</td><td>Ack. Ack.</td></tr>
+<tr id="t1742A" class="h"><td><a href="#t1742A">17:42</a></td><td class="nf">JokerDoomWork</td><td>wth just happened</td></tr>
+<tr id="t1742A" class="h"><td><a href="#t1742A">17:42</a></td><td class="ny">bbloom</td><td>clojurebot: schemer is <a href="http://scottn.us/downloads/The_Little_Schemer.pdf">http://scottn.us/downloads/The_Little_Schemer.pdf</a></td></tr>
+<tr id="t1742A" class="h"><td><a href="#t1742A">17:42</a></td><td class="nl">clojurebot</td><td>Alles klar</td></tr>
+<tr id="t1742A" class="h"><td><a href="#t1742A">17:42</a></td><td class="ny">bbloom</td><td>JokerDoomWork: i'm telling clojurebot some stuff to help answer book related questions here in irc</td></tr>
+<tr id="t1743A" class="h"><td><a href="#t1743A">17:43</a></td><td class="np">Jaood</td><td>bbloom: isn't that warez?</td></tr>
+<tr id="t1743A" class="h r"><td><a href="#t1743A">17:43</a></td><td class="np">Jaood</td><td>the little schemer pdf</td></tr>
+<tr id="t1743A" class="h"><td><a href="#t1743A">17:43</a></td><td class="ny">bbloom</td><td>Jaood: is it?</td></tr>
+<tr id="t1743A" class="h r"><td><a href="#t1743A">17:43</a></td><td class="ny">bbloom</td><td>it was 2nd link on google</td></tr>
+<tr id="t1743A" class="h r"><td><a href="#t1743A">17:43</a></td><td class="ny">bbloom</td><td>*shrug*</td></tr>
+<tr id="t1743A" class="h"><td><a href="#t1743A">17:43</a></td><td class="nf">JokerDoomWork</td><td>Eh, I'm ok on the Paul Graham, I try to steer clear of demagogues</td></tr>
+<tr id="t1744A" class="h r"><td><a href="#t1744A">17:44</a></td><td class="nf">JokerDoomWork</td><td>I'm jk, I'll check it out</td></tr>
+<tr id="t1744A" class="h"><td><a href="#t1744A">17:44</a></td><td class="np">Jaood</td><td>bbloom: as far as I know there's no official pdf for that book but I may be wrong</td></tr>
+<tr id="t1744A" class="h"><td><a href="#t1744A">17:44</a></td><td class="ny">bbloom</td><td>JokerDoomWork: all of pg's other dealings aside, On Lisp is pretty much the definitive Common Lisp book</td></tr>
+<tr id="t1746A" class="h"><td><a href="#t1746A">17:46</a></td><td class="nf">JokerDoomWork</td><td>bbloom, I actually am a fan of his writings, at least his style, but I've always assumed learning lisp from him would turn me into him on lisp, which I don't want...</td></tr>
+<tr id="t1746A" class="h"><td><a href="#t1746A">17:46</a></td><td class="n6">Glenjamin</td><td>&quot;with bottom-up programming as the unifying theme&quot;</td></tr>
+<tr id="t1746A" class="h r"><td><a href="#t1746A">17:46</a></td><td class="n6">Glenjamin</td><td>this intrigues me</td></tr>
+<tr id="t1746A" class="h r"><td><a href="#t1746A">17:46</a></td><td class="n6">Glenjamin</td><td>as i'm generally of the opinion that top-down gives better results</td></tr>
+<tr id="t1747A" class="h r"><td><a href="#t1747A">17:47</a></td><td class="n6">Glenjamin</td><td>i may have to buy this</td></tr>
+<tr id="t1747A" class="h r"><td><a href="#t1747A">17:47</a></td><td class="n6">Glenjamin</td><td>or just download it for free, apparently</td></tr>
+<tr id="t1747A" class="h"><td><a href="#t1747A">17:47</a></td><td class="nm">Hodapp</td><td>It's not that top-down gives better results, it's that a lot of languages don't provide for the sort of composition of structures that makes bottom-up even possible.</td></tr>
+<tr id="t1756A"><td><a href="#t1756A">17:56</a></td><td class="ny">bbloom</td><td>Glenjamin: Hodapp: is is the case with *any* dichotomy/duality .... the answer lies in the middle</td></tr>
+<tr id="t1756A" class="h r"><td><a href="#t1756A">17:56</a></td><td class="ny">bbloom</td><td>there's no correct answer, you need to do a little bit of both</td></tr>
+<tr id="t1757A" class="h r"><td><a href="#t1757A">17:57</a></td><td class="ny">bbloom</td><td>the reason for trumpeting the bottom up approach is b/c it is/was was common/supported/encouraged</td></tr>
+<tr id="t1802A"><td><a href="#t1802A">18:02</a></td><td class="nm">Hodapp</td><td>As is the case with any dichotomy/duality, the answer may or may not lie in the middle.</td></tr>
+<tr id="t1803A" class="h r"><td><a href="#t1803A">18:03</a></td><td class="nm">Hodapp</td><td>Claiming that it is a dichotomy and therefore that the right answer must lie in the middle</td></tr>
+<tr id="t1803A" class="h r"><td><a href="#t1803A">18:03</a></td><td class="nm">Hodapp</td><td>...can tend to lend some equivalence to a side that may not be appropriate.</td></tr>
+<tr id="t1804A" class="h"><td><a href="#t1804A">18:04</a></td><td class="n6">Glenjamin</td><td>which side is that? ;)</td></tr>
+<tr id="t1805A" class="h"><td><a href="#t1805A">18:05</a></td><td class="nm">Hodapp</td><td>Either one.</td></tr>
+<tr id="t1807A" class="h r"><td><a href="#t1807A">18:07</a></td><td class="nm">Hodapp</td><td>Both could be wrong. One could be wrong. It's not an automatic &quot;both are correct&quot;.</td></tr>
+<tr id="t1808A" class="h"><td><a href="#t1808A">18:08</a></td><td class="nd">justin_smith</td><td>a claims that PI is 3.14... b claims it is 3, Some things are not subjective and not helped by compromise</td></tr>
+<tr id="t1811A"><td><a href="#t1811A">18:11</a></td><td class="n6">Glenjamin</td><td>on a continuum from bottom-up to top-down, i'm not sure there's a third way</td></tr>
+<tr id="t1811A" class="h"><td><a href="#t1811A">18:11</a></td><td class="nd">justin_smith</td><td>middle out?</td></tr>
+<tr id="t1813A" class="h r"><td><a href="#t1813A">18:13</a></td><td class="nd">justin_smith</td><td>even Paul Graham talks about the need to alternate between Top Down and Bottom Up in On Lisp IIRC - the significant thing is that in most languages Bottom Up isn't even feasible</td></tr>
+<tr id="t1813A" class="h"><td><a href="#t1813A">18:13</a></td><td class="nf">JokerDoomWork</td><td>I'm so entrenched in Top down decomposition I have trouble even imagining what bottom up even means</td></tr>
+<tr id="t1814A" class="h"><td><a href="#t1814A">18:14</a></td><td class="nd">justin_smith</td><td>JokerDoomWork: imagine that you have all your infrastrcuture, all your libraries and data structures implemented. Now write the code that would use that infrastructure.</td></tr>
+<tr id="t1814A" class="h r"><td><a href="#t1814A">18:14</a></td><td class="nd">justin_smith</td><td>next, start implementing the stuff that makes that code valid.</td></tr>
+<tr id="t1815A" class="h r"><td><a href="#t1815A">18:15</a></td><td class="nd">justin_smith</td><td>this especially makes sense in a syntax-creation-happy lang like common lisp</td></tr>
+<tr id="t1816A" class="h"><td><a href="#t1816A">18:16</a></td><td class="nf">JokerDoomWork</td><td>but didn't I have to implement all those things first, that seems like I'm starting from the top</td></tr>
+<tr id="t1818A" class="h"><td><a href="#t1818A">18:18</a></td><td class="nd">justin_smith</td><td>no, you write the code, then the syntax and libraries that makes it compile</td></tr>
+<tr id="t1818A" class="h"><td><a href="#t1818A">18:18</a></td><td class="nf">JokerDoomWork</td><td>Oh I see</td></tr>
+<tr id="t1818A" class="h"><td><a href="#t1818A">18:18</a></td><td class="nd">justin_smith</td><td>tdd can get into that kind of thing</td></tr>
+<tr id="t1818A" class="h"><td><a href="#t1818A">18:18</a></td><td class="nf">JokerDoomWork</td><td>I do that quite a bit actually, Hrmmm, I just never thought of it as bottom up, I just consider it, pretending that I have done the hard parts haha</td></tr>
+<tr id="t1818A" class="h r"><td><a href="#t1818A">18:18</a></td><td class="nf">JokerDoomWork</td><td>tdd?</td></tr>
+<tr id="t1818A" class="h r"><td><a href="#t1818A">18:18</a></td><td class="nf">JokerDoomWork</td><td>oh test driven development</td></tr>
+<tr id="t1831A"><td><a href="#t1831A">18:31</a></td><td class="n6">Glenjamin</td><td>Interesting, I think I'll have to read this now</td></tr>
+<tr id="t1832A" class="h r"><td><a href="#t1832A">18:32</a></td><td class="n6">Glenjamin</td><td>&quot;no, you write the code, then the syntax and libraries that makes it compile&quot; &lt;- i would describe this as top-down</td></tr>
+<tr id="t1833A" class="h"><td><a href="#t1833A">18:33</a></td><td class="nd">justin_smith</td><td>Glenjamin: really? so what would you call bottom up?</td></tr>
+<tr id="t1833A" class="h"><td><a href="#t1833A">18:33</a></td><td class="n6">Glenjamin</td><td>writing the syntax and libraries first</td></tr>
+<tr id="t1834A" class="h"><td><a href="#t1834A">18:34</a></td><td class="nd">justin_smith</td><td>I think of it is the structure of the implementation vs. what usage looks like - bottom up starts with usage, top down starts with structure</td></tr>
+<tr id="t1834A" class="h"><td><a href="#t1834A">18:34</a></td><td class="n6">Glenjamin</td><td>oh, i would have used the terms in the opposite way :D</td></tr>
+<tr id="t1834A" class="h"><td><a href="#t1834A">18:34</a></td><td class="nd">justin_smith</td><td><a href="http://www.paulgraham.com/progbot.html">http://www.paulgraham.com/progbot.html</a> &lt;- here is where graham describes bottom up</td></tr>
+<tr id="t1835A" class="h r"><td><a href="#t1835A">18:35</a></td><td class="nd">justin_smith</td><td>&quot;Experienced Lisp programmers divide up their programs differently. As well as top-down design, they follow a principle which could be called bottom-up design-- changing the language to suit the problem.&quot;</td></tr>
+<tr id="t1836A" class="h"><td><a href="#t1836A">18:36</a></td><td class="n6">Glenjamin</td><td>i guess that's a meet-in-the-middle sort of thing</td></tr>
+<tr id="t1836A" class="h r"><td><a href="#t1836A">18:36</a></td><td class="n6">Glenjamin</td><td>from wikipedia, on top-down: &quot;In a top-down approach an overview of the system is formulated, specifying but not detailing any first-level subsystems. Each subsystem is then refined in yet greater detail, sometimes in many additional subsystem levels, until the entire specification is reduced to base elements.&quot;</td></tr>
+<tr id="t1837A" class="h r"><td><a href="#t1837A">18:37</a></td><td class="n6">Glenjamin</td><td>i would do that, but replace &quot;specify&quot; with &quot;implement&quot;</td></tr>
+<tr id="t1838A" class="h"><td><a href="#t1838A">18:38</a></td><td class="nd">justin_smith</td><td>&quot;implementing but not detailing&quot;?</td></tr>
+<tr id="t1838A" class="h"><td><a href="#t1838A">18:38</a></td><td class="nz">kenrestivo</td><td>bbloom: all generalizations destroy themselves. including that one.</td></tr>
+<tr id="t1839A" class="h r"><td><a href="#t1839A">18:39</a></td><td class="nz">kenrestivo</td><td>:-P</td></tr>
+<tr id="t1841A"><td><a href="#t1841A">18:41</a></td><td class="n6">Glenjamin</td><td>justin_smith: doesn't fit that sentence very well, but sort-of, You call code you wish you had</td></tr>
+<tr id="t1842A" class="h"><td><a href="#t1842A">18:42</a></td><td class="nd">justin_smith</td><td>Glenjamin: I also sometimes do refactoring this way (though it is easier in a stricter language) - I make the change I want in a few pivotal places, and then just follow the hyperlinks emacs offers to compilation errors until it all makes sense again</td></tr>
+<tr id="t1843A" class="h"><td><a href="#t1843A">18:43</a></td><td class="ng">platz</td><td>My idea of bottom-up is rather than building the control flow first and then implementing the details, you construct primitives that compose in the way that will be able to solve your problem.</td></tr>
+<tr id="t1843A" class="h r"><td><a href="#t1843A">18:43</a></td><td class="ng">platz</td><td>and then having all your building blocks putting them in the final flow is the last step</td></tr>
+<tr id="t1844A" class="h r"><td><a href="#t1844A">18:44</a></td><td class="ng">platz</td><td>which speaks to the &quot;utilities you wrote for the first program will also be useful in the succeeding ones&quot; idea in the article</td></tr>
+<tr id="t1844A" class="h"><td><a href="#t1844A">18:44</a></td><td class="nd">justin_smith</td><td>platz: well, that is kind of what I meant by writing the code in the way you think it should look before implementing the details - though that is a much better way of putting it because it is more explicit about the extending the language part</td></tr>
+<tr id="t1844A" class="h"><td><a href="#t1844A">18:44</a></td><td class="n6">Glenjamin</td><td>That fits my perception. I prefer to build downwards to discover what building blocks I need</td></tr>
+<tr id="t1844A" class="h"><td><a href="#t1844A">18:44</a></td><td class="ng">platz</td><td>justin_smith: I don't think that's the same, that seems more like tdd</td></tr>
+<tr id="t1846A" class="h"><td><a href="#t1846A">18:46</a></td><td class="nd">justin_smith</td><td>platz: your right, I was thinking sloppily, in my head the thing I was doing that was not yet implemented was language building blocks, but I in no way indicated such a thing</td></tr>
+<tr id="t1846A" class="h r"><td><a href="#t1846A">18:46</a></td><td class="nd">justin_smith</td><td>*thing I was using</td></tr>
+<tr id="t1936A"><td><a href="#t1936A">19:36</a></td><td class="nf">JokerDoomWork</td><td>so reflection in Clojure, do I need to use the normal java facilities?</td></tr>
+<tr id="t1936A" class="h r"><td><a href="#t1936A">19:36</a></td><td class="nf">JokerDoomWork</td><td>Or is there better support in clojure for reflection as a languauge feature?</td></tr>
+<tr id="t1946A"><td><a href="#t1946A">19:46</a></td><td class="nn">AWizzArd</td><td>Any AI devs around?</td></tr>
+<tr id="t1952A"><td><a href="#t1952A">19:52</a></td><td class="nd">justin_smith</td><td>JokerDoomWork: there is clojure.reflect</td></tr>
+<tr id="t1952A" class="h r"><td><a href="#t1952A">19:52</a></td><td class="nd">justin_smith</td><td>and there are some other, easier to use libs too</td></tr>
+<tr id="t1952A" class="h r"><td><a href="#t1952A">19:52</a></td><td class="nd">justin_smith</td><td>sometimes it suffices to just use bean to find what I want</td></tr>
+<tr id="t1952A" class="h r"><td><a href="#t1952A">19:52</a></td><td class="nd">justin_smith</td><td>,(bean java.io.File)</td></tr>
+<tr id="t1952A" class="h"><td><a href="#t1952A">19:52</a></td><td class="nl">clojurebot</td><td>{:enum false, :interfaces #&lt;Class[] [Ljava.lang.Class;@cdd309&gt;, :declaredConstructors #&lt;Constructor[] [Ljava.lang.reflect.Constructor;@133fb54&gt;, :simpleName &quot;File&quot;, :package #&lt;Package package java.io, Java Platform API Specification, version 1.6&gt;, ...}</td></tr>
+<tr id="t2027A"><td><a href="#t2027A">20:27</a></td><td class="nf">pandeiro</td><td>any thoughts on the easiest way to create a new lein project /within/ the pwd instead of creating a new directory?</td></tr>
+<tr id="t2034A"><td><a href="#t2034A">20:34</a></td><td class="nd">justin_smith</td><td>pandeiro: why?</td></tr>
+<tr id="t2035A" class="h r"><td><a href="#t2035A">20:35</a></td><td class="nd">justin_smith</td><td>lein new whatever; mv whatever/* .; rmdir whatever</td></tr>
+<tr id="t2035A" class="h"><td><a href="#t2035A">20:35</a></td><td class="nf">pandeiro</td><td>justin_smith: my workflow is: i create a project as a bare remote repo, clone it to a local dir, then do the scaffolding</td></tr>
+<tr id="t2036A" class="h r"><td><a href="#t2036A">20:36</a></td><td class="nf">pandeiro</td><td>sure i guess that is what i thought of wrapping in a script</td></tr>
+<tr id="t2036A" class="h r"><td><a href="#t2036A">20:36</a></td><td class="nf">pandeiro</td><td>then the complexity came in with not knowing which arg would be the project name</td></tr>
+<tr id="t2036A" class="h r"><td><a href="#t2036A">20:36</a></td><td class="nf">pandeiro</td><td>`lein new schwa` vs. `lein new ouija schwa`</td></tr>
+<tr id="t2038A" class="h"><td><a href="#t2038A">20:38</a></td><td class="nm">amalloy</td><td>pandeiro: why clone the bare repo? create a bare repo, then create a project with lein new, then git init; git remote add the bare repo</td></tr>
+<tr id="t2038A" class="h"><td><a href="#t2038A">20:38</a></td><td class="nd">justin_smith</td><td>pandeiro: &quot;${@: -1}&quot; in bash</td></tr>
+<tr id="t2038A" class="h r"><td><a href="#t2038A">20:38</a></td><td class="nd">justin_smith</td><td>and yeah, amalloy's suggestion is what I do</td></tr>
+<tr id="t2040A"><td><a href="#t2040A">20:40</a></td><td class="nh">mwelt</td><td>hi there</td></tr>
+<tr id="t2040A" class="h"><td><a href="#t2040A">20:40</a></td><td class="nn">AWizzArd</td><td>Moin mwelt.</td></tr>
+<tr id="t2040A" class="h"><td><a href="#t2040A">20:40</a></td><td class="nh">mwelt</td><td>the leiningen chan seems dead so maybe here is some one who can help me :)</td></tr>
+<tr id="t2040A" class="h"><td><a href="#t2040A">20:40</a></td><td class="nn">AWizzArd</td><td>Worth a try.</td></tr>
+<tr id="t2041A" class="h"><td><a href="#t2041A">20:41</a></td><td class="nh">mwelt</td><td>got the latest leiningen version and made up simple dummy project with lein new app someappname</td></tr>
+<tr id="t2041A" class="h r"><td><a href="#t2041A">20:41</a></td><td class="nh">mwelt</td><td>lein run needs 47s to print out hello world</td></tr>
+<tr id="t2041A" class="h"><td><a href="#t2041A">20:41</a></td><td class="nn">AWizzArd</td><td>mwelt: even when you do this 2-3 times in a row?</td></tr>
+<tr id="t2042A" class="h"><td><a href="#t2042A">20:42</a></td><td class="nd">justin_smith</td><td>yeah, that's mainly clojure's fault</td></tr>
+<tr id="t2042A" class="h"><td><a href="#t2042A">20:42</a></td><td class="nv">tolstoy</td><td>Did Clojure 1.6 significantly increase boot time like that?</td></tr>
+<tr id="t2042A" class="h"><td><a href="#t2042A">20:42</a></td><td class="nh">mwelt</td><td>its 1.5</td></tr>
+<tr id="t2043A" class="h r"><td><a href="#t2043A">20:43</a></td><td class="nh">mwelt</td><td>1.5.1 to be correct</td></tr>
+<tr id="t2043A" class="h"><td><a href="#t2043A">20:43</a></td><td class="nn">AWizzArd</td><td>Tho 47s is still a bit high, no?</td></tr>
+<tr id="t2043A" class="h"><td><a href="#t2043A">20:43</a></td><td class="nv">tolstoy</td><td>Oh, hm.</td></tr>
+<tr id="t2043A" class="h"><td><a href="#t2043A">20:43</a></td><td class="nh">mwelt</td><td>and leiningen version 2.3.4</td></tr>
+<tr id="t2044A" class="h r"><td><a href="#t2044A">20:44</a></td><td class="nh">mwelt</td><td>AWizzArd: its the same time even 2-3 times in a row ...</td></tr>
+<tr id="t2044A" class="h r"><td><a href="#t2044A">20:44</a></td><td class="nh">mwelt</td><td>this is a reald dealbreaker for me, but i hoped it did something wrong</td></tr>
+<tr id="t2044A" class="h r"><td><a href="#t2044A">20:44</a></td><td class="nh">mwelt</td><td>its running on jdk 8_5</td></tr>
+<tr id="t2044A" class="h"><td><a href="#t2044A">20:44</a></td><td class="nn">AWizzArd</td><td>mwelt: I am using Java 8 too. But why is that a dealbreaker?</td></tr>
+<tr id="t2045A" class="h"><td><a href="#t2045A">20:45</a></td><td class="nh">mwelt</td><td>AWizzArd: i am not willing to wait nearly one minute to execute a bunch of simple code. I wanted to build up a project on clojure...love the language thou...but 1 minute to run a simple test? no way</td></tr>
+<tr id="t2046A" class="h"><td><a href="#t2046A">20:46</a></td><td class="nc">Bronsa</td><td>47s is insanely slow, lein run on a new project takes 3.5s here</td></tr>
+<tr id="t2046A" class="h"><td><a href="#t2046A">20:46</a></td><td class="nh">mwelt</td><td>Bronsa: so maybe my setup ist corrupted</td></tr>
+<tr id="t2046A" class="h"><td><a href="#t2046A">20:46</a></td><td class="nn">AWizzArd</td><td>mwelt: typically the idea is that in the morning you run „lein repl” and develop your program. There should be very few startups per day.</td></tr>
+<tr id="t2046A" class="h"><td><a href="#t2046A">20:46</a></td><td class="nv">tolstoy</td><td>I just did a &quot;lein new app someapp&quot; and &quot;time lein run&quot; and got:</td></tr>
+<tr id="t2047A" class="h r"><td><a href="#t2047A">20:47</a></td><td class="nv">tolstoy</td><td>real	0m2.453s</td></tr>
+<tr id="t2047A" class="h r"><td><a href="#t2047A">20:47</a></td><td class="nv">tolstoy</td><td>user	0m3.579s</td></tr>
+<tr id="t2047A" class="h r"><td><a href="#t2047A">20:47</a></td><td class="nv">tolstoy</td><td>sys	0m0.241s</td></tr>
+<tr id="t2047A" class="h"><td><a href="#t2047A">20:47</a></td><td class="nh">mwelt</td><td>tolstoy: this would be great :)</td></tr>
+<tr id="t2047A" class="h"><td><a href="#t2047A">20:47</a></td><td class="nv">tolstoy</td><td>java version &quot;1.8.0_05&quot;</td></tr>
+<tr id="t2047A" class="h r"><td><a href="#t2047A">20:47</a></td><td class="nv">tolstoy</td><td>Nice fast iMac, though.</td></tr>
+<tr id="t2049A" class="h r"><td><a href="#t2049A">20:49</a></td><td class="nv">tolstoy</td><td>mwelt: Not sure if it'll be of any use, but &quot;DEBUG=1 lein run&quot;.</td></tr>
+<tr id="t2049A" class="h"><td><a href="#t2049A">20:49</a></td><td class="nh">mwelt</td><td>ill try</td></tr>
+<tr id="t2050A"><td><a href="#t2050A">20:50</a></td><td class="nd">justin_smith</td><td>mwelt: also, you can do (clojure.test/run-tests) as many times as you like in a repl (after reloading changed namespaces of course)</td></tr>
+<tr id="t2050A" class="h"><td><a href="#t2050A">20:50</a></td><td class="nv">tolstoy</td><td>If you have any deps defined, but they can't be pulled down for some network issue, I wonder if that would make a diff?</td></tr>
+<tr id="t2050A" class="h"><td><a href="#t2050A">20:50</a></td><td class="nn">AWizzArd</td><td>While a startup time of one minute would be bothersome I still don’t see why it should be a tragic problem in practice in most cases.</td></tr>
+<tr id="t2051A" class="h"><td><a href="#t2051A">20:51</a></td><td class="nd">justin_smith</td><td>it can also be caused by large numbers of deps</td></tr>
+<tr id="t2051A" class="h"><td><a href="#t2051A">20:51</a></td><td class="nn">AWizzArd</td><td>justin_smith: how often do you call „lein run”?</td></tr>
+<tr id="t2052A" class="h"><td><a href="#t2052A">20:52</a></td><td class="nd">justin_smith</td><td>less than once a week per project usually</td></tr>
+<tr id="t2052A" class="h r"><td><a href="#t2052A">20:52</a></td><td class="nd">justin_smith</td><td>with long lived repls, and reloading files as apropriate</td></tr>
+<tr id="t2052A" class="h"><td><a href="#t2052A">20:52</a></td><td class="nn">AWizzArd</td><td>Compared to me you are a high-profile user of lein run then (:</td></tr>
+<tr id="t2052A" class="h"><td><a href="#t2052A">20:52</a></td><td class="nd">justin_smith</td><td>heh</td></tr>
+<tr id="t2053A" class="h r"><td><a href="#t2053A">20:53</a></td><td class="nd">justin_smith</td><td>but mind you, I start my repl with lein run</td></tr>
+<tr id="t2053A" class="h"><td><a href="#t2053A">20:53</a></td><td class="nv">tolstoy</td><td>When people are just learning, typing code then running &quot;lean run&quot; is the lowest barrier.</td></tr>
+<tr id="t2053A" class="h"><td><a href="#t2053A">20:53</a></td><td class="nd">justin_smith</td><td>so that my repl is also the back door into a long running server process</td></tr>
+<tr id="t2053A" class="h"><td><a href="#t2053A">20:53</a></td><td class="nn">AWizzArd</td><td>tolstoy: I accept this point.</td></tr>
+<tr id="t2053A" class="h"><td><a href="#t2053A">20:53</a></td><td class="nv">tolstoy</td><td>Going &quot;full repl&quot; is a bit later in the game, no?</td></tr>
+<tr id="t2053A" class="h"><td><a href="#t2053A">20:53</a></td><td class="nd">justin_smith</td><td>tolstoy: easier than lein repl really?</td></tr>
+<tr id="t2053A" class="h r"><td><a href="#t2053A">20:53</a></td><td class="nd">justin_smith</td><td>tolstoy: with my first lisp, the repl was a revelation and made everything in programming make so much more sense</td></tr>
+<tr id="t2054A" class="h r"><td><a href="#t2054A">20:54</a></td><td class="nd">justin_smith</td><td>I guess some others have different experiences</td></tr>
+<tr id="t2054A" class="h"><td><a href="#t2054A">20:54</a></td><td class="nv">tolstoy</td><td>justin_smith: not ultimately, but when I first learned Common Lisp, repl + emacs + the language: I focussed on the language first.</td></tr>
+<tr id="t2054A" class="h"><td><a href="#t2054A">20:54</a></td><td class="nd">justin_smith</td><td>hah, I started with the repl inside xterm</td></tr>
+<tr id="t2055A" class="h r"><td><a href="#t2055A">20:55</a></td><td class="nd">justin_smith</td><td>then later started entering stuff directly into files</td></tr>
+<tr id="t2055A" class="h"><td><a href="#t2055A">20:55</a></td><td class="nv">tolstoy</td><td>Me, too, kind of. But there was no way to hook up files to the repl, until Emacs. But (for me) that was a WHOLE new thing.</td></tr>
+<tr id="t2055A" class="h"><td><a href="#t2055A">20:55</a></td><td class="nh">mwelt</td><td>i also started with repl only</td></tr>
+<tr id="t2056A" class="h"><td><a href="#t2056A">20:56</a></td><td class="ng">zaiste</td><td>is it possible to dynamically destruct a map ? i.e. <a href="https://gist.github.com/zaiste/19f9c4c0cb84bd9e8819">https://gist.github.com/zaiste/19f9c4c0cb84bd9e8819</a></td></tr>
+<tr id="t2056A" class="h"><td><a href="#t2056A">20:56</a></td><td class="nv">tolstoy</td><td>I had to learn the difference between the language errors, editor problems, etc, etc. ;)</td></tr>
+<tr id="t2056A" class="h"><td><a href="#t2056A">20:56</a></td><td class="nh">mwelt</td><td>tried to fix some 4clojures</td></tr>
+<tr id="t2056A" class="h r"><td><a href="#t2056A">20:56</a></td><td class="nh">mwelt</td><td>and this brought the language to me</td></tr>
+<tr id="t2056A" class="h r"><td><a href="#t2056A">20:56</a></td><td class="nh">mwelt</td><td>but now i want to build up a litte project</td></tr>
+<tr id="t2056A" class="h"><td><a href="#t2056A">20:56</a></td><td class="nn">AWizzArd</td><td>mwelt: when the repl is up you can start doing Clojure for several hours. The time spent with startups would even take with your 47s scenario just 3-4 minutes a day.</td></tr>
+<tr id="t2056A" class="h r"><td><a href="#t2056A">20:56</a></td><td class="nn">AWizzArd</td><td>mwelt: what project you wanna build? (:</td></tr>
+<tr id="t2057A" class="h"><td><a href="#t2057A">20:57</a></td><td class="nd">justin_smith</td><td>zaiste: looks like you want :keys</td></tr>
+<tr id="t2057A" class="h"><td><a href="#t2057A">20:57</a></td><td class="nh">mwelt</td><td>how can i execute my written code with all dependency and stuff in REPL?</td></tr>
+<tr id="t2057A" class="h"><td><a href="#t2057A">20:57</a></td><td class="nd">justin_smith</td><td>,(let [{:keys [a b c d]} {:a 0 :b 2 :c 4 :d 8}] d)</td></tr>
+<tr id="t2057A" class="h"><td><a href="#t2057A">20:57</a></td><td class="nl">clojurebot</td><td>8</td></tr>
+<tr id="t2057A" class="h"><td><a href="#t2057A">20:57</a></td><td class="ng">zaiste</td><td>justin_smith: yes, perfect, thank you</td></tr>
+<tr id="t2057A" class="h"><td><a href="#t2057A">20:57</a></td><td class="nd">justin_smith</td><td>mwelt: (require '[your.ns :as alias] :reload)</td></tr>
+<tr id="t2058A" class="h"><td><a href="#t2058A">20:58</a></td><td class="nh">mwelt</td><td>its something 4 my plessure language related data mining stuff on a huge amount of textdata</td></tr>
+<tr id="t2058A" class="h"><td><a href="#t2058A">20:58</a></td><td class="nd">justin_smith</td><td>sometimes you may also want to do (in-ns 'your.ns)</td></tr>
+<tr id="t2058A" class="h"><td><a href="#t2058A">20:58</a></td><td class="nn">AWizzArd</td><td>,(let [{:keys [amount name x] :strs [foo] :or {x 33}}   {:amount 14, &quot;foo&quot; 88, :name &quot;Carlos&quot;}] [amount name x foo])</td></tr>
+<tr id="t2058A" class="h"><td><a href="#t2058A">20:58</a></td><td class="nl">clojurebot</td><td>[14 &quot;Carlos&quot; 33 88]</td></tr>
+<tr id="t2058A" class="h"><td><a href="#t2058A">20:58</a></td><td class="nd">justin_smith</td><td>AWizzArd: nice</td></tr>
+<tr id="t2059A" class="h r"><td><a href="#t2059A">20:59</a></td><td class="nd">justin_smith</td><td>mwelt: there is also :reload-all to recursively reload the requires of an ns</td></tr>
+<tr id="t2100A"><td><a href="#t2100A">21:00</a></td><td class="nh">mwelt</td><td>justin_smith: and this is always project related?</td></tr>
+<tr id="t2101A" class="h"><td><a href="#t2101A">21:01</a></td><td class="nd">justin_smith</td><td>mwelt: well it uses your classpath, which lein sets up based on your project.clj</td></tr>
+<tr id="t2101A" class="h r"><td><a href="#t2101A">21:01</a></td><td class="nd">justin_smith</td><td>but you can hypothetically extend your classpath at runtime and fudge things, if that matters to you</td></tr>
+<tr id="t2102A" class="h r"><td><a href="#t2102A">21:02</a></td><td class="nd">justin_smith</td><td>with alembic you don't even need a restart to use new deps from clojars or maven central</td></tr>
+<tr id="t2102A" class="h"><td><a href="#t2102A">21:02</a></td><td class="nh">mwelt</td><td>justin_smith: seems cool to me, but why does lein need 47s to startup this seems odd</td></tr>
+<tr id="t2103A" class="h"><td><a href="#t2103A">21:03</a></td><td class="nd">justin_smith</td><td>mwelt: clojure does a lot of work at load time - it has no tree shaking and very little lazy loading (if any?) in core</td></tr>
+<tr id="t2103A" class="h r"><td><a href="#t2103A">21:03</a></td><td class="nd">justin_smith</td><td>this is not just a lein issue</td></tr>
+<tr id="t2103A" class="h"><td><a href="#t2103A">21:03</a></td><td class="ng">zaiste</td><td>justin_smith: is it also possible to generate vec for :keys automatically, from symbols ? 3rd snippet: <a href="https://gist.github.com/zaiste/19f9c4c0cb84bd9e8819">https://gist.github.com/zaiste/19f9c4c0cb84bd9e8819</a></td></tr>
+<tr id="t2103A" class="h"><td><a href="#t2103A">21:03</a></td><td class="ng">arrdem</td><td>justin_smith: loading is lazy, but there is no tree shaking at all.</td></tr>
+<tr id="t2103A" class="h"><td><a href="#t2103A">21:03</a></td><td class="nv">tolstoy</td><td>mwelt: Unless your computer is really underpowered, that IS odd.</td></tr>
+<tr id="t2104A" class="h"><td><a href="#t2104A">21:04</a></td><td class="ng">arrdem</td><td>for lazy defined at the level of namespaces</td></tr>
+<tr id="t2104A" class="h"><td><a href="#t2104A">21:04</a></td><td class="nd">justin_smith</td><td>arrdem: oh, good to know, thanks</td></tr>
+<tr id="t2104A" class="h"><td><a href="#t2104A">21:04</a></td><td class="nj">nDuff</td><td>mwelt, ...I'd expect that kind of timing if, say, lein were downloading a library that wasn't in your local Maven cache.</td></tr>
+<tr id="t2104A" class="h"><td><a href="#t2104A">21:04</a></td><td class="ng">arrdem</td><td>nDuff: or if you're running on a free ec2 instance</td></tr>
+<tr id="t2105A" class="h"><td><a href="#t2105A">21:05</a></td><td class="nh">mwelt</td><td>tolstoy: got i7 with 16GB ram and ssd</td></tr>
+<tr id="t2105A" class="h r"><td><a href="#t2105A">21:05</a></td><td class="nh">mwelt</td><td>seems fine to me</td></tr>
+<tr id="t2105A" class="h"><td><a href="#t2105A">21:05</a></td><td class="nv">tolstoy</td><td>Yep. Something's odd. ;)</td></tr>
+<tr id="t2105A" class="h"><td><a href="#t2105A">21:05</a></td><td class="nd">justin_smith</td><td>zaiste: I am confused about the use case there - you wouldn't know until runtime what symbols are bound in the let, so you would not be able to effectively write code using those symbols</td></tr>
+<tr id="t2106A" class="h"><td><a href="#t2106A">21:06</a></td><td class="nv">tolstoy</td><td>mwelt: Still 47secs when you &quot;lein run&quot; a brand new project with no deps you've added yourself?</td></tr>
+<tr id="t2106A" class="h r"><td><a href="#t2106A">21:06</a></td><td class="nv">tolstoy</td><td>mwelt: Surely &quot;java -version&quot; doesn't take a long time, right?</td></tr>
+<tr id="t2106A" class="h"><td><a href="#t2106A">21:06</a></td><td class="nh">mwelt</td><td>tolstoy: mom</td></tr>
+<tr id="t2107A" class="h r"><td><a href="#t2107A">21:07</a></td><td class="nh">mwelt</td><td>java -version :</td></tr>
+<tr id="t2107A" class="h r"><td><a href="#t2107A">21:07</a></td><td class="nh">mwelt</td><td>real    0m0.067s</td></tr>
+<tr id="t2107A" class="h r"><td><a href="#t2107A">21:07</a></td><td class="nh">mwelt</td><td>user    0m0.052s</td></tr>
+<tr id="t2107A" class="h r"><td><a href="#t2107A">21:07</a></td><td class="nh">mwelt</td><td>sys     0m0.007s</td></tr>
+<tr id="t2108A" class="h"><td><a href="#t2108A">21:08</a></td><td class="nv">tolstoy</td><td>mwelt: The folks on #leiningen woke up.</td></tr>
+<tr id="t2108A" class="h"><td><a href="#t2108A">21:08</a></td><td class="nn">AWizzArd</td><td>mwelt: it might be worthwhile to start up a jvm with clojure.jar on the CP.</td></tr>
+<tr id="t2109A" class="h"><td><a href="#t2109A">21:09</a></td><td class="nd">justin_smith</td><td>mwelt: what are the deps in the project that takes that long anyway?</td></tr>
+<tr id="t2109A" class="h"><td><a href="#t2109A">21:09</a></td><td class="nh">mwelt</td><td>no</td></tr>
+<tr id="t2109A" class="h r"><td><a href="#t2109A">21:09</a></td><td class="nh">mwelt</td><td>justin_smith: no deps just plain ne genrated projekt</td></tr>
+<tr id="t2110A" class="r"><td><a href="#t2110A">21:10</a></td><td class="nh">mwelt</td><td>time lein run</td></tr>
+<tr id="t2110A" class="h r"><td><a href="#t2110A">21:10</a></td><td class="nh">mwelt</td><td>Hello, World!</td></tr>
+<tr id="t2110A" class="h r"><td><a href="#t2110A">21:10</a></td><td class="nh">mwelt</td><td>real    0m24.313s</td></tr>
+<tr id="t2110A" class="h r"><td><a href="#t2110A">21:10</a></td><td class="nh">mwelt</td><td>user    0m4.367s</td></tr>
+<tr id="t2110A" class="h r"><td><a href="#t2110A">21:10</a></td><td class="nh">mwelt</td><td>sys     0m0.289s</td></tr>
+<tr id="t2110A" class="h"><td><a href="#t2110A">21:10</a></td><td class="nn">AWizzArd</td><td>justin_smith: how are your timings for “java -server -version”?</td></tr>
+<tr id="t2111A" class="h"><td><a href="#t2111A">21:11</a></td><td class="ng">zaiste</td><td>justin_smith: you're right, i've overcomplicated, thanks</td></tr>
+<tr id="t2111A" class="h"><td><a href="#t2111A">21:11</a></td><td class="nd">justin_smith</td><td>0.076</td></tr>
+<tr id="t2114A" class="h"><td><a href="#t2114A">21:14</a></td><td class="nh">mwelt</td><td>time java -server -version</td></tr>
+<tr id="t2114A" class="h r"><td><a href="#t2114A">21:14</a></td><td class="nh">mwelt</td><td>java version &quot;1.8.0_05&quot;</td></tr>
+<tr id="t2114A" class="h r"><td><a href="#t2114A">21:14</a></td><td class="nh">mwelt</td><td>Java(TM) SE Runtime Environment (build 1.8.0_05-b13)</td></tr>
+<tr id="t2114A" class="h r"><td><a href="#t2114A">21:14</a></td><td class="nh">mwelt</td><td>Java HotSpot(TM) 64-Bit Server VM (build 25.5-b02, mixed mode)</td></tr>
+<tr id="t2114A" class="h r"><td><a href="#t2114A">21:14</a></td><td class="nh">mwelt</td><td>real    0m0.064s</td></tr>
+<tr id="t2114A" class="h r"><td><a href="#t2114A">21:14</a></td><td class="nh">mwelt</td><td>user    0m0.046s</td></tr>
+<tr id="t2114A" class="h r"><td><a href="#t2114A">21:14</a></td><td class="nh">mwelt</td><td>sys     0m0.019s</td></tr>
+<tr id="t2114A" class="h"><td><a href="#t2114A">21:14</a></td><td class="nn">AWizzArd</td><td>mwelt: but try this with  java -server -cp clojure.jar</td></tr>
+<tr id="t2115A" class="h"><td><a href="#t2115A">21:15</a></td><td class="nh">mwelt</td><td>k</td></tr>
+<tr id="t2116A" class="h r"><td><a href="#t2116A">21:16</a></td><td class="nh">mwelt</td><td>where does leiningen store clojure.jar?</td></tr>
+<tr id="t2116A" class="h"><td><a href="#t2116A">21:16</a></td><td class="nn">AWizzArd</td><td>java -server -cp clojure-1.6.0.jar clojure.main -e &quot;(println 55)&quot;</td></tr>
+<tr id="t2122A"><td><a href="#t2122A">21:22</a></td><td class="nv">tolstoy</td><td>mwelt: ~/.m2/repository/org/clojure/clojure/1.6.0/clojure-1.6.0.jar</td></tr>
+<tr id="t2122A" class="h"><td><a href="#t2122A">21:22</a></td><td class="ng">arrdem</td><td>does lein's eval-in-project return the eval result as one would expect?</td></tr>
+<tr id="t2124A" class="h r"><td><a href="#t2124A">21:24</a></td><td class="ng">arrdem</td><td>it doesn't appear to T_T</td></tr>
+<tr id="t2124A" class="h"><td><a href="#t2124A">21:24</a></td><td class="nv">tolstoy</td><td>For me, AWizzArd's suggestion ran in .7s.</td></tr>
+<tr id="t2124A" class="h"><td><a href="#t2124A">21:24</a></td><td class="nn">AWizzArd</td><td>tolstoy: that seems pretty okay</td></tr>
+<tr id="t2125A" class="h"><td><a href="#t2125A">21:25</a></td><td class="nv">tolstoy</td><td>Yep.</td></tr>
+<tr id="t2127A" class="h"><td><a href="#t2127A">21:27</a></td><td class="nn">AWizzArd</td><td>mwelt: another test for you and tolstoy could be: just type  “lein help” and time that.</td></tr>
+<tr id="t2127A" class="h r"><td><a href="#t2127A">21:27</a></td><td class="nn">AWizzArd</td><td>On my not-so-fast system it’s around 8s.</td></tr>
+<tr id="t2127A" class="h"><td><a href="#t2127A">21:27</a></td><td class="nh">mwelt</td><td>3 s</td></tr>
+<tr id="t2128A" class="h"><td><a href="#t2128A">21:28</a></td><td class="nn">AWizzArd</td><td>lein help actually must load a jvm</td></tr>
+<tr id="t2128A" class="h"><td><a href="#t2128A">21:28</a></td><td class="nv">tolstoy</td><td>I *thought* my system was fast, I get around 8s too.</td></tr>
+<tr id="t2128A" class="h"><td><a href="#t2128A">21:28</a></td><td class="nh">mwelt</td><td>the plain java run without leinen is also under 3s</td></tr>
+<tr id="t2129A" class="h"><td><a href="#t2129A">21:29</a></td><td class="nn">AWizzArd</td><td>So, it seems Leiningen can start up fast enough with its own code &amp; Clojure.</td></tr>
+<tr id="t2129A" class="h"><td><a href="#t2129A">21:29</a></td><td class="nv">tolstoy</td><td>I've got stuff in my .lein/profiles.clj, too.</td></tr>
+<tr id="t2130A" class="r"><td><a href="#t2130A">21:30</a></td><td class="nv">tolstoy</td><td>Yeah, lein is fast enough for me with the empty project. I was just hoping to establish that mwelt is experiencing a fluke compared to the average.</td></tr>
+<tr id="t2130A" class="h r"><td><a href="#t2130A">21:30</a></td><td class="nv">tolstoy</td><td>lein deps :tree might be interesting.</td></tr>
+<tr id="t2131A" class="h r"><td><a href="#t2131A">21:31</a></td><td class="nv">tolstoy</td><td>(I have nrepl snapshot, for instance.)</td></tr>
+<tr id="t2131A" class="h r"><td><a href="#t2131A">21:31</a></td><td class="nv">tolstoy</td><td>faster: lein with-profile production deps :tree</td></tr>
+<tr id="t2133A" class="h"><td><a href="#t2133A">21:33</a></td><td class="nm">amalloy</td><td>`lein help` is a bad thing to time, because it loads all plugins</td></tr>
+<tr id="t2133A" class="h"><td><a href="#t2133A">21:33</a></td><td class="nh">mwelt</td><td>tolstoy: the problem was the fileshare</td></tr>
+<tr id="t2133A" class="h"><td><a href="#t2133A">21:33</a></td><td class="nv">tolstoy</td><td>Woo hoo! ;)</td></tr>
+<tr id="t2133A" class="h"><td><a href="#t2133A">21:33</a></td><td class="nh">mwelt</td><td>tolstoy: i ran the program in sshfs</td></tr>
+<tr id="t2133A" class="h r"><td><a href="#t2133A">21:33</a></td><td class="nh">mwelt</td><td>tolstoy: without it its under 2s</td></tr>
+<tr id="t2133A" class="h"><td><a href="#t2133A">21:33</a></td><td class="nv">tolstoy</td><td>Glad you found it. Phew!</td></tr>
+<tr id="t2133A" class="h"><td><a href="#t2133A">21:33</a></td><td class="nh">mwelt</td><td>tolstoy: ^^</td></tr>
+<tr id="t2134A" class="h"><td><a href="#t2134A">21:34</a></td><td class="nd">justin_smith</td><td>oh wow, yeah, I guess that would affect things</td></tr>
+<tr id="t2134A" class="h"><td><a href="#t2134A">21:34</a></td><td class="nn">AWizzArd</td><td>those 47s were indeed a bit too suspicious, even for some slower system.</td></tr>
+<tr id="t2134A" class="h"><td><a href="#t2134A">21:34</a></td><td class="nd">justin_smith</td><td>I guess I have used / developed to many bloated mega-apps for 47 seconds to seem that big a deal :(</td></tr>
+<tr id="t2134A" class="h"><td><a href="#t2134A">21:34</a></td><td class="nv">tolstoy</td><td>Yeah. Now, add cljsbuild to your hooks, and we're back into the 1 minute start territory. ;)</td></tr>
+<tr id="t2135A" class="h"><td><a href="#t2135A">21:35</a></td><td class="nh">mwelt</td><td>tolstoy: well ... no :) but thanks a lot for helping</td></tr>
+<tr id="t2135A" class="h"><td><a href="#t2135A">21:35</a></td><td class="nv">tolstoy</td><td>Heh.</td></tr>
+<tr id="t2136A" class="h"><td><a href="#t2136A">21:36</a></td><td class="nh">mwelt</td><td>and yea shame on me for not believing in slow network issues</td></tr>
+<tr id="t2137A" class="h r"><td><a href="#t2137A">21:37</a></td><td class="nh">mwelt</td><td>what is cljsbuild?</td></tr>
+<tr id="t2138A" class="h"><td><a href="#t2138A">21:38</a></td><td class="nv">tolstoy</td><td>It's a plugin for compiling (and cleaning) clojurescript clients.</td></tr>
+<tr id="t2138A" class="h r"><td><a href="#t2138A">21:38</a></td><td class="nv">tolstoy</td><td>When you add it to the hooks key in your project, it'll participate in the normal &quot;run&quot; &quot;jar&quot; and &quot;clean&quot; tasks.</td></tr>
+<tr id="t2139A" class="h"><td><a href="#t2139A">21:39</a></td><td class="nd">justin_smith</td><td>yeah, clojurescript currently builds kind of slow</td></tr>
+<tr id="t2139A" class="h"><td><a href="#t2139A">21:39</a></td><td class="nv">tolstoy</td><td>At least the incremental build it fast, but, yeah.</td></tr>
+<tr id="t2139A" class="h"><td><a href="#t2139A">21:39</a></td><td class="nd">justin_smith</td><td>yeah, auto can be OK</td></tr>
+<tr id="t2150A"><td><a href="#t2150A">21:50</a></td><td class="nm">amalloy</td><td>man, i remember when i tried to run lein over sshfs. what a terrible idea</td></tr>
+<tr id="t2150A" class="h"><td><a href="#t2150A">21:50</a></td><td class="ng">arrdem</td><td>amalloy: I tried that once... the .class files made my wifi cry</td></tr>
+<tr id="t2153A" class="h"><td><a href="#t2153A">21:53</a></td><td class="nh">mwelt</td><td>amalloy: it was not a good idea</td></tr>
+<tr id="t2155A" class="h"><td><a href="#t2155A">21:55</a></td><td class="ng">arrdem</td><td>RFC on <a href="https://github.com/arrdem/radagast/blob/54844b2d3939d77dba3fd1c36c99829b803ad206/src/leiningen/radagast.clj,">https://github.com/arrdem/radagast/blob/54844b2d3939d77dba3fd1c36c99829b803ad206/src/leiningen/radagast.clj,</a> I kinda feel like failing test cases should also be a reason for a nonzero return code in addition to incomplete test coverage.</td></tr>
+<tr id="t2229A"><td><a href="#t2229A">22:29</a></td><td class="n9">allenj12</td><td>hey, what is the most recommended full stack framework?</td></tr>
+<tr id="t2229A" class="h"><td><a href="#t2229A">22:29</a></td><td class="nd">justin_smith</td><td>,nil</td></tr>
+<tr id="t2229A" class="h"><td><a href="#t2229A">22:29</a></td><td class="nl">clojurebot</td><td>nil</td></tr>
+<tr id="t2230A"><td><a href="#t2230A">22:30</a></td><td class="nv">tolstoy</td><td>allenj12: Most Clojure devs and tinkerers compose small frameworks. Since Clojure is not OO, there's no ORM, for instance.</td></tr>
+<tr id="t2231A" class="h r"><td><a href="#t2231A">22:31</a></td><td class="nv">tolstoy</td><td>But I think there are fullstack things out there.</td></tr>
+<tr id="t2231A" class="h"><td><a href="#t2231A">22:31</a></td><td class="nd">justin_smith</td><td>allenj12: I have worked on one that people who are familiar with django or rails may find familiar in its usage (caribou), but what tolstoy said</td></tr>
+<tr id="t2231A" class="h"><td><a href="#t2231A">22:31</a></td><td class="nv">tolstoy</td><td>Yeah, caribou. I was trying to remember what that was. ;)</td></tr>
+<tr id="t2232A" class="h"><td><a href="#t2232A">22:32</a></td><td class="n9">allenj12</td><td>hmm alright im new to web dev completely just not sure where to start :p</td></tr>
+<tr id="t2232A" class="h"><td><a href="#t2232A">22:32</a></td><td class="nd">justin_smith</td><td>caribou tries to do mvc / orm with clojure maps, kind of. it is overengineered in places, and clunky in places, but has a lot of stuff out of the box</td></tr>
+<tr id="t2233A" class="h"><td><a href="#t2233A">22:33</a></td><td class="nv">tolstoy</td><td>allenj12: I'd find an interesting Compojure tutorial somewhere.</td></tr>
+<tr id="t2233A" class="h"><td><a href="#t2233A">22:33</a></td><td class="n9">allenj12</td><td>hmm alright sounds good</td></tr>
+<tr id="t2234A" class="h"><td><a href="#t2234A">22:34</a></td><td class="nv">tolstoy</td><td>compojure is a routing lib, like sinatra in ruby, so you can get an app running and use CURL to try it out. Then use a JSON lib to convert clojure maps to json, try that out, etc.</td></tr>
+<tr id="t2235A" class="h r"><td><a href="#t2235A">22:35</a></td><td class="nv">tolstoy</td><td>Put your html, js and css in /resources/public, try that. Hook up mongo or sql or something....</td></tr>
+<tr id="t2236A" class="h r"><td><a href="#t2236A">22:36</a></td><td class="nv">tolstoy</td><td>At that point, you'll have something to swap out parts, or at least a general idea of what's good or bad. IMHO. ;)</td></tr>
+<tr id="t2236A" class="h"><td><a href="#t2236A">22:36</a></td><td class="n9">allenj12</td><td>haha alright</td></tr>
+<tr id="t2237A" class="h"><td><a href="#t2237A">22:37</a></td><td class="nv">tolstoy</td><td>Where I work (conservative Java shop), someone demo'd a compojure app that read in a SQL file from disk and executed the query, returning the results as json.</td></tr>
+<tr id="t2238A" class="h r"><td><a href="#t2238A">22:38</a></td><td class="nv">tolstoy</td><td>People were amazed at how little code made that work.</td></tr>
+<tr id="t2238A" class="h r"><td><a href="#t2238A">22:38</a></td><td class="nv">tolstoy</td><td>Oh, and you might look up the &quot;lein ring&quot; plugin.</td></tr>
+<tr id="t2240A"><td><a href="#t2240A">22:40</a></td><td class="n9">allenj12</td><td>ring? got it. ill do that</td></tr>
+<tr id="t2242A" class="h"><td><a href="#t2242A">22:42</a></td><td class="nv">tolstoy</td><td>This: <a href="https://github.com/weavejester/lein-ring">https://github.com/weavejester/lein-ring</a></td></tr>
+<tr id="t2242A" class="h r"><td><a href="#t2242A">22:42</a></td><td class="nv">tolstoy</td><td>And this: <a href="https://github.com/weavejester/compojure/wiki/Getting-Started">https://github.com/weavejester/compojure/wiki/Getting-Started</a></td></tr>
+<tr id="t2246A" class="h"><td><a href="#t2246A">22:46</a></td><td class="n5">dbasch</td><td>this is kinda nice <a href="http://jafingerhut.github.io/cheatsheet-clj-1.3/cheatsheet-tiptip-cdocs-summary.html">http://jafingerhut.github.io/cheatsheet-clj-1.3/cheatsheet-tiptip-cdocs-summary.html</a></td></tr>
+<tr id="t2248A" class="h"><td><a href="#t2248A">22:48</a></td><td class="nv">tolstoy</td><td>Nice. Hover gives the doc string.</td></tr>
+<tr id="t2249A" class="h"><td><a href="#t2249A">22:49</a></td><td class="n9">allenj12</td><td>hmm ok so im looking more at this stuff. Just wanna make sure tho, is it worth building a website in clojure? i assumed it would be best because its pretty much all i have been programming in for a while, but is there something else i should be using?</td></tr>
+<tr id="t2250A"><td><a href="#t2250A">22:50</a></td><td class="nr">benkay</td><td>for a 'web site' you might consider flat files on disk and a web server like nginx or apache over clojure</td></tr>
+<tr id="t2250A" class="h r"><td><a href="#t2250A">22:50</a></td><td class="nr">benkay</td><td>if it needs to be interactive, clojure webapps are pretty fun imho</td></tr>
+<tr id="t2250A" class="h"><td><a href="#t2250A">22:50</a></td><td class="n5">dbasch</td><td>allenj12: if you mean a web application, yes</td></tr>
+<tr id="t2250A" class="h"><td><a href="#t2250A">22:50</a></td><td class="nd">justin_smith</td><td>allenj12: for dynamic content, yeah, clojure is pretty kickass</td></tr>
+<tr id="t2250A" class="h"><td><a href="#t2250A">22:50</a></td><td class="n9">allenj12</td><td>maybe i should be more specific</td></tr>
+<tr id="t2251A" class="h"><td><a href="#t2251A">22:51</a></td><td class="nd">justin_smith</td><td>also if you need to integrate with other web APIs etc.</td></tr>
+<tr id="t2251A" class="h r"><td><a href="#t2251A">22:51</a></td><td class="nd">justin_smith</td><td>clojure makes that stuff very straightforward (thanks to the amount of similarity in edn and json in part)</td></tr>
+<tr id="t2251A" class="h"><td><a href="#t2251A">22:51</a></td><td class="nv">tolstoy</td><td>Using clojure to generate a static site is fun, too.</td></tr>
+<tr id="t2252A" class="h"><td><a href="#t2252A">22:52</a></td><td class="nd">justin_smith</td><td>tolstoy: but maybe not the most practical way to do it</td></tr>
+<tr id="t2252A" class="h"><td><a href="#t2252A">22:52</a></td><td class="n9">allenj12</td><td>so i am making a gaming platform, i need a website that can make users where they can buy credit etc. i also need my platform to access that information (its going to be a downloadable client).</td></tr>
+<tr id="t2252A" class="h"><td><a href="#t2252A">22:52</a></td><td class="nv">tolstoy</td><td>you mean maybe awk and sed are praps even better?</td></tr>
+<tr id="t2253A" class="h"><td><a href="#t2253A">22:53</a></td><td class="n9">allenj12</td><td>does that change anything?</td></tr>
+<tr id="t2253A" class="h"><td><a href="#t2253A">22:53</a></td><td class="nd">justin_smith</td><td>allenj12: you should definitely check out friend, and clojure.java.jdbc</td></tr>
+<tr id="t2253A" class="h r"><td><a href="#t2253A">22:53</a></td><td class="nd">justin_smith</td><td>that's totally doable in clojure</td></tr>
+<tr id="t2255A" class="h"><td><a href="#t2255A">22:55</a></td><td class="n9">allenj12</td><td>hmm ok i am most comfortable in clojure so thats good. and its as practical as other options?</td></tr>
+<tr id="t2255A" class="h"><td><a href="#t2255A">22:55</a></td><td class="ng">arrdem</td><td>for other options defined to be the usual suspects of PHP, nod_js# and dogescript, sure.</td></tr>
+<tr id="t2256A" class="h r"><td><a href="#t2256A">22:56</a></td><td class="ng">arrdem</td><td>justin_smith: what was that doge json knockoff you linked?</td></tr>
+<tr id="t2256A" class="h r"><td><a href="#t2256A">22:56</a></td><td class="ng">arrdem</td><td><a href="http://dogeon.org/">http://dogeon.org/</a> gotcha</td></tr>
+<tr id="t2256A" class="h"><td><a href="#t2256A">22:56</a></td><td class="nd">justin_smith</td><td>allenj12: practical can mean dev time or cpu time - it's better performing than most mainstream web dev options, and pretty close to the rest, and in terms of dev time it can be very straightforward</td></tr>
+<tr id="t2257A" class="h r"><td><a href="#t2257A">22:57</a></td><td class="nd">justin_smith</td><td>arrdem: speaking of practical, huh :)</td></tr>
+<tr id="t2257A" class="h"><td><a href="#t2257A">22:57</a></td><td class="n9">allenj12</td><td>ok great thats what i wanted to hear :)</td></tr>
+<tr id="t2257A" class="h"><td><a href="#t2257A">22:57</a></td><td class="ng">arrdem</td><td>justin_smith: sssssh nobody needs to know that my databases are really just flat dogeon files</td></tr>
+<tr id="t2257A" class="h"><td><a href="#t2257A">22:57</a></td><td class="n9">allenj12</td><td>is there a specific host i should be looking at when i decide to look for one?</td></tr>
+<tr id="t2258A" class="h"><td><a href="#t2258A">22:58</a></td><td class="nd">justin_smith</td><td>arrdem: wow, such table, much data, many plaintext passwords</td></tr>
+<tr id="t2258A" class="h"><td><a href="#t2258A">22:58</a></td><td class="ng">arrdem</td><td>allenj12: anything that'll let you run a JVM with arbitrary jars...</td></tr>
+<tr id="t2258A" class="h r"><td><a href="#t2258A">22:58</a></td><td class="ng">arrdem</td><td>allenj12: digitalocian and ec2 get some love around here.</td></tr>
+<tr id="t2258A" class="h"><td><a href="#t2258A">22:58</a></td><td class="n5">dbasch</td><td>allenj12: I heard Heroku is putting effort into making clojure easy to deploy</td></tr>
+<tr id="t2258A" class="h"><td><a href="#t2258A">22:58</a></td><td class="nd">justin_smith</td><td>allenj12: well the nice thing is that you can just use httpkit and make an uberjar, so any host that has java, which is pretty much any host worth using</td></tr>
+<tr id="t2258A" class="h"><td><a href="#t2258A">22:58</a></td><td class="ng">arrdem</td><td>dbasch: yeah but heroku's prices are insane for a nonfree instance of both a database and a server...</td></tr>
+<tr id="t2259A" class="h r"><td><a href="#t2259A">22:59</a></td><td class="ng">arrdem</td><td>dbasch: you pay a ton for their tooling</td></tr>
+<tr id="t2259A" class="h"><td><a href="#t2259A">22:59</a></td><td class="nd">justin_smith</td><td>well really they should support nginx and varnish too, but that is also not hard to find</td></tr>
+<tr id="t2259A" class="h"><td><a href="#t2259A">22:59</a></td><td class="n5">dbasch</td><td>arrdem: of course</td></tr>
+<tr id="t2259A" class="h"><td><a href="#t2259A">22:59</a></td><td class="n9">allenj12</td><td>yea i heard both af digital ocean and heroku lately when asking around</td></tr>
+<tr id="t2259A" class="h"><td><a href="#t2259A">22:59</a></td><td class="nr">benkay</td><td>does anyone know how to return a value from deftest? i'd like to compose the output of some kerodon testing from a threaded macro with another test.</td></tr>
+<tr id="t2259A" class="h"><td><a href="#t2259A">22:59</a></td><td class="n9">allenj12</td><td>both seemed most recommended</td></tr>
+<tr id="t2259A" class="h"><td><a href="#t2259A">22:59</a></td><td class="nr">benkay</td><td>if your budget's constrained, ipxcore's nice</td></tr>
+<tr id="t2300A"><td><a href="#t2300A">23:00</a></td><td class="n5">dbasch</td><td>arrdem: I use ec2 directly, but also used Heroku quite a bit for one-off ruby/rack apps years ago</td></tr>
+<tr id="t2300A" class="h"><td><a href="#t2300A">23:00</a></td><td class="nr">benkay</td><td>if not terribly performant on the vps side of things.</td></tr>
+<tr id="t2300A" class="h"><td><a href="#t2300A">23:00</a></td><td class="n9">allenj12</td><td>heroku seems expensive for now tho... since i need to play around with things like that :)</td></tr>
+<tr id="t2300A" class="h"><td><a href="#t2300A">23:00</a></td><td class="nr">benkay</td><td>if you have a budget, servers from aws is the way to go.</td></tr>
+<tr id="t2300A" class="h"><td><a href="#t2300A">23:00</a></td><td class="ng">arrdem</td><td>dbasch: I did my first real clojure blog on heroku. their deployment system was nice, but then I realized what their pricing was like.</td></tr>
+<tr id="t2301A" class="h"><td><a href="#t2301A">23:01</a></td><td class="nd">justin_smith</td><td>speaking of deployment, also one of the wins with clojure compared with other backend web server options is you can get more throughput while spending less on hardware</td></tr>
+<tr id="t2301A" class="h"><td><a href="#t2301A">23:01</a></td><td class="n9">allenj12</td><td>hmm alright cool. btw is is there a lein template recommeded for this kinda stuff?</td></tr>
+<tr id="t2302A" class="h"><td><a href="#t2302A">23:02</a></td><td class="n5">dbasch</td><td>allenj12: the default compojure template is an ok start</td></tr>
+<tr id="t2302A" class="h"><td><a href="#t2302A">23:02</a></td><td class="ng">arrdem</td><td>allenj12: there is a lein template for a new ring app, but in general lein templates are few and far between.</td></tr>
+<tr id="t2302A" class="h"><td><a href="#t2302A">23:02</a></td><td class="nd">justin_smith</td><td>the compojure one should be a nice start (though I recommend looking into one of the non-macro-based routers too, being able to make routes from data at runtime is nice)</td></tr>
+<tr id="t2303A" class="h"><td><a href="#t2303A">23:03</a></td><td class="ng">arrdem</td><td>allenj12: if you see anything about noir, steer clear of it 'cause it's deprecated.</td></tr>
+<tr id="t2303A" class="h"><td><a href="#t2303A">23:03</a></td><td class="n9">allenj12</td><td>hmm gotcha, o really? i atcually just did, thanks for the heads up</td></tr>
+<tr id="t2303A" class="h"><td><a href="#t2303A">23:03</a></td><td class="ng">arrdem</td><td>allenj12: lib-noir is OK tho.</td></tr>
+<tr id="t2303A" class="h"><td><a href="#t2303A">23:03</a></td><td class="nd">justin_smith</td><td>there is also (from the project I work on) lein new caribou, which is kind of everything you need and 5 times as many things you don't need, but hell it comes with a semi-usable web cms UI out of the box</td></tr>
+<tr id="t2304A" class="h r"><td><a href="#t2304A">23:04</a></td><td class="nd">justin_smith</td><td>and a db backend with &quot;data models&quot; all set up and ready to use from the cms</td></tr>
+<tr id="t2304A" class="h"><td><a href="#t2304A">23:04</a></td><td class="ng">arrdem</td><td>allenj12: yeah ibdknox did a reasonable job of making all the ring stuff nice to use, but the result wasn't very flexible and he wound up abaindoning it. that happened about 3mo after I finished my noir backed blog :P</td></tr>
+<tr id="t2305A" class="h"><td><a href="#t2305A">23:05</a></td><td class="n9">allenj12</td><td>lol :)</td></tr>
+<tr id="t2307A" class="h r"><td><a href="#t2307A">23:07</a></td><td class="n9">allenj12</td><td>o i guess i should also ask although it might sound really dumb. when does cljs come into the picture</td></tr>
+<tr id="t2307A" class="h r"><td><a href="#t2307A">23:07</a></td><td class="n9">allenj12</td><td>?</td></tr>
+<tr id="t2308A" class="h"><td><a href="#t2308A">23:08</a></td><td class="nd">justin_smith</td><td>when you want to make client side js code in clojure</td></tr>
+<tr id="t2308A" class="h"><td><a href="#t2308A">23:08</a></td><td class="n9">allenj12</td><td>gotcha</td></tr>
+<tr id="t2308A" class="h"><td><a href="#t2308A">23:08</a></td><td class="nd">justin_smith</td><td>you compile the cljs to js, and send that in a page</td></tr>
+<tr id="t2308A" class="h r"><td><a href="#t2308A">23:08</a></td><td class="nd">justin_smith</td><td>useful for single page app kind of stuff</td></tr>
+<tr id="t2310A"><td><a href="#t2310A">23:10</a></td><td class="nr">benkay</td><td>does anyone know how to return a value from deftest?</td></tr>
+<tr id="t2310A" class="h r"><td><a href="#t2310A">23:10</a></td><td class="nr">benkay</td><td>from a deftest macro</td></tr>
+<tr id="t2310A" class="h"><td><a href="#t2310A">23:10</a></td><td class="ng">arrdem</td><td>why would you do such a thing?</td></tr>
+<tr id="t2311A" class="h"><td><a href="#t2311A">23:11</a></td><td class="nr">benkay</td><td>composing a kerodon test, would like to preserve a session across composed tests.</td></tr>
+<tr id="t2311A" class="h r"><td><a href="#t2311A">23:11</a></td><td class="nr">benkay</td><td>unless...crazy/stupid.</td></tr>
+<tr id="t2311A" class="h r"><td><a href="#t2311A">23:11</a></td><td class="nr">benkay</td><td>in which case, what's a really awesome way to test a webapp's session functionality and then compose those tests?</td></tr>
+<tr id="t2312A" class="h"><td><a href="#t2312A">23:12</a></td><td class="ng">arrdem</td><td>you can write tests that require other tests pass, I think the &quot;right way&quot; to do this is just to structure your test such that the test of the composition requires individual tests and then tests the compise.</td></tr>
+<tr id="t2312A" class="h r"><td><a href="#t2312A">23:12</a></td><td class="ng">arrdem</td><td>*tests the compose of the individual elements.</td></tr>
+<tr id="t2312A" class="h"><td><a href="#t2312A">23:12</a></td><td class="nd">justin_smith</td><td>you can use a fixture that runs once around all tests</td></tr>
+<tr id="t2312A" class="h r"><td><a href="#t2312A">23:12</a></td><td class="nd">justin_smith</td><td>that sets up your session</td></tr>
+<tr id="t2313A" class="h"><td><a href="#t2313A">23:13</a></td><td class="nr">benkay</td><td>hm write the to-be-composed stuff in regular functions and then call them composedly from inside deftest macros?</td></tr>
+<tr id="t2313A" class="h"><td><a href="#t2313A">23:13</a></td><td class="nd">justin_smith</td><td>also remember that you can call is in functions outside a deftest, and then call said functions in multiple deftests</td></tr>
+<tr id="t2313A" class="h r"><td><a href="#t2313A">23:13</a></td><td class="nd">justin_smith</td><td>right</td></tr>
+<tr id="t2313A" class="h"><td><a href="#t2313A">23:13</a></td><td class="nr">benkay</td><td>man lisp is cool</td></tr>
+<tr id="t2314A" class="h"><td><a href="#t2314A">23:14</a></td><td class="nd">justin_smith</td><td>indeed, I do love it as well</td></tr>
+<tr id="t2314A" class="h r"><td><a href="#t2314A">23:14</a></td><td class="nd">justin_smith</td><td>(inc clojure)</td></tr>
+<tr id="t2314A" class="h"><td><a href="#t2314A">23:14</a></td><td class="nx">lazybot</td><td>⇒ 16</td></tr>
+<tr id="t2314A" class="h"><td><a href="#t2314A">23:14</a></td><td class="nd">justin_smith</td><td>haha</td></tr>
+<tr id="t2314A" class="h r"><td><a href="#t2314A">23:14</a></td><td class="nd">justin_smith</td><td>(inc juxt)</td></tr>
+<tr id="t2314A" class="h"><td><a href="#t2314A">23:14</a></td><td class="nx">lazybot</td><td>⇒ 10</td></tr>
+<tr id="t2314A" class="h"><td><a href="#t2314A">23:14</a></td><td class="nr">benkay</td><td>anyways, thanks y'all.</td></tr>
+<tr id="t2314A" class="h"><td><a href="#t2314A">23:14</a></td><td class="n9">allenj12</td><td>is envlive useful?</td></tr>
+<tr id="t2315A" class="h"><td><a href="#t2315A">23:15</a></td><td class="nr">benkay</td><td>rather, allenj12</td></tr>
+<tr id="t2315A" class="h"><td><a href="#t2315A">23:15</a></td><td class="nd">justin_smith</td><td>yeah, enlive is great for being able to treat html content in a functional way</td></tr>
+<tr id="t2317A" class="h"><td><a href="#t2317A">23:17</a></td><td class="n9">allenj12</td><td>ok cool</td></tr>
+</tbody></table></main></body></html>

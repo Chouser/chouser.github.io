@@ -1,0 +1,821 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#clojure – 2012-06-24</title><link rel="stylesheet" href="../style.css"></head><body>
+<header class="sh"><a class="st" href="../index.html">#clojure logs</a><nav class="dn"><a href="2012-06-23.html">&larr;</a><span>2012-06-24</span><a href="2012-06-25.html">&rarr;</a></nav></header>
+<main><p class="dh">2012-06-24</p><table class="lg"><tbody>
+<tr id="t0000A"><td><a href="#t0000A">00:00</a></td><td class="n7">gfredericks</td><td>1) your call to print is causing things to be printed (a side effect)</td></tr>
+<tr id="t0000A" class="h"><td><a href="#t0000A">00:00</a></td><td class="n0">y3di</td><td>im gettin the same error that this guy had: <a href="https://gist.github.com/1326747">https://gist.github.com/1326747</a></td></tr>
+<tr id="t0000A" class="h"><td><a href="#t0000A">00:00</a></td><td class="n7">gfredericks</td><td>2) print is returning nil, and those nils are being collected into a list which is the return value of the for expression; that list of nils is being printed at the repl because the repl prints the return value of the expression you give it</td></tr>
+<tr id="t0001A" class="h r"><td><a href="#t0001A">00:01</a></td><td class="n7">gfredericks</td><td>so two things are printed: &quot;0123&quot; and &quot;(nil nil nil nil)&quot;</td></tr>
+<tr id="t0001A" class="h r"><td><a href="#t0001A">00:01</a></td><td class="n7">gfredericks</td><td>and they're somewhat interleaved in the output</td></tr>
+<tr id="t0001A" class="h"><td><a href="#t0001A">00:01</a></td><td class="nv">SrPx</td><td>actually</td></tr>
+<tr id="t0002A" class="h r"><td><a href="#t0002A">00:02</a></td><td class="nv">SrPx</td><td>if that was true then I would get the output &quot;0123 (nil nil nil nil)&quot;. but I'm getting the output &quot;(0123 nil nil nil nil)&quot;</td></tr>
+<tr id="t0002A" class="h r"><td><a href="#t0002A">00:02</a></td><td class="nv">SrPx</td><td>how is the 1234 getting inside the parenthesis</td></tr>
+<tr id="t0002A" class="h"><td><a href="#t0002A">00:02</a></td><td class="n7">gfredericks</td><td>welp</td></tr>
+<tr id="t0002A" class="h r"><td><a href="#t0002A">00:02</a></td><td class="n7">gfredericks</td><td>for is lazy</td></tr>
+<tr id="t0002A" class="h r"><td><a href="#t0002A">00:02</a></td><td class="n7">gfredericks</td><td>it returns immediately with a lazy seq</td></tr>
+<tr id="t0002A" class="h r"><td><a href="#t0002A">00:02</a></td><td class="n7">gfredericks</td><td>the repl say &quot;oh I have a seq; that means I need to print an open paren and the print the contents&quot;</td></tr>
+<tr id="t0003A" class="h r"><td><a href="#t0003A">00:03</a></td><td class="n7">gfredericks</td><td>so it prints the open paren and then proceeds to read the contents of the seq</td></tr>
+<tr id="t0003A" class="h r"><td><a href="#t0003A">00:03</a></td><td class="n7">gfredericks</td><td>which causes the side effects</td></tr>
+<tr id="t0003A" class="h r"><td><a href="#t0003A">00:03</a></td><td class="n7">gfredericks</td><td>you might expect (0nil 1nil 2nil 3nil) or something like that</td></tr>
+<tr id="t0003A" class="h r"><td><a href="#t0003A">00:03</a></td><td class="n7">gfredericks</td><td>,(for [a '[0 1 2 3]] (print a))</td></tr>
+<tr id="t0003A" class="h"><td><a href="#t0003A">00:03</a></td><td class="nl">clojurebot</td><td>(0123nil nil nil nil)</td></tr>
+<tr id="t0003A" class="h"><td><a href="#t0003A">00:03</a></td><td class="n7">gfredericks</td><td>,(for [a '(0 1 2 3)] (print a))</td></tr>
+<tr id="t0003A" class="h"><td><a href="#t0003A">00:03</a></td><td class="nl">clojurebot</td><td>(01nil 2nil 3nil nil)</td></tr>
+<tr id="t0003A" class="h"><td><a href="#t0003A">00:03</a></td><td class="n7">gfredericks</td><td>ah like that ^</td></tr>
+<tr id="t0004A" class="h r"><td><a href="#t0004A">00:04</a></td><td class="n7">gfredericks</td><td>the reason you don't get something more interleaved like that, and instead get the whole &quot;0123&quot; up front is because some seqs are chunked for optimization</td></tr>
+<tr id="t0004A" class="h r"><td><a href="#t0004A">00:04</a></td><td class="n7">gfredericks</td><td>so when you request the first thing, the first 32 things are computed. or 4 in this case since there are only 4.</td></tr>
+<tr id="t0004A" class="h"><td><a href="#t0004A">00:04</a></td><td class="nv">SrPx</td><td>wow</td></tr>
+<tr id="t0004A" class="h"><td><a href="#t0004A">00:04</a></td><td class="n7">gfredericks</td><td>this whole thing can be avoided if</td></tr>
+<tr id="t0004A" class="h"><td><a href="#t0004A">00:04</a></td><td class="nv">SrPx</td><td>,(for [a '[0 1 2 3]] (print a))</td></tr>
+<tr id="t0004A" class="h"><td><a href="#t0004A">00:04</a></td><td class="nl">clojurebot</td><td>(0123nil nil nil nil)</td></tr>
+<tr id="t0005A" class="h"><td><a href="#t0005A">00:05</a></td><td class="n7">gfredericks</td><td>you don't mix laziness with side effects</td></tr>
+<tr id="t0005A" class="h"><td><a href="#t0005A">00:05</a></td><td class="nv">SrPx</td><td>,(for [a '[0 1 2 3]] (print a))</td></tr>
+<tr id="t0005A" class="h"><td><a href="#t0005A">00:05</a></td><td class="nl">clojurebot</td><td>(0123nil nil nil nil)</td></tr>
+<tr id="t0005A" class="h"><td><a href="#t0005A">00:05</a></td><td class="nv">SrPx</td><td>,(for [a '[0 1 2 3]] (print a))</td></tr>
+<tr id="t0005A" class="h"><td><a href="#t0005A">00:05</a></td><td class="nl">clojurebot</td><td>(0123nil nil nil nil)</td></tr>
+<tr id="t0005A" class="h"><td><a href="#t0005A">00:05</a></td><td class="nv">SrPx</td><td>wat</td></tr>
+<tr id="t0005A" class="h"><td><a href="#t0005A">00:05</a></td><td class="n7">gfredericks</td><td>for is lazy and print is a side effect</td></tr>
+<tr id="t0005A" class="h r"><td><a href="#t0005A">00:05</a></td><td class="n7">gfredericks</td><td>doseq is good for side effects</td></tr>
+<tr id="t0005A" class="h"><td><a href="#t0005A">00:05</a></td><td class="nv">SrPx</td><td>how did you manage to get that different output</td></tr>
+<tr id="t0005A" class="h"><td><a href="#t0005A">00:05</a></td><td class="n7">gfredericks</td><td>,(doseq [a (range 4)] (print a))</td></tr>
+<tr id="t0005A" class="h"><td><a href="#t0005A">00:05</a></td><td class="nl">clojurebot</td><td>0123</td></tr>
+<tr id="t0005A" class="h"><td><a href="#t0005A">00:05</a></td><td class="n7">gfredericks</td><td>SrPx: using a list instead of a vector</td></tr>
+<tr id="t0005A" class="h"><td><a href="#t0005A">00:05</a></td><td class="nv">SrPx</td><td>oh I see</td></tr>
+<tr id="t0005A" class="h"><td><a href="#t0005A">00:05</a></td><td class="n7">gfredericks</td><td>vectors are chunked, lists are not</td></tr>
+<tr id="t0005A" class="h r"><td><a href="#t0005A">00:05</a></td><td class="n7">gfredericks</td><td>apparently</td></tr>
+<tr id="t0006A" class="h"><td><a href="#t0006A">00:06</a></td><td class="nv">SrPx</td><td>,(for [a '(0 1 2 3)] (print a))</td></tr>
+<tr id="t0006A" class="h"><td><a href="#t0006A">00:06</a></td><td class="nl">clojurebot</td><td>(01nil 2nil 3nil nil)</td></tr>
+<tr id="t0006A" class="h"><td><a href="#t0006A">00:06</a></td><td class="n7">gfredericks</td><td>you got chunked output originally because range is also chunked</td></tr>
+<tr id="t0006A" class="h"><td><a href="#t0006A">00:06</a></td><td class="nv">SrPx</td><td>,(for [a '(0 1 2 3)] (print a))</td></tr>
+<tr id="t0006A" class="h"><td><a href="#t0006A">00:06</a></td><td class="nl">clojurebot</td><td>(01nil 2nil 3nil nil)</td></tr>
+<tr id="t0006A" class="h"><td><a href="#t0006A">00:06</a></td><td class="n7">gfredericks</td><td>,(for [a (take 4 (iterate inc 0))] (print a))</td></tr>
+<tr id="t0006A" class="h"><td><a href="#t0006A">00:06</a></td><td class="nl">clojurebot</td><td>(01nil 2nil 3nil nil)</td></tr>
+<tr id="t0006A" class="h"><td><a href="#t0006A">00:06</a></td><td class="n7">gfredericks</td><td>^ that's another way to avoid chunking</td></tr>
+<tr id="t0006A" class="h"><td><a href="#t0006A">00:06</a></td><td class="nv">SrPx</td><td>hm</td></tr>
+<tr id="t0007A" class="h"><td><a href="#t0007A">00:07</a></td><td class="n7">gfredericks</td><td>99% of the time you don't have to think about these things</td></tr>
+<tr id="t0007A" class="h"><td><a href="#t0007A">00:07</a></td><td class="nv">SrPx</td><td>anyway</td></tr>
+<tr id="t0007A" class="h r"><td><a href="#t0007A">00:07</a></td><td class="nv">SrPx</td><td>for generates a list</td></tr>
+<tr id="t0007A" class="h"><td><a href="#t0007A">00:07</a></td><td class="n7">gfredericks</td><td>yep</td></tr>
+<tr id="t0007A" class="h"><td><a href="#t0007A">00:07</a></td><td class="nv">SrPx</td><td>would be more to a list comprehension on python than python's for itself right</td></tr>
+<tr id="t0007A" class="h"><td><a href="#t0007A">00:07</a></td><td class="n7">gfredericks</td><td>correct</td></tr>
+<tr id="t0007A" class="h"><td><a href="#t0007A">00:07</a></td><td class="nv">SrPx</td><td>(=</td></tr>
+<tr id="t0008A" class="h r"><td><a href="#t0008A">00:08</a></td><td class="nv">SrPx</td><td>very cool.</td></tr>
+<tr id="t0008A" class="h"><td><a href="#t0008A">00:08</a></td><td class="n7">gfredericks</td><td>so the second question was about a succincter syntax for function composition?</td></tr>
+<tr id="t0009A" class="h"><td><a href="#t0009A">00:09</a></td><td class="nv">SrPx</td><td>I dont know the word succincter but well, just asking if some syntax sugars are possible</td></tr>
+<tr id="t0010A"><td><a href="#t0010A">00:10</a></td><td class="n7">gfredericks</td><td>with macros most sugars are possible, within a couple constraints</td></tr>
+<tr id="t0010A" class="h r"><td><a href="#t0010A">00:10</a></td><td class="n7">gfredericks</td><td>1) you still have to use s-expressions -- i.e., only what the clojure reader accepts</td></tr>
+<tr id="t0011A" class="h r"><td><a href="#t0011A">00:11</a></td><td class="n7">gfredericks</td><td>2) macros have to be called as a list, i.e. (macro-name ...other-things...)</td></tr>
+<tr id="t0011A" class="h"><td><a href="#t0011A">00:11</a></td><td class="nv">SrPx</td><td>so I definitely cant make something like (+ 3*2 2) &gt;&gt; 8</td></tr>
+<tr id="t0011A" class="h r"><td><a href="#t0011A">00:11</a></td><td class="nv">SrPx</td><td>(not that I want that, just wondering)</td></tr>
+<tr id="t0011A" class="h"><td><a href="#t0011A">00:11</a></td><td class="n7">gfredericks</td><td>per constraint 2, you could arrange that IF that expression were wrapped in a macro that was managing it for you</td></tr>
+<tr id="t0011A" class="h r"><td><a href="#t0011A">00:11</a></td><td class="n7">gfredericks</td><td>well</td></tr>
+<tr id="t0012A" class="h r"><td><a href="#t0012A">00:12</a></td><td class="n7">gfredericks</td><td>constraint 1 will probably say that 3*2 is unreadable</td></tr>
+<tr id="t0012A" class="h r"><td><a href="#t0012A">00:12</a></td><td class="n7">gfredericks</td><td>but (+ 3 * 2 2) should be possible</td></tr>
+<tr id="t0012A" class="h r"><td><a href="#t0012A">00:12</a></td><td class="n7">gfredericks</td><td>,(read-string &quot;3*2&quot;)</td></tr>
+<tr id="t0012A" class="h"><td><a href="#t0012A">00:12</a></td><td class="nl">clojurebot</td><td>#&lt;NumberFormatException java.lang.NumberFormatException: Invalid number: 3*2&gt;</td></tr>
+<tr id="t0012A" class="h"><td><a href="#t0012A">00:12</a></td><td class="nv">SrPx</td><td>gfredericks: should it?</td></tr>
+<tr id="t0013A" class="h"><td><a href="#t0013A">00:13</a></td><td class="n7">gfredericks</td><td>SrPx: if it was wrapped in a macro; e.g. (with-funny-syntax (+ 3 * 2 2))</td></tr>
+<tr id="t0013A" class="h"><td><a href="#t0013A">00:13</a></td><td class="nv">SrPx</td><td>gfredericks: how? + is not a macro so... ?</td></tr>
+<tr id="t0013A" class="h"><td><a href="#t0013A">00:13</a></td><td class="n7">gfredericks</td><td>or I suppose you could also define a macro called +</td></tr>
+<tr id="t0013A" class="h r"><td><a href="#t0013A">00:13</a></td><td class="n7">gfredericks</td><td>different tradeoffs in each case</td></tr>
+<tr id="t0018A" class="h"><td><a href="#t0018A">00:18</a></td><td class="nn">bhenry</td><td>has anyone else run into this? <a href="http://i.imgur.com/kVdJB.png">http://i.imgur.com/kVdJB.png</a></td></tr>
+<tr id="t0018A" class="h r"><td><a href="#t0018A">00:18</a></td><td class="nn">bhenry</td><td>i can't figure out where my code is making that happen.</td></tr>
+<tr id="t0019A" class="h"><td><a href="#t0019A">00:19</a></td><td class="n7">gfredericks</td><td>bhenry: that's interesting looking</td></tr>
+<tr id="t0020A" class="r"><td><a href="#t0020A">00:20</a></td><td class="n7">gfredericks</td><td>bhenry: you have an re-matches in your code somewhere?</td></tr>
+<tr id="t0020A" class="h"><td><a href="#t0020A">00:20</a></td><td class="nn">bhenry</td><td>nope!</td></tr>
+<tr id="t0020A" class="h r"><td><a href="#t0020A">00:20</a></td><td class="nn">bhenry</td><td>it must be used in ibdknox's remote stuff with his fetch library</td></tr>
+<tr id="t0021A" class="h"><td><a href="#t0021A">00:21</a></td><td class="n7">gfredericks</td><td>it looks like something that could get compiled from (let [[x y z] (re-matches ...)] ...)</td></tr>
+<tr id="t0021A" class="h r"><td><a href="#t0021A">00:21</a></td><td class="n7">gfredericks</td><td>but in clojure when re-matches returns nil then it should just bind x y and z to nil</td></tr>
+<tr id="t0021A" class="h r"><td><a href="#t0021A">00:21</a></td><td class="n7">gfredericks</td><td>rather than crash</td></tr>
+<tr id="t0021A" class="h r"><td><a href="#t0021A">00:21</a></td><td class="n7">gfredericks</td><td>I can't imagine cljs behaving differently</td></tr>
+<tr id="t0022A" class="h r"><td><a href="#t0022A">00:22</a></td><td class="n7">gfredericks</td><td>surely someone would have noticed by now :)</td></tr>
+<tr id="t0022A" class="h r"><td><a href="#t0022A">00:22</a></td><td class="n7">gfredericks</td><td>but can't say more than that without seeing the source for that line</td></tr>
+<tr id="t0022A" class="h r"><td><a href="#t0022A">00:22</a></td><td class="n7">gfredericks</td><td>and I'm going to bed anyhow</td></tr>
+<tr id="t0304A"><td><a href="#t0304A">03:04</a></td><td class="n6">michaelr525</td><td>2.5 hours of full channel sleep</td></tr>
+<tr id="t0454A" class="r"><td><a href="#t0454A">04:54</a></td><td class="n6">michaelr525</td><td>4.5 hours of full channel sleep</td></tr>
+<tr id="t0454A" class="h"><td><a href="#t0454A">04:54</a></td><td class="nk">Erika_Mustermann</td><td>hush</td></tr>
+<tr id="t0552A"><td><a href="#t0552A">05:52</a></td><td class="nm">muhoo</td><td>zzzzz</td></tr>
+<tr id="t0552A" class="h r"><td><a href="#t0552A">05:52</a></td><td class="nm">muhoo</td><td>this has been a much less chatty channel in recent months than it used to be</td></tr>
+<tr id="t0552A" class="h r"><td><a href="#t0552A">05:52</a></td><td class="nm">muhoo</td><td>not sure tht's a bad thing tho</td></tr>
+<tr id="t0600A"><td><a href="#t0600A">06:00</a></td><td class="n6">michaelr525</td><td>muhoo: if you want to sleep, sleep! don't talk!</td></tr>
+<tr id="t0624A"><td><a href="#t0624A">06:24</a></td><td class="nb">bartj</td><td>hello, can someone please have a look at this tiny example of multimethods: <a href="http://pastie.org/4142109">http://pastie.org/4142109</a></td></tr>
+<tr id="t0624A" class="h"><td><a href="#t0624A">06:24</a></td><td class="nx">antares_</td><td>clojurebot: anyone</td></tr>
+<tr id="t0624A" class="h"><td><a href="#t0624A">06:24</a></td><td class="nl">clojurebot</td><td>Just a heads up, you're more likely to get some help if you ask the question you really want the answer to, instead of &quot;does anyone ...&quot;</td></tr>
+<tr id="t0625A" class="h"><td><a href="#t0625A">06:25</a></td><td class="nb">bartj</td><td>I am not sure why the multimethod is not getting executed. Instead it throws the error: java.lang.IllegalArgumentException: No method in multimethod 'test' for dispatch value: true (NO_SOURCE_FILE:0)</td></tr>
+<tr id="t0627A" class="h"><td><a href="#t0627A">06:27</a></td><td class="nx">antares_</td><td>bartj: because you defined implementations for [true] and [false]</td></tr>
+<tr id="t0627A" class="h r"><td><a href="#t0627A">06:27</a></td><td class="nx">antares_</td><td>not true and false</td></tr>
+<tr id="t0627A" class="h r"><td><a href="#t0627A">06:27</a></td><td class="nx">antares_</td><td>2nd argument to defmethod is an exact value, not a vector: <a href="https://github.com/michaelklishin/welle/blob/master/src/clojure/clojurewerkz/welle/conversion.clj#L310">https://github.com/michaelklishin/welle/blob/master/src/clojure/clojurewerkz/welle/conversion.clj#L310</a></td></tr>
+<tr id="t0628A" class="h"><td><a href="#t0628A">06:28</a></td><td class="nb">bartj</td><td>ok, I think you mean the first argument?</td></tr>
+<tr id="t0629A" class="h r"><td><a href="#t0629A">06:29</a></td><td class="nb">bartj</td><td>because when I do this: (defmethod mtest true [_] (println &quot;hello&quot;))</td></tr>
+<tr id="t0629A" class="h r"><td><a href="#t0629A">06:29</a></td><td class="nb">bartj</td><td>(defmethod mtest false [_] (println &quot;world&quot;))</td></tr>
+<tr id="t0629A" class="h r"><td><a href="#t0629A">06:29</a></td><td class="nb">bartj</td><td>it works</td></tr>
+<tr id="t0629A" class="h"><td><a href="#t0629A">06:29</a></td><td class="nx">antares_</td><td>yes, that's the 2nd argument</td></tr>
+<tr id="t0629A" class="h"><td><a href="#t0629A">06:29</a></td><td class="nn">Guest52069</td><td>hi</td></tr>
+<tr id="t0630A"><td><a href="#t0630A">06:30</a></td><td class="nx">antares_</td><td>bartj: so it is [name of multimethod] [dispatch value] [vector of args] [body]</td></tr>
+<tr id="t0631A" class="h"><td><a href="#t0631A">06:31</a></td><td class="nb">bartj</td><td>antares_, thank you very much!</td></tr>
+<tr id="t0631A" class="h"><td><a href="#t0631A">06:31</a></td><td class="nx">antares_</td><td>bartj: no problem</td></tr>
+<tr id="t0722A"><td><a href="#t0722A">07:22</a></td><td class="nk">gtuckerkellogg</td><td>i just upgraded to 1.4, and now clojure-jack-in fails :(</td></tr>
+<tr id="t0723A" class="h r"><td><a href="#t0723A">07:23</a></td><td class="nk">gtuckerkellogg</td><td>anyone else seen this: &quot;error in process filter: slime-require: Assertion failed: (keywordp module)&quot;</td></tr>
+<tr id="t0723A" class="h"><td><a href="#t0723A">07:23</a></td><td class="nn">bhenry</td><td>gtuckerkellogg:  did you also upgrade lein-swank?</td></tr>
+<tr id="t0724A" class="h"><td><a href="#t0724A">07:24</a></td><td class="nk">gtuckerkellogg</td><td>hmm</td></tr>
+<tr id="t0725A" class="h r"><td><a href="#t0725A">07:25</a></td><td class="nk">gtuckerkellogg</td><td>bhenry, you mean swank-clojure?</td></tr>
+<tr id="t0726A" class="h"><td><a href="#t0726A">07:26</a></td><td class="nn">bhenry</td><td>gtuckerkellogg:  yes that's exactly what i mean, sorry</td></tr>
+<tr id="t0731A"><td><a href="#t0731A">07:31</a></td><td class="nk">gtuckerkellogg</td><td>i seem to be using lein-swank 1.4.4, but lein 1.7.1</td></tr>
+<tr id="t0731A" class="h"><td><a href="#t0731A">07:31</a></td><td class="nx">antares_</td><td>gtuckerkellogg: I have lein-swank 1.4.3 here and it works great with 1.3 and 1.4 codebases</td></tr>
+<tr id="t0731A" class="h r"><td><a href="#t0731A">07:31</a></td><td class="nx">antares_</td><td>I use lein2, though</td></tr>
+<tr id="t0731A" class="h r"><td><a href="#t0731A">07:31</a></td><td class="nx">antares_</td><td>for everything</td></tr>
+<tr id="t0731A" class="h"><td><a href="#t0731A">07:31</a></td><td class="nk">gtuckerkellogg</td><td>maybe I should upgrade</td></tr>
+<tr id="t0732A" class="h r"><td><a href="#t0732A">07:32</a></td><td class="nk">gtuckerkellogg</td><td>to lein2</td></tr>
+<tr id="t0832A"><td><a href="#t0832A">08:32</a></td><td class="n8">espeed</td><td>what's the recommended Thrift library?</td></tr>
+<tr id="t0839A" class="h"><td><a href="#t0839A">08:39</a></td><td class="n2">dfgdfgdfg</td><td>am planning to do SICP in the next couple of months..would it be advisable to use clojure instead of scheme?</td></tr>
+<tr id="t0840A"><td><a href="#t0840A">08:40</a></td><td class="n6">michaelr525</td><td>dfgdfgdfg: dfgdfgfhgdfgdg</td></tr>
+<tr id="t0840A" class="h"><td><a href="#t0840A">08:40</a></td><td class="n2">dfgdfgdfg</td><td>michaelr525: I cannot decipher</td></tr>
+<tr id="t0842A" class="h"><td><a href="#t0842A">08:42</a></td><td class="nx">antares_</td><td>dfgdfgdfg: yes</td></tr>
+<tr id="t0842A" class="h"><td><a href="#t0842A">08:42</a></td><td class="n2">dfgdfgdfg</td><td>antares_: alright, I am going to give it a shot</td></tr>
+<tr id="t0842A" class="h"><td><a href="#t0842A">08:42</a></td><td class="nx">antares_</td><td>dfgdfgdfg: there is nothing wrong with scheme but clojure has many nice aspects about it and some traditional Lisp baggage that was dropped (for good)</td></tr>
+<tr id="t0843A" class="h"><td><a href="#t0843A">08:43</a></td><td class="n2">dfgdfgdfg</td><td>antares_: cool, I might even be able to do something with it at work :)</td></tr>
+<tr id="t0845A" class="h"><td><a href="#t0845A">08:45</a></td><td class="nx">antares_</td><td>dfgdfgdfg: right :)</td></tr>
+<tr id="t0915A"><td><a href="#t0915A">09:15</a></td><td class="nt">samrat</td><td>ok, so i've downloaded this repo <a href="https://bitbucket.org/drcabana/euler">https://bitbucket.org/drcabana/euler</a> but i've no idea about how to try out the programs</td></tr>
+<tr id="t0916A" class="h r"><td><a href="#t0916A">09:16</a></td><td class="nt">samrat</td><td>also, i already have lein installed</td></tr>
+<tr id="t0916A" class="h r"><td><a href="#t0916A">09:16</a></td><td class="nt">samrat</td><td>can anyone help me</td></tr>
+<tr id="t0918A" class="h"><td><a href="#t0918A">09:18</a></td><td class="nx">antares_</td><td>project.clj has a comment that says there are unit tests</td></tr>
+<tr id="t0918A" class="h r"><td><a href="#t0918A">09:18</a></td><td class="nx">antares_</td><td>so, lein test</td></tr>
+<tr id="t0920A"><td><a href="#t0920A">09:20</a></td><td class="n6">michaelr525</td><td>samrat: you can 'lein repl' and then '(load &quot;file.clj&quot;)' and then you can run any of the functions from that file</td></tr>
+<tr id="t0921A" class="h"><td><a href="#t0921A">09:21</a></td><td class="nt">samrat</td><td>michaelr525: thanks, i'll try it</td></tr>
+<tr id="t1002A"><td><a href="#t1002A">10:02</a></td><td class="ns">tenso</td><td>Hi, this gives me an error in slime / swank:</td></tr>
+<tr id="t1002A" class="h r"><td><a href="#t1002A">10:02</a></td><td class="ns">tenso</td><td>(do  (println &quot;LOG: Computing...&quot;)</td></tr>
+<tr id="t1002A" class="h r"><td><a href="#t1002A">10:02</a></td><td class="ns">tenso</td><td>  (+ 1 1))</td></tr>
+<tr id="t1002A" class="h r"><td><a href="#t1002A">10:02</a></td><td class="ns">tenso</td><td>sry</td></tr>
+<tr id="t1003A" class="h r"><td><a href="#t1003A">10:03</a></td><td class="ns">tenso</td><td>it makes slime-repl print &quot;; Evaluation aborted.&quot;</td></tr>
+<tr id="t1004A" class="h"><td><a href="#t1004A">10:04</a></td><td class="ny">Vinzent</td><td>tenso, that's all? No buffer with stacktrace?</td></tr>
+<tr id="t1009A" class="h"><td><a href="#t1009A">10:09</a></td><td class="ns">tenso</td><td>Huh, the error disappeared after I restarted Emacs</td></tr>
+<tr id="t1010A"><td><a href="#t1010A">10:10</a></td><td class="nn">xeqi</td><td>I've had that occasionally, when I restart swank it disappears</td></tr>
+<tr id="t1010A" class="h"><td><a href="#t1010A">10:10</a></td><td class="ny">Vinzent</td><td>you probably sent something BAD before :)</td></tr>
+<tr id="t1010A" class="h"><td><a href="#t1010A">10:10</a></td><td class="ns">tenso</td><td>weird, it might be I still had a stacktrace open in the background</td></tr>
+<tr id="t1029A"><td><a href="#t1029A">10:29</a></td><td class="n8">jhowarth</td><td>Is there a keybind in emacs paredit mode for swapping a s-expression's surrounding character?  e.g. change ( to [?</td></tr>
+<tr id="t1033A"><td><a href="#t1033A">10:33</a></td><td class="na">AimHere</td><td>Unlikely, since paredit is really for all lisps, and users of not-Clojure lisps have no need of brackets that aren't your traditional rounded parentheses</td></tr>
+<tr id="t1033A" class="h r"><td><a href="#t1033A">10:33</a></td><td class="na">AimHere</td><td>It's the sort of thing you'd write your own binding for if you had a pressing need for it</td></tr>
+<tr id="t1037A" class="h"><td><a href="#t1037A">10:37</a></td><td class="n8">jhowarth</td><td>AimHere:</td></tr>
+<tr id="t1037A" class="h r"><td><a href="#t1037A">10:37</a></td><td class="n8">jhowarth</td><td>Thanks</td></tr>
+<tr id="t1043A"><td><a href="#t1043A">10:43</a></td><td class="n0">y3di</td><td>getting swank-clojure on windows is feeling impossible, sigh</td></tr>
+<tr id="t1043A" class="h"><td><a href="#t1043A">10:43</a></td><td class="nj">Scorchin</td><td>What are the best &quot;introduction to clojure&quot; lightning talks (10-15 min) out there? Bonus points if you can provide a link to view/download a video.</td></tr>
+<tr id="t1048A" class="h"><td><a href="#t1048A">10:48</a></td><td class="ns">nonrecursive</td><td>Scorchin: this is a good talk but it's an hour and ten minutesL <a href="http://www.infoq.com/presentations/Are-We-There-Yet-Rich-Hickey">http://www.infoq.com/presentations/Are-We-There-Yet-Rich-Hickey</a></td></tr>
+<tr id="t1048A" class="h"><td><a href="#t1048A">10:48</a></td><td class="nj">Scorchin</td><td>nonrecursive: cool, thanks!</td></tr>
+<tr id="t1049A" class="h"><td><a href="#t1049A">10:49</a></td><td class="ns">nonrecursive</td><td>np</td></tr>
+<tr id="t1049A" class="h r"><td><a href="#t1049A">10:49</a></td><td class="ns">nonrecursive</td><td>Just put my first noir site on heroku :) :)</td></tr>
+<tr id="t1057A"><td><a href="#t1057A">10:57</a></td><td class="n8">jhowarth</td><td>grats!</td></tr>
+<tr id="t1057A" class="h r"><td><a href="#t1057A">10:57</a></td><td class="n8">jhowarth</td><td>Hoping I can do the same this weekend :D</td></tr>
+<tr id="t1058A" class="h"><td><a href="#t1058A">10:58</a></td><td class="nc">Frozenlo`</td><td>Why on Heroku VS your own machine?</td></tr>
+<tr id="t1059A" class="h"><td><a href="#t1059A">10:59</a></td><td class="n8">jhowarth</td><td>I actually was more hoping to get my first noir site done this weekend.  Hadn't thought about hosting.</td></tr>
+<tr id="t1059A" class="h r"><td><a href="#t1059A">10:59</a></td><td class="n8">jhowarth</td><td>heroku is easier initially to get setup</td></tr>
+<tr id="t1136A"><td><a href="#t1136A">11:36</a></td><td class="nb">bartj</td><td>,(+ 18.99  1.90)</td></tr>
+<tr id="t1136A" class="h"><td><a href="#t1136A">11:36</a></td><td class="nl">clojurebot</td><td>20.889999999999997</td></tr>
+<tr id="t1137A" class="h"><td><a href="#t1137A">11:37</a></td><td class="nb">bartj</td><td>why is the above result not simply 20.89</td></tr>
+<tr id="t1137A" class="h r"><td><a href="#t1137A">11:37</a></td><td class="nb">bartj</td><td>how can I get clojure to output: 20.89 ?</td></tr>
+<tr id="t1137A" class="h"><td><a href="#t1137A">11:37</a></td><td class="na">AimHere</td><td>Because you're using floating point numbers, which are necessarily inaccurate</td></tr>
+<tr id="t1138A" class="h r"><td><a href="#t1138A">11:38</a></td><td class="na">AimHere</td><td>,(+ 1899/100 19/10)</td></tr>
+<tr id="t1138A" class="h"><td><a href="#t1138A">11:38</a></td><td class="nl">clojurebot</td><td>2089/100</td></tr>
+<tr id="t1138A" class="h"><td><a href="#t1138A">11:38</a></td><td class="na">AimHere</td><td>You could try rounding the numbers somehow</td></tr>
+<tr id="t1138A" class="h"><td><a href="#t1138A">11:38</a></td><td class="ng">zomg</td><td>wut, does 1/2 to mean 0.5 work?</td></tr>
+<tr id="t1138A" class="h r"><td><a href="#t1138A">11:38</a></td><td class="ng">zomg</td><td>Neat</td></tr>
+<tr id="t1139A" class="h"><td><a href="#t1139A">11:39</a></td><td class="na">AimHere</td><td>Well clojure does support rationals</td></tr>
+<tr id="t1139A" class="h r"><td><a href="#t1139A">11:39</a></td><td class="na">AimHere</td><td>bartj, if you want it as a String, eventually, you could use format</td></tr>
+<tr id="t1139A" class="h r"><td><a href="#t1139A">11:39</a></td><td class="na">AimHere</td><td>,(format &quot;%.2f&quot; (+ 18.99 1.90))</td></tr>
+<tr id="t1139A" class="h"><td><a href="#t1139A">11:39</a></td><td class="nl">clojurebot</td><td>&quot;20.89&quot;</td></tr>
+<tr id="t1139A" class="h"><td><a href="#t1139A">11:39</a></td><td class="ng">zomg</td><td>AimHere: well a lot of languages do but first time I see that syntax for it :)</td></tr>
+<tr id="t1142A"><td><a href="#t1142A">11:42</a></td><td class="nb">bartj</td><td>, (+ (Double/parseDouble &quot;18.99&quot;) (Double/parseDouble &quot;1.90&quot;))</td></tr>
+<tr id="t1142A" class="h"><td><a href="#t1142A">11:42</a></td><td class="nl">clojurebot</td><td>20.889999999999997</td></tr>
+<tr id="t1142A" class="h"><td><a href="#t1142A">11:42</a></td><td class="nb">bartj</td><td>I tried using double instead of float but, still the precision does not seem enough</td></tr>
+<tr id="t1142A" class="h"><td><a href="#t1142A">11:42</a></td><td class="n7">gfredericks</td><td>,(let [third (double 1/3)] (+ third third third))</td></tr>
+<tr id="t1142A" class="h"><td><a href="#t1142A">11:42</a></td><td class="nl">clojurebot</td><td>1.0</td></tr>
+<tr id="t1142A" class="h"><td><a href="#t1142A">11:42</a></td><td class="n7">gfredericks</td><td>^ why does that happen?</td></tr>
+<tr id="t1143A" class="h r"><td><a href="#t1143A">11:43</a></td><td class="n7">gfredericks</td><td>bartj: if you don't like floating point spookiness, use rationals</td></tr>
+<tr id="t1143A" class="h r"><td><a href="#t1143A">11:43</a></td><td class="n7">gfredericks</td><td>it's not too hard to write an exact function that outputs a rational in decimal format to any precision you like</td></tr>
+<tr id="t1144A" class="h"><td><a href="#t1144A">11:44</a></td><td class="na">AimHere</td><td>Trouble is, you see, bartj, floating point numbers are always going to have artifacts of that nature. You could write a dinky little function to round the function to the nth significant figure, if there isn't one pinched from Java in Math/foo or whatever</td></tr>
+<tr id="t1148A" class="h"><td><a href="#t1148A">11:48</a></td><td class="nb">bartj</td><td>AimHere, gfredericks thanks!</td></tr>
+<tr id="t1149A" class="h"><td><a href="#t1149A">11:49</a></td><td class="n7">gfredericks</td><td>,(first (drop-while #(= 1.0 (apply + (repeat % (double (/ 1 %))))) (drop 2 (range))))</td></tr>
+<tr id="t1149A" class="h"><td><a href="#t1149A">11:49</a></td><td class="nl">clojurebot</td><td>6</td></tr>
+<tr id="t1149A" class="h"><td><a href="#t1149A">11:49</a></td><td class="n7">gfredericks</td><td>,(let [x 1/6] (+ x x x x x x))</td></tr>
+<tr id="t1149A" class="h"><td><a href="#t1149A">11:49</a></td><td class="nl">clojurebot</td><td>1N</td></tr>
+<tr id="t1150A"><td><a href="#t1150A">11:50</a></td><td class="n7">gfredericks</td><td>,(let [x (double 1/6)] (+ x x x x x x))</td></tr>
+<tr id="t1150A" class="h"><td><a href="#t1150A">11:50</a></td><td class="nl">clojurebot</td><td>1.0000000000000002</td></tr>
+<tr id="t1150A" class="h"><td><a href="#t1150A">11:50</a></td><td class="n7">gfredericks</td><td>I still don't understand why 1/3 and 1/5 escape</td></tr>
+<tr id="t1151A" class="h"><td><a href="#t1151A">11:51</a></td><td class="na">kaoD</td><td>gfredericks, what do you mean escape?</td></tr>
+<tr id="t1152A" class="h"><td><a href="#t1152A">11:52</a></td><td class="n7">gfredericks</td><td>kaoD: why is (+ 1/3 1/3 1/3) equal to 1.0 in floating point addition?</td></tr>
+<tr id="t1152A" class="h r"><td><a href="#t1152A">11:52</a></td><td class="n7">gfredericks</td><td>(double 1/3) must be rounded either up or down</td></tr>
+<tr id="t1152A" class="h r"><td><a href="#t1152A">11:52</a></td><td class="n7">gfredericks</td><td>so it stands to reason that the sum should be either greater or less than 1.0</td></tr>
+<tr id="t1153A" class="h r"><td><a href="#t1153A">11:53</a></td><td class="n7">gfredericks</td><td>it's as if there's some sort of trivial exception logic built in to the floating point ALU</td></tr>
+<tr id="t1153A" class="h"><td><a href="#t1153A">11:53</a></td><td class="nj">mmarczyk</td><td>,(+ 0.3333333333333333333333333333333333333333333333333 0.33333333333333333333333333333333333333333 0.33333333333333333333333333333333333333333333)</td></tr>
+<tr id="t1153A" class="h"><td><a href="#t1153A">11:53</a></td><td class="nl">clojurebot</td><td>1.0</td></tr>
+<tr id="t1154A" class="h"><td><a href="#t1154A">11:54</a></td><td class="n7">gfredericks</td><td>or else the software is silently rounding things that look really close to other things</td></tr>
+<tr id="t1154A" class="h r"><td><a href="#t1154A">11:54</a></td><td class="n7">gfredericks</td><td>but that's disturbing as well</td></tr>
+<tr id="t1156A" class="h r"><td><a href="#t1156A">11:56</a></td><td class="n7">gfredericks</td><td>ruby has the same threshold (6 breaks, 3 and 5 don't)</td></tr>
+<tr id="t1156A" class="h r"><td><a href="#t1156A">11:56</a></td><td class="n7">gfredericks</td><td>but stranger, the result for 6 it still prints as &quot;1.0&quot; despite reporting that it doesn't equal 1.0</td></tr>
+<tr id="t1156A" class="h"><td><a href="#t1156A">11:56</a></td><td class="nj">mmarczyk</td><td>huh?</td></tr>
+<tr id="t1157A" class="h"><td><a href="#t1157A">11:57</a></td><td class="na">kaoD</td><td>gfredericks, I guess rounding is right there</td></tr>
+<tr id="t1157A" class="h"><td><a href="#t1157A">11:57</a></td><td class="nj">mmarczyk</td><td>irb says 0.333... + 0.333... + 0.333... == 1.0</td></tr>
+<tr id="t1157A" class="h"><td><a href="#t1157A">11:57</a></td><td class="n7">gfredericks</td><td>x=1.0/6;y=x+x+x+x+x+x;[y.to_s,y==1.0]</td></tr>
+<tr id="t1157A" class="h"><td><a href="#t1157A">11:57</a></td><td class="nj">mmarczyk</td><td>oh, for 6</td></tr>
+<tr id="t1157A" class="h"><td><a href="#t1157A">11:57</a></td><td class="nb">bartj</td><td>gfredericks, you are very curious</td></tr>
+<tr id="t1157A" class="h"><td><a href="#t1157A">11:57</a></td><td class="na">kaoD</td><td>,(float 1/3)</td></tr>
+<tr id="t1157A" class="h"><td><a href="#t1157A">11:57</a></td><td class="nl">clojurebot</td><td>0.33333334</td></tr>
+<tr id="t1157A" class="h"><td><a href="#t1157A">11:57</a></td><td class="nj">mmarczyk</td><td>well, nothing suspect about this</td></tr>
+<tr id="t1157A" class="h"><td><a href="#t1157A">11:57</a></td><td class="na">kaoD</td><td>,(* 3 0.33333334)</td></tr>
+<tr id="t1157A" class="h"><td><a href="#t1157A">11:57</a></td><td class="nl">clojurebot</td><td>1.0000000199999999</td></tr>
+<tr id="t1158A" class="h"><td><a href="#t1158A">11:58</a></td><td class="nj">mmarczyk</td><td>an extra digit of precision appears &quot;to the left&quot;, so some precision might be lost &quot;to the right&quot;</td></tr>
+<tr id="t1158A" class="h"><td><a href="#t1158A">11:58</a></td><td class="n7">gfredericks</td><td>mmarczyk: about what?</td></tr>
+<tr id="t1158A" class="h"><td><a href="#t1158A">11:58</a></td><td class="na">kaoD</td><td>,(float (* 3 0.33333334))</td></tr>
+<tr id="t1158A" class="h"><td><a href="#t1158A">11:58</a></td><td class="nl">clojurebot</td><td>1.0</td></tr>
+<tr id="t1158A" class="h"><td><a href="#t1158A">11:58</a></td><td class="na">kaoD</td><td>see?</td></tr>
+<tr id="t1158A" class="h r"><td><a href="#t1158A">11:58</a></td><td class="na">kaoD</td><td>it's just lucky about the rounding error</td></tr>
+<tr id="t1158A" class="h"><td><a href="#t1158A">11:58</a></td><td class="n7">gfredericks</td><td>mmarczyk: what extra digit of precision?</td></tr>
+<tr id="t1159A" class="h"><td><a href="#t1159A">11:59</a></td><td class="nj">mmarczyk</td><td>gfredericks: just before the decimal point in our representation of choice</td></tr>
+<tr id="t1159A" class="h"><td><a href="#t1159A">11:59</a></td><td class="n7">gfredericks</td><td>101 vs 110 both have 3 digits</td></tr>
+<tr id="t1159A" class="h r"><td><a href="#t1159A">11:59</a></td><td class="n7">gfredericks</td><td>whence the difference between 5 and 6?</td></tr>
+<tr id="t1159A" class="h"><td><a href="#t1159A">11:59</a></td><td class="nj">mmarczyk</td><td>what kaoD said</td></tr>
+<tr id="t1200A"><td><a href="#t1200A">12:00</a></td><td class="na">kaoD</td><td>floating point representation is quite different from binary</td></tr>
+<tr id="t1200A" class="h"><td><a href="#t1200A">12:00</a></td><td class="n7">gfredericks</td><td>well they're inverted so 101 vs 110 doesn't apply I guess</td></tr>
+<tr id="t1200A" class="h"><td><a href="#t1200A">12:00</a></td><td class="na">kaoD</td><td>see IEEE754</td></tr>
+<tr id="t1200A" class="h"><td><a href="#t1200A">12:00</a></td><td class="n7">gfredericks</td><td>kaoD: I'm familiar with it</td></tr>
+<tr id="t1200A" class="h r"><td><a href="#t1200A">12:00</a></td><td class="n7">gfredericks</td><td>kaoD: (double 1/3) must be either slightly less or greater than the ideal 1/3, right?</td></tr>
+<tr id="t1200A" class="h"><td><a href="#t1200A">12:00</a></td><td class="nj">mmarczyk</td><td>you could draw diagrams of ieee 754 doubles and do the calculations by hand to check :-)</td></tr>
+<tr id="t1201A" class="h"><td><a href="#t1201A">12:01</a></td><td class="na">kaoD</td><td>let's see</td></tr>
+<tr id="t1201A" class="h r"><td><a href="#t1201A">12:01</a></td><td class="na">kaoD</td><td>,(double 1/3)</td></tr>
+<tr id="t1201A" class="h"><td><a href="#t1201A">12:01</a></td><td class="nl">clojurebot</td><td>0.3333333333333333</td></tr>
+<tr id="t1201A" class="h"><td><a href="#t1201A">12:01</a></td><td class="na">kaoD</td><td>,(* 3 (double 1/3))</td></tr>
+<tr id="t1201A" class="h"><td><a href="#t1201A">12:01</a></td><td class="nl">clojurebot</td><td>1.0</td></tr>
+<tr id="t1201A" class="h"><td><a href="#t1201A">12:01</a></td><td class="na">kaoD</td><td>you don't see the rounding error really</td></tr>
+<tr id="t1201A" class="h r"><td><a href="#t1201A">12:01</a></td><td class="na">kaoD</td><td>you can see it in float (using double)</td></tr>
+<tr id="t1201A" class="h r"><td><a href="#t1201A">12:01</a></td><td class="na">kaoD</td><td>but double is the max representation</td></tr>
+<tr id="t1201A" class="h"><td><a href="#t1201A">12:01</a></td><td class="nj">mmarczyk</td><td>that doesn't mean that when you add three of them you won't get 1.0</td></tr>
+<tr id="t1201A" class="h"><td><a href="#t1201A">12:01</a></td><td class="n7">gfredericks</td><td>why not?</td></tr>
+<tr id="t1202A" class="h r"><td><a href="#t1202A">12:02</a></td><td class="n7">gfredericks</td><td>oh hmmm maybe I can imagine</td></tr>
+<tr id="t1202A" class="h"><td><a href="#t1202A">12:02</a></td><td class="nj">mmarczyk</td><td>since the &quot;ideal&quot; result of adding three copies of the double closest to 1/3 might turn out to be the double closest to 1.0</td></tr>
+<tr id="t1202A" class="h r"><td><a href="#t1202A">12:02</a></td><td class="nj">mmarczyk</td><td>that is, 1.0</td></tr>
+<tr id="t1202A" class="h"><td><a href="#t1202A">12:02</a></td><td class="n7">gfredericks</td><td>so perhaps it is larger by a slight amount but that amount gets lopped off?</td></tr>
+<tr id="t1202A" class="h"><td><a href="#t1202A">12:02</a></td><td class="na">kaoD</td><td>gfredericks, that's it</td></tr>
+<tr id="t1202A" class="h"><td><a href="#t1202A">12:02</a></td><td class="n7">gfredericks</td><td>okay, I can buy that</td></tr>
+<tr id="t1202A" class="h"><td><a href="#t1202A">12:02</a></td><td class="na">kaoD</td><td>I insist: it's easier to se in float because you can use double to see the actual rounding error</td></tr>
+<tr id="t1202A" class="h r"><td><a href="#t1202A">12:02</a></td><td class="na">kaoD</td><td>but it happens in double too</td></tr>
+<tr id="t1203A" class="h"><td><a href="#t1203A">12:03</a></td><td class="nj">mmarczyk</td><td>I mean, might turn out to be closest to the double closets to 1.0 :-P</td></tr>
+<tr id="t1203A" class="h"><td><a href="#t1203A">12:03</a></td><td class="na">kaoD</td><td>and not only that, most FPUs have extra bits of precision</td></tr>
+<tr id="t1203A" class="h"><td><a href="#t1203A">12:03</a></td><td class="nj">mmarczyk</td><td>closest</td></tr>
+<tr id="t1203A" class="h"><td><a href="#t1203A">12:03</a></td><td class="n7">gfredericks</td><td>,(first (drop-while #(= 1.0 (apply + (repeat % (float (/ 1 %))))) (drop 2 (range))))</td></tr>
+<tr id="t1203A" class="h"><td><a href="#t1203A">12:03</a></td><td class="nl">clojurebot</td><td>3</td></tr>
+<tr id="t1203A" class="h"><td><a href="#t1203A">12:03</a></td><td class="na">kaoD</td><td>and once that bit's trimmed, there's an extra rounding error there too</td></tr>
+<tr id="t1203A" class="h r"><td><a href="#t1203A">12:03</a></td><td class="na">kaoD</td><td>(which luckily turns 1.3*3 into 1.0)</td></tr>
+<tr id="t1204A" class="h"><td><a href="#t1204A">12:04</a></td><td class="n7">gfredericks</td><td>,(take 10 (remove #(= 1.0 (apply + (repeat % (float (/ 1 %))))) (drop 2 (range))))</td></tr>
+<tr id="t1204A" class="h"><td><a href="#t1204A">12:04</a></td><td class="nl">clojurebot</td><td>(3 5 6 7 9 ...)</td></tr>
+<tr id="t1204A" class="h"><td><a href="#t1204A">12:04</a></td><td class="na">kaoD</td><td>in fact, think about the internal representation</td></tr>
+<tr id="t1204A" class="h r"><td><a href="#t1204A">12:04</a></td><td class="na">kaoD</td><td>the implied 1 bit</td></tr>
+<tr id="t1204A" class="h r"><td><a href="#t1204A">12:04</a></td><td class="na">kaoD</td><td>and a lot of zeroes</td></tr>
+<tr id="t1204A" class="h r"><td><a href="#t1204A">12:04</a></td><td class="na">kaoD</td><td>(in the mantissa, of course)</td></tr>
+<tr id="t1204A" class="h"><td><a href="#t1204A">12:04</a></td><td class="n7">gfredericks</td><td>of course</td></tr>
+<tr id="t1204A" class="h"><td><a href="#t1204A">12:04</a></td><td class="na">kaoD</td><td>if, after rounding, you lose all the ones, it will be rounded to 1.0</td></tr>
+<tr id="t1205A" class="h"><td><a href="#t1205A">12:05</a></td><td class="n7">gfredericks</td><td>so for 1/6, too much error is accumulated</td></tr>
+<tr id="t1205A" class="h"><td><a href="#t1205A">12:05</a></td><td class="na">kaoD</td><td>no</td></tr>
+<tr id="t1205A" class="h r"><td><a href="#t1205A">12:05</a></td><td class="na">kaoD</td><td>the error is at the end</td></tr>
+<tr id="t1205A" class="h r"><td><a href="#t1205A">12:05</a></td><td class="na">kaoD</td><td>once the floating point value is truncated</td></tr>
+<tr id="t1205A" class="h r"><td><a href="#t1205A">12:05</a></td><td class="na">kaoD</td><td>as I said, most FPUs have extra bits</td></tr>
+<tr id="t1206A" class="h r"><td><a href="#t1206A">12:06</a></td><td class="na">kaoD</td><td>and it might be truncated only at the end</td></tr>
+<tr id="t1206A" class="h"><td><a href="#t1206A">12:06</a></td><td class="n0">y3di</td><td>hm, i can't seem to find clojure-mode in the package list for emacs, does that mean i might already have it installed</td></tr>
+<tr id="t1206A" class="h"><td><a href="#t1206A">12:06</a></td><td class="na">kaoD</td><td>y3di, nope, that means you oughta add marmalade to your package list</td></tr>
+<tr id="t1207A" class="h r"><td><a href="#t1207A">12:07</a></td><td class="na">kaoD</td><td>see the slime-clojure (or swank-clojure, not sure) README.md at their GitHub repo</td></tr>
+<tr id="t1207A" class="h r"><td><a href="#t1207A">12:07</a></td><td class="na">kaoD</td><td>gotta go, cya!</td></tr>
+<tr id="t1209A" class="h"><td><a href="#t1209A">12:09</a></td><td class="nx">rlb</td><td>...and with x86 you those extra bits can be confusing if you forget they're there. gcc has some options to control their use.</td></tr>
+<tr id="t1210A"><td><a href="#t1210A">12:10</a></td><td class="n0">y3di</td><td>i followed a tutorial, and this is in my init.el file: (add-to-list 'load-path &quot;~/.emacs.d/&quot;)</td></tr>
+<tr id="t1210A" class="h r"><td><a href="#t1210A">12:10</a></td><td class="n0">y3di</td><td>(require 'clojure-mode)</td></tr>
+<tr id="t1210A" class="h r"><td><a href="#t1210A">12:10</a></td><td class="n0">y3di</td><td>i assume this may mean i already have clojure-mode?</td></tr>
+<tr id="t1211A" class="h r"><td><a href="#t1211A">12:11</a></td><td class="n0">y3di</td><td>and i installed swank-clojure through lein</td></tr>
+<tr id="t1211A" class="h r"><td><a href="#t1211A">12:11</a></td><td class="n0">y3di</td><td>so i think i should be good to go</td></tr>
+<tr id="t1213A" class="h r"><td><a href="#t1213A">12:13</a></td><td class="n0">y3di</td><td>hm but doing m-x swank/slime shows no match</td></tr>
+<tr id="t1213A" class="h r"><td><a href="#t1213A">12:13</a></td><td class="n0">y3di</td><td>m-x clojure-jack-in works however</td></tr>
+<tr id="t1217A" class="h"><td><a href="#t1217A">12:17</a></td><td class="ny">Vinzent</td><td>y3di, well you also need slime, slime-repl and swank-clojure in your emacs</td></tr>
+<tr id="t1220A"><td><a href="#t1220A">12:20</a></td><td class="n0">y3di</td><td>hm, I installed swank-clojure through lein</td></tr>
+<tr id="t1220A" class="h r"><td><a href="#t1220A">12:20</a></td><td class="n0">y3di</td><td>im having trouble figuring out how ti install slime/slime-repl/swank-clojure</td></tr>
+<tr id="t1220A" class="h r"><td><a href="#t1220A">12:20</a></td><td class="n0">y3di</td><td>reading the swank readme, it says to get marmalade</td></tr>
+<tr id="t1308A"><td><a href="#t1308A">13:08</a></td><td class="nv">SrPx</td><td>how can I see a list of variables on local namespace?</td></tr>
+<tr id="t1319A"><td><a href="#t1319A">13:19</a></td><td class="n8">jhowarth</td><td>y3di: I recently setup slime so I might be able to help.  Did you end up upgrading to emacs 24?</td></tr>
+<tr id="t1324A"><td><a href="#t1324A">13:24</a></td><td class="na">kaoD</td><td>y3di, as I said, you've got to add the Marmalade package repositories</td></tr>
+<tr id="t1324A" class="h r"><td><a href="#t1324A">13:24</a></td><td class="na">kaoD</td><td>see the README.md of related projects at GitHub, it's there somewhere</td></tr>
+<tr id="t1325A" class="h r"><td><a href="#t1325A">13:25</a></td><td class="na">kaoD</td><td>you might need Emacs snapshot, if you're not using it already</td></tr>
+<tr id="t1325A" class="h r"><td><a href="#t1325A">13:25</a></td><td class="na">kaoD</td><td>and make sure you just add clojure-mode and paredit</td></tr>
+<tr id="t1325A" class="h r"><td><a href="#t1325A">13:25</a></td><td class="na">kaoD</td><td>don't install anything else, clojure-mode takes care of SLIME for you</td></tr>
+<tr id="t1325A" class="h r"><td><a href="#t1325A">13:25</a></td><td class="na">kaoD</td><td>(just invoke clojure-jack-in and it'll download and install everything)</td></tr>
+<tr id="t1326A" class="h r"><td><a href="#t1326A">13:26</a></td><td class="na">kaoD</td><td>and don't even try clojure starter kit, it didn't work very well for me</td></tr>
+<tr id="t1401A"><td><a href="#t1401A">14:01</a></td><td class="nt">Rakin05</td><td>hi guys. i'm a vimmer at heart and found my love for clojure. i downloaded VimClojure and installed it. now i have the question if there is any syntaxchecker for clojure that can work with syntastic?</td></tr>
+<tr id="t1436A"><td><a href="#t1436A">14:36</a></td><td class="n0">y3di</td><td>kaoD, thanks, imma pm you</td></tr>
+<tr id="t1445A"><td><a href="#t1445A">14:45</a></td><td class="na">kaoD</td><td>y3di, answered your pm, not sure if you've read it</td></tr>
+<tr id="t1458A"><td><a href="#t1458A">14:58</a></td><td class="nj">Scorchin</td><td>what's the easiest way to convert a ByteArrayInputStream into clojure string?</td></tr>
+<tr id="t1458A" class="h r"><td><a href="#t1458A">14:58</a></td><td class="nj">Scorchin</td><td>*into a clojure string</td></tr>
+<tr id="t1459A" class="h"><td><a href="#t1459A">14:59</a></td><td class="nm">S11001001</td><td>,(doc slurp)</td></tr>
+<tr id="t1459A" class="h"><td><a href="#t1459A">14:59</a></td><td class="nl">clojurebot</td><td>&quot;([f &amp; opts]); Opens a reader on f and reads all its contents, returning a string. See clojure.java.io/reader for a complete list of supported arguments.&quot;</td></tr>
+<tr id="t1459A" class="h"><td><a href="#t1459A">14:59</a></td><td class="nm">S11001001</td><td>^^ Scorchin</td></tr>
+<tr id="t1501A"><td><a href="#t1501A">15:01</a></td><td class="nj">Scorchin</td><td>S11001001: thanks</td></tr>
+<tr id="t1504A" class="h"><td><a href="#t1504A">15:04</a></td><td class="ns">shawnlewis</td><td>Is there a way to specify contrib.datalog as a dependency in leiningen,  given that contrib is gone and datalog didn't move?</td></tr>
+<tr id="t1504A" class="h r"><td><a href="#t1504A">15:04</a></td><td class="ns">shawnlewis</td><td>(with clojure 1.3)</td></tr>
+<tr id="t1504A" class="h"><td><a href="#t1504A">15:04</a></td><td class="nm">S11001001</td><td>no; put it in your own source under a different namespace, or offer to maintain it</td></tr>
+<tr id="t1505A" class="h"><td><a href="#t1505A">15:05</a></td><td class="ns">shawnlewis</td><td>S11001001: word, thanks</td></tr>
+<tr id="t1506A" class="h"><td><a href="#t1506A">15:06</a></td><td class="nm">S11001001</td><td>you could complain to jstraszheim about it, but I'm not sure that will work</td></tr>
+<tr id="t1508A" class="h"><td><a href="#t1508A">15:08</a></td><td class="ns">shawnlewis</td><td>S11001001: well… no complaint really. I was just wondering if I was right that its gone away.</td></tr>
+<tr id="t1512A"><td><a href="#t1512A">15:12</a></td><td class="nu">jicksta</td><td>Can anyone explain why doing (take 5 (cycle (range 6)) in the REPL would hang?</td></tr>
+<tr id="t1513A" class="h"><td><a href="#t1513A">15:13</a></td><td class="nr">raek</td><td>jicksta: the repl waits for one more closing parenthesis</td></tr>
+<tr id="t1514A" class="h"><td><a href="#t1514A">15:14</a></td><td class="nu">jicksta</td><td>Haha, a much stupider problem that I expected. I was getting problems with the (cycle (range 6)) outputting an infinite sequence just before this so I thought it was the same problem. Thanks  :)</td></tr>
+<tr id="t1522A"><td><a href="#t1522A">15:22</a></td><td class="nt">Rakin05</td><td>is there anything like &quot;~ compile&quot; from sbt/scala in leiningen?</td></tr>
+<tr id="t1524A" class="h"><td><a href="#t1524A">15:24</a></td><td class="nm">S11001001</td><td>Rakin05: no; compilation doesn't take long, and doesn't really help you code anyway</td></tr>
+<tr id="t1525A" class="h"><td><a href="#t1525A">15:25</a></td><td class="nt">Rakin05</td><td>S11001001: what about live error checking? is there anything?</td></tr>
+<tr id="t1525A" class="h"><td><a href="#t1525A">15:25</a></td><td class="nm">S11001001</td><td>Rakin05: also, in clj-land, we code by installing new source into a running program, not compiler loops</td></tr>
+<tr id="t1525A" class="h r"><td><a href="#t1525A">15:25</a></td><td class="nm">S11001001</td><td>Rakin05: I make edits and press C-c C-l to load my source changes into the running program</td></tr>
+<tr id="t1526A" class="h"><td><a href="#t1526A">15:26</a></td><td class="nt">Rakin05</td><td>S11001001: You use Emacs?</td></tr>
+<tr id="t1526A" class="h"><td><a href="#t1526A">15:26</a></td><td class="nm">S11001001</td><td>yes</td></tr>
+<tr id="t1526A" class="h r"><td><a href="#t1526A">15:26</a></td><td class="nm">S11001001</td><td>for scala too</td></tr>
+<tr id="t1527A" class="h"><td><a href="#t1527A">15:27</a></td><td class="nt">Rakin05</td><td>S11001001: tried emacs...my pinky still hurts</td></tr>
+<tr id="t1527A" class="h"><td><a href="#t1527A">15:27</a></td><td class="nm">S11001001</td><td>swap your caps lock and control keys</td></tr>
+<tr id="t1527A" class="h r"><td><a href="#t1527A">15:27</a></td><td class="nm">S11001001</td><td>or just replace caps lock, who needs that</td></tr>
+<tr id="t1527A" class="h r"><td><a href="#t1527A">15:27</a></td><td class="nm">S11001001</td><td>I guess there is also a vimclojure thing if you're into that, but I don't care about vim usage</td></tr>
+<tr id="t1528A" class="h r"><td><a href="#t1528A">15:28</a></td><td class="nm">S11001001</td><td>and some IDE things, but I don't care about those either</td></tr>
+<tr id="t1528A" class="h"><td><a href="#t1528A">15:28</a></td><td class="nt">Rakin05</td><td>S11001001: does'nt that mean that i write Uppercase and Lowercase randomly?</td></tr>
+<tr id="t1528A" class="h"><td><a href="#t1528A">15:28</a></td><td class="nm">S11001001</td><td>uh, what</td></tr>
+<tr id="t1528A" class="h r"><td><a href="#t1528A">15:28</a></td><td class="nm">S11001001</td><td>I am fairly sure they all provide live loading into a running program</td></tr>
+<tr id="t1528A" class="h r"><td><a href="#t1528A">15:28</a></td><td class="nm">S11001001</td><td>so, I replaced caps lock with control</td></tr>
+<tr id="t1528A" class="h r"><td><a href="#t1528A">15:28</a></td><td class="nm">S11001001</td><td>when I hold down caps lock, it just does what ctrl does</td></tr>
+<tr id="t1529A" class="h r"><td><a href="#t1529A">15:29</a></td><td class="nm">S11001001</td><td>even the vim people I know do this</td></tr>
+<tr id="t1529A" class="h"><td><a href="#t1529A">15:29</a></td><td class="nx">rlb</td><td>(and it's much better)</td></tr>
+<tr id="t1529A" class="h"><td><a href="#t1529A">15:29</a></td><td class="nt">Rakin05</td><td>Ohhh...okay...i understand. you mean via system settings</td></tr>
+<tr id="t1530A"><td><a href="#t1530A">15:30</a></td><td class="nb">bartj</td><td>hello, was the &quot;run/test&quot; task added to leningen after version 1.1 ?</td></tr>
+<tr id="t1530A" class="h r"><td><a href="#t1530A">15:30</a></td><td class="nb">bartj</td><td>i can't seem to find them in version 1.1</td></tr>
+<tr id="t1530A" class="h"><td><a href="#t1530A">15:30</a></td><td class="nm">S11001001</td><td>1.1?!?!</td></tr>
+<tr id="t1532A" class="h"><td><a href="#t1532A">15:32</a></td><td class="nb">bartj</td><td>yes :)</td></tr>
+<tr id="t1532A" class="h"><td><a href="#t1532A">15:32</a></td><td class="nm">S11001001</td><td>bartj: can you not upgrade for some reason?</td></tr>
+<tr id="t1534A" class="h r"><td><a href="#t1534A">15:34</a></td><td class="nm">S11001001</td><td>Rakin05: you may like to peruse my intro to clojure for scalawags at <a href="https://bazaar.launchpad.net/~scompall/+junk/clojure-stuff/view/head:/src/com/nocandysw/cloj_dummy/scala.clj">https://bazaar.launchpad.net/~scompall/+junk/clojure-stuff/view/head:/src/com/nocandysw/cloj_dummy/scala.clj</a> ; instructions for cloning at <a href="https://code.launchpad.net/~scompall/+junk/clojure-stuff">https://code.launchpad.net/~scompall/+junk/clojure-stuff</a></td></tr>
+<tr id="t1534A" class="h r"><td><a href="#t1534A">15:34</a></td><td class="nm">S11001001</td><td>in progress :)</td></tr>
+<tr id="t1535A" class="h"><td><a href="#t1535A">15:35</a></td><td class="nv">SrPx</td><td>How do you guys organize your project? For example, in C++ it would be .cpp files for class implementation, .h files for header implementation, with the old OO design of classes and methods...</td></tr>
+<tr id="t1535A" class="h r"><td><a href="#t1535A">15:35</a></td><td class="nv">SrPx</td><td>How are clojure projects organized?</td></tr>
+<tr id="t1535A" class="h"><td><a href="#t1535A">15:35</a></td><td class="nt">Rakin05</td><td>S11001001: The idea with Caps Lock Ctrl switching is great. thanks for that hint</td></tr>
+<tr id="t1536A" class="h"><td><a href="#t1536A">15:36</a></td><td class="ne">uvtc</td><td>SrPx, `lein new` gets you off to a good start.</td></tr>
+<tr id="t1536A" class="h r"><td><a href="#t1536A">15:36</a></td><td class="ne">uvtc</td><td>SrPx, The newest version will also create a &quot;doc&quot; dir for you and start you off with, I think, an &quot;intro.md&quot; file.</td></tr>
+<tr id="t1537A" class="h"><td><a href="#t1537A">15:37</a></td><td class="nm">S11001001</td><td>I assume due to github bias?</td></tr>
+<tr id="t1537A" class="h"><td><a href="#t1537A">15:37</a></td><td class="nv">SrPx</td><td>lein new,? let me see</td></tr>
+<tr id="t1538A" class="h"><td><a href="#t1538A">15:38</a></td><td class="ne">uvtc</td><td>S11001001, may as well settle on a standard, IMO. .md files in a &quot;doc&quot; directory seems to work fine.</td></tr>
+<tr id="t1538A" class="h r"><td><a href="#t1538A">15:38</a></td><td class="ne">uvtc</td><td>Which brings me to...</td></tr>
+<tr id="t1538A" class="h"><td><a href="#t1538A">15:38</a></td><td class="nm">S11001001</td><td>hmm.</td></tr>
+<tr id="t1539A" class="h"><td><a href="#t1539A">15:39</a></td><td class="ne">uvtc</td><td>I've been working some more on my project to centralize project docs. I added a way to create examples for a given project, similar to how there's examples at clojuredocs.</td></tr>
+<tr id="t1539A" class="h r"><td><a href="#t1539A">15:39</a></td><td class="ne">uvtc</td><td>The project is called &quot;The Alcove&quot; and it's at <a href="http://www.unexpected-vortices.com/alcove/index.html">http://www.unexpected-vortices.com/alcove/index.html</a></td></tr>
+<tr id="t1540A" class="r"><td><a href="#t1540A">15:40</a></td><td class="ne">uvtc</td><td>I'll announce it on the ML, but thought I'd post here first, and maybe get some feedback and also suggestions on projects to add.</td></tr>
+<tr id="t1540A" class="h r"><td><a href="#t1540A">15:40</a></td><td class="ne">uvtc</td><td>It works now for projects without a &quot;doc&quot; directory,</td></tr>
+<tr id="t1540A" class="h r"><td><a href="#t1540A">15:40</a></td><td class="ne">uvtc</td><td>and also even for projects without a README.md file.</td></tr>
+<tr id="t1540A" class="h"><td><a href="#t1540A">15:40</a></td><td class="nb">bartj</td><td>SrPx, <a href="https://github.com/technomancy/leiningen/blob/master/doc/TUTORIAL.md">https://github.com/technomancy/leiningen/blob/master/doc/TUTORIAL.md</a></td></tr>
+<tr id="t1542A" class="h"><td><a href="#t1542A">15:42</a></td><td class="n8">jhowarth</td><td>Does Korma guard against sql injection?</td></tr>
+<tr id="t1544A" class="h"><td><a href="#t1544A">15:44</a></td><td class="ne">uvtc</td><td>S11001001, regarding creating docs for a project, I don't think it's necessarily a github bias, though github does use markdown all over the place. But so do sites like reddit and various blog commenting systems. And marginalia uses it too. And it's the nicest of the bunch (of markup formats that I've used). And pretty much everyone already knows it or can learn the basics in a few minutes.</td></tr>
+<tr id="t1545A" class="h"><td><a href="#t1545A">15:45</a></td><td class="nm">S11001001</td><td>alright, good</td></tr>
+<tr id="t1546A" class="h"><td><a href="#t1546A">15:46</a></td><td class="ne">uvtc</td><td>What other projects should I add to the alcove? For what projects do you think others might be interested in adding examples?</td></tr>
+<tr id="t1549A" class="h"><td><a href="#t1549A">15:49</a></td><td class="nm">S11001001</td><td>uvtc: slingshot, tools.macro, and algo.monads are good example fodder</td></tr>
+<tr id="t1551A"><td><a href="#t1551A">15:51</a></td><td class="ne">uvtc</td><td>S11001001: Some of those are contrib. I think contrib docs/examples are at clojuredocs, correct?</td></tr>
+<tr id="t1551A" class="h"><td><a href="#t1551A">15:51</a></td><td class="ny">wingy</td><td>how is closjurescript doing in async programming?</td></tr>
+<tr id="t1551A" class="h"><td><a href="#t1551A">15:51</a></td><td class="nm">S11001001</td><td>I don't know</td></tr>
+<tr id="t1552A" class="h"><td><a href="#t1552A">15:52</a></td><td class="ne">uvtc</td><td>S11001001, Looks like they are. For example, monads: <a href="http://clojuredocs.org/clojure_contrib/clojure.contrib.monads">http://clojuredocs.org/clojure_contrib/clojure.contrib.monads</a></td></tr>
+<tr id="t1552A" class="h"><td><a href="#t1552A">15:52</a></td><td class="nm">S11001001</td><td>that would be ancient history</td></tr>
+<tr id="t1553A" class="h r"><td><a href="#t1553A">15:53</a></td><td class="nm">S11001001</td><td>your chance to grab onto the new hotness while clojuredocs is stuck with the old and busted</td></tr>
+<tr id="t1554A" class="h"><td><a href="#t1554A">15:54</a></td><td class="ne">uvtc</td><td>S11001001, added slingshot. Thanks.</td></tr>
+<tr id="t1555A" class="h r"><td><a href="#t1555A">15:55</a></td><td class="ne">uvtc</td><td>S11001001, I actually emailed clojuredocs to see about having the alcove hosted there. Have not heard back yet.</td></tr>
+<tr id="t1555A" class="h r"><td><a href="#t1555A">15:55</a></td><td class="ne">uvtc</td><td>S11001001, I mean, Zachary.</td></tr>
+<tr id="t1556A" class="h"><td><a href="#t1556A">15:56</a></td><td class="nv">SrPx</td><td>seriously what is that</td></tr>
+<tr id="t1556A" class="h r"><td><a href="#t1556A">15:56</a></td><td class="nv">SrPx</td><td>o.o</td></tr>
+<tr id="t1556A" class="h r"><td><a href="#t1556A">15:56</a></td><td class="nv">SrPx</td><td>what do you use instead of classes, just this?</td></tr>
+<tr id="t1557A" class="h"><td><a href="#t1557A">15:57</a></td><td class="nm">S11001001</td><td>SrPx: that what?</td></tr>
+<tr id="t1601A"><td><a href="#t1601A">16:01</a></td><td class="nv">SrPx</td><td>lein</td></tr>
+<tr id="t1601A" class="h"><td><a href="#t1601A">16:01</a></td><td class="nm">S11001001</td><td>lein is a build tool</td></tr>
+<tr id="t1601A" class="h r"><td><a href="#t1601A">16:01</a></td><td class="nm">S11001001</td><td>it knows how to create project trees and set up a REPL with your code and libraries you're using</td></tr>
+<tr id="t1602A" class="h r"><td><a href="#t1602A">16:02</a></td><td class="nm">S11001001</td><td>if you mean organization at the source level, clojure programs are organized mostly as functions in namespaces</td></tr>
+<tr id="t1612A"><td><a href="#t1612A">16:12</a></td><td class="ns">technomancy</td><td>rlb: did you say you're working on getting emacs 24 into Debian?</td></tr>
+<tr id="t1628A"><td><a href="#t1628A">16:28</a></td><td class="nb">bartj</td><td>is the error: &quot;Exception in thread &quot;main&quot; java.lang.Exception: Unable to resolve symbol: defrecord in this context&quot; because of an older clojure version ?</td></tr>
+<tr id="t1630A"><td><a href="#t1630A">16:30</a></td><td class="nm">S11001001</td><td>Yes</td></tr>
+<tr id="t1631A" class="h r"><td><a href="#t1631A">16:31</a></td><td class="nm">S11001001</td><td>still wondering why you're stuck with lein 1.1</td></tr>
+<tr id="t1632A" class="h"><td><a href="#t1632A">16:32</a></td><td class="nb">bartj</td><td>S11001001, I've upgraded</td></tr>
+<tr id="t1632A" class="h r"><td><a href="#t1632A">16:32</a></td><td class="nb">bartj</td><td>Leiningen 2.0.0-preview6 on Java 1.6.0_22 Java HotSpot(TM) Client VM</td></tr>
+<tr id="t1632A" class="h"><td><a href="#t1632A">16:32</a></td><td class="nm">S11001001</td><td>ok, so your clojure version in project.clj...</td></tr>
+<tr id="t1638A" class="h"><td><a href="#t1638A">16:38</a></td><td class="nv">clj_newb_024587</td><td>I have a clojure web app currently setup using ring, compojure, friend, clojurescript. Now, I want to add ssl support to it. What is the easiest way to do this?</td></tr>
+<tr id="t1639A" class="h"><td><a href="#t1639A">16:39</a></td><td class="nj">weavejester</td><td>clj_newb_024587: Usually it's easiest to proxy from nginx or something similar.</td></tr>
+<tr id="t1639A" class="h"><td><a href="#t1639A">16:39</a></td><td class="nv">clj_newb_024587</td><td>I am using ubuntu 12.04. I have no exprience setting up ssl, though I am familiar with crypto. Which one do I have the smallest chance of fucking up?</td></tr>
+<tr id="t1639A" class="h"><td><a href="#t1639A">16:39</a></td><td class="nj">weavejester</td><td>clj_newb_024587: The Ring Jetty adapter does support SSL, but it's often useful to separate it out into a proxy.</td></tr>
+<tr id="t1640A" class="r"><td><a href="#t1640A">16:40</a></td><td class="nj">weavejester</td><td>clj_newb_024587: nginx SSL is fairly straightforward.</td></tr>
+<tr id="t1640A" class="h"><td><a href="#t1640A">16:40</a></td><td class="nv">clj_newb_024587</td><td>weavejester: this is very low bandwidth, i.e. I have a dual 8GB machine, and there's be a max of 3 concurrent users at any time.</td></tr>
+<tr id="t1640A" class="h r"><td><a href="#t1640A">16:40</a></td><td class="nv">clj_newb_024587</td><td>So I can set this all up using just ring-jetty, without nginx?</td></tr>
+<tr id="t1641A" class="h"><td><a href="#t1641A">16:41</a></td><td class="nj">weavejester</td><td>clj_newb_024587: It's often useful to proxy a web server through a proxy nginx as a matter of course. That way you can bind nginx to port 80 as root, but have your web app run as an unpriviledged user.</td></tr>
+<tr id="t1641A" class="h"><td><a href="#t1641A">16:41</a></td><td class="nv">clj_newb_024587</td><td>right now, I have an iptables rule forwarding port 80 to port 8080</td></tr>
+<tr id="t1642A" class="h r"><td><a href="#t1642A">16:42</a></td><td class="nv">clj_newb_024587</td><td>but it sounds like I should learn about ngninx</td></tr>
+<tr id="t1643A" class="h"><td><a href="#t1643A">16:43</a></td><td class="nj">weavejester</td><td>clj_newb_024587: I think nginx would be my choice, whether I was writing a web app in Clojure or Ruby or something else.</td></tr>
+<tr id="t1643A" class="h"><td><a href="#t1643A">16:43</a></td><td class="nv">clj_newb_024587</td><td>weavejester: can you recommend something better than <a href="http://nginx.org/en/docs/http/configuring_https_servers.html">http://nginx.org/en/docs/http/configuring_https_servers.html</a> ?</td></tr>
+<tr id="t1644A" class="h"><td><a href="#t1644A">16:44</a></td><td class="nj">weavejester</td><td>clj_newb_024587: Let me see if I can find something...</td></tr>
+<tr id="t1645A" class="h"><td><a href="#t1645A">16:45</a></td><td class="nv">clj_newb_024587</td><td>weavejester: one more thing; how do I get a signed ssl certificate?</td></tr>
+<tr id="t1645A" class="h r"><td><a href="#t1645A">16:45</a></td><td class="nv">clj_newb_024587</td><td>do I just go and throw my wallet at godaddy ?</td></tr>
+<tr id="t1645A" class="h"><td><a href="#t1645A">16:45</a></td><td class="ng">arrdem</td><td>clj_newb_024587: that'll work.... but I would look around some first</td></tr>
+<tr id="t1646A" class="h r"><td><a href="#t1646A">16:46</a></td><td class="ng">arrdem</td><td>godaddy is not what you would call cheap.</td></tr>
+<tr id="t1646A" class="h"><td><a href="#t1646A">16:46</a></td><td class="nv">clj_newb_024587</td><td>arrdem: what would you use?</td></tr>
+<tr id="t1646A" class="h"><td><a href="#t1646A">16:46</a></td><td class="ng">arrdem</td><td>clj_newb_024587: honestly? no idea. I have never worked with SSL/HTTPS certs. I've just had sub-optiomal experiences with GDDY</td></tr>
+<tr id="t1649A" class="h"><td><a href="#t1649A">16:49</a></td><td class="nv">clj_newb_024587</td><td><a href="http://emspace.com.au/article/installing-ssl-ubuntu-nginx">http://emspace.com.au/article/installing-ssl-ubuntu-nginx</a> damn this is compliated</td></tr>
+<tr id="t1649A" class="h"><td><a href="#t1649A">16:49</a></td><td class="nj">weavejester</td><td>clj_newb_024587: Try looking at this for examples of proxying: <a href="https://help.ubuntu.com/community/Nginx/ReverseProxy">https://help.ubuntu.com/community/Nginx/ReverseProxy</a></td></tr>
+<tr id="t1650A" class="r"><td><a href="#t1650A">16:50</a></td><td class="nj">weavejester</td><td>clj_newb_024587: It's actually not that complex… You just need to dump one file in a directory, and then run one command, if memory serves.</td></tr>
+<tr id="t1650A" class="h"><td><a href="#t1650A">16:50</a></td><td class="nv">clj_newb_024587</td><td>it's like NP-complete; an expoenntial amount of work for a short solution</td></tr>
+<tr id="t1657A" class="h"><td><a href="#t1657A">16:57</a></td><td class="nj">weavejester</td><td>clj_newb_024587: This file should be all you need to proxy (HTTP at least): <a href="https://gist.github.com/2984900">https://gist.github.com/2984900</a></td></tr>
+<tr id="t1657A" class="h"><td><a href="#t1657A">16:57</a></td><td class="nv">clj_newb_024587</td><td>intersting you merged in proxy.conf</td></tr>
+<tr id="t1657A" class="h r"><td><a href="#t1657A">16:57</a></td><td class="nv">clj_newb_024587</td><td>(I was just working through the tutorial)</td></tr>
+<tr id="t1658A" class="h"><td><a href="#t1658A">16:58</a></td><td class="nj">weavejester</td><td>clj_newb_024587: You just dump that in /etc/nginx/available, and sym-link ot to /etc/nginx/enabled and then reload</td></tr>
+<tr id="t1658A" class="h"><td><a href="#t1658A">16:58</a></td><td class="nv">clj_newb_024587</td><td>so I have this weird situation right now, where (1) ssh-ed into my server, &quot;lynx localhost:80&quot; works (it gets me localhost:8080's content); however, from my laptop, going to remote-addr:80 ... it hangs</td></tr>
+<tr id="t1658A" class="h"><td><a href="#t1658A">16:58</a></td><td class="nj">weavejester</td><td>For SSL, add another server to listen on 443</td></tr>
+<tr id="t1659A" class="h"><td><a href="#t1659A">16:59</a></td><td class="nv">clj_newb_024587</td><td>crap ; I think I just nuked my ssh conections</td></tr>
+<tr id="t1700A" class="r"><td><a href="#t1700A">17:00</a></td><td class="nv">clj_newb_024587</td><td>okay; my current problems = firewall problem; not nginx problem</td></tr>
+<tr id="t1700A" class="h r"><td><a href="#t1700A">17:00</a></td><td class="nv">clj_newb_024587</td><td>weavejester: thanks for help</td></tr>
+<tr id="t1700A" class="h"><td><a href="#t1700A">17:00</a></td><td class="nj">weavejester</td><td>clj_newb_024587: np</td></tr>
+<tr id="t1701A" class="h"><td><a href="#t1701A">17:01</a></td><td class="nv">clj_newb_024587</td><td>weavejester: one more dumb question; I acutally don't need to change anythign on the ring/compojre/clojure side right? i.e. I can just redirect 443 to port 8080, and not modify my clojure code, and everything will wor as is, since nginx handles everything?</td></tr>
+<tr id="t1702A" class="h"><td><a href="#t1702A">17:02</a></td><td class="nj">weavejester</td><td>clj_newb_024587: Right</td></tr>
+<tr id="t1703A" class="h r"><td><a href="#t1703A">17:03</a></td><td class="nj">weavejester</td><td>clj_newb_024587: If you wanted to work with client SSL certificates, you'd have to have Jetty handle the SSL, but client SSL certs are rarely used</td></tr>
+<tr id="t1703A" class="h r"><td><a href="#t1703A">17:03</a></td><td class="nj">weavejester</td><td>clj_newb_024587: Once nginx is setup, you can use any back end web server and not have to worry about SSL anymore</td></tr>
+<tr id="t1703A" class="h"><td><a href="#t1703A">17:03</a></td><td class="nv">clj_newb_024587</td><td>I like this separation of concerns.</td></tr>
+<tr id="t1704A" class="h"><td><a href="#t1704A">17:04</a></td><td class="nj">weavejester</td><td>clj_newb_024587: Another benefit is that you can configure nginx to wait if the web app is down, so you can restart your app with new code, and users wouldn't see any downtime - their connections would just be delayed for a few seconds while the app restarts.</td></tr>
+<tr id="t1705A" class="h"><td><a href="#t1705A">17:05</a></td><td class="nv">clj_newb_024587</td><td>weavejester: oh boy, I'm not sure if that is possible with jvm start up times</td></tr>
+<tr id="t1707A" class="h"><td><a href="#t1707A">17:07</a></td><td class="nj">weavejester</td><td>clj_newb_024587: The JVM only takes a few seconds to boot, right?</td></tr>
+<tr id="t1707A" class="h r"><td><a href="#t1707A">17:07</a></td><td class="nj">weavejester</td><td>clj_newb_024587: Alternatively, you could have two servers, and restart each separately, so you always have one server up.</td></tr>
+<tr id="t1711A"><td><a href="#t1711A">17:11</a></td><td class="nb">bartj</td><td>in clojure.test is there a diff b/w error and failure ?</td></tr>
+<tr id="t1713A" class="h"><td><a href="#t1713A">17:13</a></td><td class="n9">cky</td><td>bartj: Yes. A failure means your code has a bug. An error means some unexpected error occurred, which means your code may or may not be buggy.</td></tr>
+<tr id="t1713A" class="h"><td><a href="#t1713A">17:13</a></td><td class="nn">xeqi</td><td>did it throw an exception or fail an (is ..)</td></tr>
+<tr id="t1714A" class="h"><td><a href="#t1714A">17:14</a></td><td class="nb">bartj</td><td>i purposefully changed an expected test-case which it showed as &quot;failure&quot;</td></tr>
+<tr id="t1714A" class="h"><td><a href="#t1714A">17:14</a></td><td class="ne">clj_newb_09824</td><td>weavejester: okay, after firewall fixing, port 443 forwarding works now</td></tr>
+<tr id="t1714A" class="h r"><td><a href="#t1714A">17:14</a></td><td class="ne">clj_newb_09824</td><td>so correct me if i&quot;mwrong all I need now is to generate the fiels cert.pem and cert.key</td></tr>
+<tr id="t1714A" class="h"><td><a href="#t1714A">17:14</a></td><td class="nb">bartj</td><td>xeqi, failure</td></tr>
+<tr id="t1715A" class="h r"><td><a href="#t1715A">17:15</a></td><td class="nb">bartj</td><td>is it possible to write a multimethod for this scenario:</td></tr>
+<tr id="t1715A" class="h r"><td><a href="#t1715A">17:15</a></td><td class="nb">bartj</td><td>input is a string</td></tr>
+<tr id="t1716A" class="h"><td><a href="#t1716A">17:16</a></td><td class="nj">weavejester</td><td>clj_newb_09824: I can never remember the exact steps, but essentially a cert is a public key plus metadata about the site (domain name, owner, etc.). You need to generate the key-pair, generate the cert, then upload the cert to a cert authority to sign it.</td></tr>
+<tr id="t1716A" class="h"><td><a href="#t1716A">17:16</a></td><td class="nb">bartj</td><td>if input contains the string &quot;abc&quot; return 1, if input contains the string &quot;xyz&quot; return 2, input is &quot;pqr&quot; return 3</td></tr>
+<tr id="t1716A" class="h"><td><a href="#t1716A">17:16</a></td><td class="nj">weavejester</td><td>clj_newb_09824: Then nginx needs to have a file with the signed cert, and the private key.</td></tr>
+<tr id="t1716A" class="h"><td><a href="#t1716A">17:16</a></td><td class="nb">bartj</td><td>i think it is not possible because the dispatch value has to be a *constant*</td></tr>
+<tr id="t1719A" class="h"><td><a href="#t1719A">17:19</a></td><td class="na">Raynes</td><td>mmarczyk: The problem we were seeing in refheap was that mongo-session had a transitive dependency on an ancient version of the java mongo driver. Updating it fixed that issue.</td></tr>
+<tr id="t1720A" class="r"><td><a href="#t1720A">17:20</a></td><td class="na">Raynes</td><td>bartj: That would require predicate dispatch which Clojure's multimethods do not support.</td></tr>
+<tr id="t1726A" class="h r"><td><a href="#t1726A">17:26</a></td><td class="na">Raynes</td><td>mmarczyk: Also, this is ridiculously slow.</td></tr>
+<tr id="t1726A" class="h r"><td><a href="#t1726A">17:26</a></td><td class="na">Raynes</td><td>:(</td></tr>
+<tr id="t1726A" class="h r"><td><a href="#t1726A">17:26</a></td><td class="na">Raynes</td><td>20 seconds to highlight a 655 line java file.</td></tr>
+<tr id="t1727A" class="h"><td><a href="#t1727A">17:27</a></td><td class="nb">bartj</td><td>Raynes, I meant something like this: <a href="http://pastie.org/4144823">http://pastie.org/4144823</a></td></tr>
+<tr id="t1728A" class="h r"><td><a href="#t1728A">17:28</a></td><td class="nb">bartj</td><td>do you think that implementation is wrong, for the problem I posted above?</td></tr>
+<tr id="t1729A" class="h"><td><a href="#t1729A">17:29</a></td><td class="na">Raynes</td><td>bartj: That looks about right. (nth foo 1) is just (second foo) though.</td></tr>
+<tr id="t1729A" class="h r"><td><a href="#t1729A">17:29</a></td><td class="na">Raynes</td><td>&amp;(nth [1 2 3] 1)</td></tr>
+<tr id="t1729A" class="h r"><td><a href="#t1729A">17:29</a></td><td class="na">Raynes</td><td>Damn bot.</td></tr>
+<tr id="t1729A" class="h"><td><a href="#t1729A">17:29</a></td><td class="nb">bartj</td><td>but, you said it wasn't possible ?</td></tr>
+<tr id="t1729A" class="h r"><td><a href="#t1729A">17:29</a></td><td class="nb">bartj</td><td>so I was wondering...</td></tr>
+<tr id="t1730A"><td><a href="#t1730A">17:30</a></td><td class="na">Raynes</td><td>I thought you were asking for something much more general.</td></tr>
+<tr id="t1730A" class="h r"><td><a href="#t1730A">17:30</a></td><td class="na">Raynes</td><td>It sounded like you wanted to execute a different function for each method implementation until one matched.</td></tr>
+<tr id="t1746A"><td><a href="#t1746A">17:46</a></td><td class="ne">clj_newb_09824</td><td>hmm</td></tr>
+<tr id="t1746A" class="h r"><td><a href="#t1746A">17:46</a></td><td class="ne">clj_newb_09824</td><td>where can I get my *.csr file signed?</td></tr>
+<tr id="t1749A" class="h"><td><a href="#t1749A">17:49</a></td><td class="nx">rlb</td><td>technomancy: yes, should be soonish (next few days I hope).</td></tr>
+<tr id="t1750A"><td><a href="#t1750A">17:50</a></td><td class="n9">cky</td><td>clj_newb_09824: Any certificate authority will do that for you for some $$$.</td></tr>
+<tr id="t1800A"><td><a href="#t1800A">18:00</a></td><td class="ns">technomancy</td><td>rlb: godspeed =)</td></tr>
+<tr id="t1801A" class="h"><td><a href="#t1801A">18:01</a></td><td class="nx">rlb</td><td>thx -- nearly finished; the dfsg split and debian &quot;multiple flavor&quot; infrastructure just takes some time.</td></tr>
+<tr id="t1811A"><td><a href="#t1811A">18:11</a></td><td class="nf">hcliff</td><td>hey, anyone know how to bring up the chrome debugger from the clojurescript reply? (js* &quot;debugger&quot;) isn't working</td></tr>
+<tr id="t1813A" class="h"><td><a href="#t1813A">18:13</a></td><td class="no">brehaut</td><td>hcliff: are you wanting to just make it appear, or to break at a certain point?</td></tr>
+<tr id="t1828A"><td><a href="#t1828A">18:28</a></td><td class="n8">jlewis</td><td>do the runtime characteristics of assocEx differ from assoc in IPersistentHashMap?</td></tr>
+<tr id="t1833A"><td><a href="#t1833A">18:33</a></td><td class="n7">gfredericks</td><td>I was wondering what assocEx was the other day</td></tr>
+<tr id="t1833A" class="h r"><td><a href="#t1833A">18:33</a></td><td class="n7">gfredericks</td><td>is that assoc where you know the key to be already present?</td></tr>
+<tr id="t1833A" class="h"><td><a href="#t1833A">18:33</a></td><td class="n8">jlewis</td><td>well, i think what it does is throw an exception immediately if the key already exists</td></tr>
+<tr id="t1833A" class="h r"><td><a href="#t1833A">18:33</a></td><td class="n8">jlewis</td><td>but... if that's the case, what does assoc do when the key already exists?</td></tr>
+<tr id="t1836A" class="h r"><td><a href="#t1836A">18:36</a></td><td class="n8">jlewis</td><td>oh, i see</td></tr>
+<tr id="t1836A" class="h r"><td><a href="#t1836A">18:36</a></td><td class="n8">jlewis</td><td>assoc replaces the value</td></tr>
+<tr id="t1836A" class="h r"><td><a href="#t1836A">18:36</a></td><td class="n8">jlewis</td><td>assocEx blows up</td></tr>
+<tr id="t1911A"><td><a href="#t1911A">19:11</a></td><td class="nb">ibdknox</td><td>dnolen: have you run into this showing up with master: clojure.lang.PersistentHashMap.create.call(null, b)</td></tr>
+<tr id="t1911A" class="h r"><td><a href="#t1911A">19:11</a></td><td class="nb">ibdknox</td><td>dnolen: it's appearing in cljs.core.js-&gt;clj and blowing up</td></tr>
+<tr id="t1934A"><td><a href="#t1934A">19:34</a></td><td class="nq">iwillig</td><td>does anyone know if i can call a compojure application with a ring request ?</td></tr>
+<tr id="t1935A" class="h"><td><a href="#t1935A">19:35</a></td><td class="nj">weavejester</td><td>iwillig: Yes; Compojure is built on top of Ring.</td></tr>
+<tr id="t1935A" class="h"><td><a href="#t1935A">19:35</a></td><td class="nq">iwillig</td><td>cool</td></tr>
+<tr id="t1935A" class="h"><td><a href="#t1935A">19:35</a></td><td class="nj">weavejester</td><td>iwillig: Compojure's effectively a routing library for Ring</td></tr>
+<tr id="t1936A" class="h r"><td><a href="#t1936A">19:36</a></td><td class="nj">weavejester</td><td>Almost every function in Compojure returns a Ring handler</td></tr>
+<tr id="t1936A" class="h"><td><a href="#t1936A">19:36</a></td><td class="nq">iwillig</td><td>so if i have an compojure app... I should be able to call (app (request :get &quot;/&quot;))</td></tr>
+<tr id="t1936A" class="h"><td><a href="#t1936A">19:36</a></td><td class="nj">mmarczyk</td><td>ibdknox: do you have an example of code where this happens?</td></tr>
+<tr id="t1936A" class="h"><td><a href="#t1936A">19:36</a></td><td class="nj">weavejester</td><td>iwillig: Right</td></tr>
+<tr id="t1936A" class="h"><td><a href="#t1936A">19:36</a></td><td class="nq">iwillig</td><td>where request is from request ring-mock</td></tr>
+<tr id="t1936A" class="h r"><td><a href="#t1936A">19:36</a></td><td class="nq">iwillig</td><td>cool weavejester thanks</td></tr>
+<tr id="t1936A" class="h"><td><a href="#t1936A">19:36</a></td><td class="nb">ibdknox</td><td>mmarczyk: it's in cljs.core</td></tr>
+<tr id="t1937A" class="h"><td><a href="#t1937A">19:37</a></td><td class="nj">weavejester</td><td>iwillig: A compojure app = a ring handler</td></tr>
+<tr id="t1937A" class="h"><td><a href="#t1937A">19:37</a></td><td class="nj">mmarczyk</td><td>ibdknox: I mean, a call to js-&gt;clj which is guaranteed to blow up</td></tr>
+<tr id="t1937A" class="h r"><td><a href="#t1937A">19:37</a></td><td class="nj">mmarczyk</td><td>I've never seen this happen</td></tr>
+<tr id="t1937A" class="h"><td><a href="#t1937A">19:37</a></td><td class="nq">iwillig</td><td>lovely thank weavejester</td></tr>
+<tr id="t1938A" class="h"><td><a href="#t1938A">19:38</a></td><td class="nb">ibdknox</td><td>mmarczyk: here's what is in my output: <a href="https://www.refheap.com/paste/3304">https://www.refheap.com/paste/3304</a></td></tr>
+<tr id="t1938A" class="h r"><td><a href="#t1938A">19:38</a></td><td class="nb">ibdknox</td><td>mmarczyk: any call to js-&gt;clj will trigger that path</td></tr>
+<tr id="t1939A" class="h"><td><a href="#t1939A">19:39</a></td><td class="nj">mmarczyk</td><td>whoa</td></tr>
+<tr id="t1939A" class="h"><td><a href="#t1939A">19:39</a></td><td class="nq">iwillig</td><td>weavejester: when i try (app (request :get &quot;/&quot;))</td></tr>
+<tr id="t1939A" class="h r"><td><a href="#t1939A">19:39</a></td><td class="nq">iwillig</td><td>i keep on getting an key must be an integer error</td></tr>
+<tr id="t1939A" class="h"><td><a href="#t1939A">19:39</a></td><td class="nb">ibdknox</td><td>mmarczyk: yeah, I have no idea what's going on</td></tr>
+<tr id="t1939A" class="h r"><td><a href="#t1939A">19:39</a></td><td class="nb">ibdknox</td><td>mmarczyk: makes no sense to me</td></tr>
+<tr id="t1940A"><td><a href="#t1940A">19:40</a></td><td class="nj">weavejester</td><td>iwillig: It sounds like there's a problem in your app</td></tr>
+<tr id="t1940A" class="h"><td><a href="#t1940A">19:40</a></td><td class="nq">iwillig</td><td>okay</td></tr>
+<tr id="t1940A" class="h"><td><a href="#t1940A">19:40</a></td><td class="nb">ibdknox</td><td>mmarczyk: this started happening after I picked up the analyzer split changes</td></tr>
+<tr id="t1940A" class="h r"><td><a href="#t1940A">19:40</a></td><td class="nb">ibdknox</td><td>mmarczyk: I was a little behind though, so it could be anything since then</td></tr>
+<tr id="t1940A" class="h"><td><a href="#t1940A">19:40</a></td><td class="nq">iwillig</td><td>shoot silly error sorry to bug you</td></tr>
+<tr id="t1944A" class="h"><td><a href="#t1944A">19:44</a></td><td class="n7">gfredericks</td><td>there is no cljs.core/format?</td></tr>
+<tr id="t1944A" class="h r"><td><a href="#t1944A">19:44</a></td><td class="n7">gfredericks</td><td>I guess because it'd have to be implemented from scratch instead of deferring to jvm?</td></tr>
+<tr id="t1945A" class="h"><td><a href="#t1945A">19:45</a></td><td class="nb">ibdknox</td><td>gfredericks: correct</td></tr>
+<tr id="t1945A" class="h"><td><a href="#t1945A">19:45</a></td><td class="n7">gfredericks</td><td>is that a wanted feature?</td></tr>
+<tr id="t1946A" class="h"><td><a href="#t1946A">19:46</a></td><td class="na">dnolen</td><td>ibdknox: I just looked at my output, I don't see this. Did you try cleaning everything?</td></tr>
+<tr id="t1946A" class="h"><td><a href="#t1946A">19:46</a></td><td class="nb">ibdknox</td><td>dnolen: yeah</td></tr>
+<tr id="t1946A" class="h r"><td><a href="#t1946A">19:46</a></td><td class="nb">ibdknox</td><td>dnolen: I'll recheckout</td></tr>
+<tr id="t1946A" class="h r"><td><a href="#t1946A">19:46</a></td><td class="nb">ibdknox</td><td>gfredericks: I'd love it :D</td></tr>
+<tr id="t1946A" class="h"><td><a href="#t1946A">19:46</a></td><td class="n7">gfredericks</td><td>is there a jira ticket for it?</td></tr>
+<tr id="t1946A" class="h"><td><a href="#t1946A">19:46</a></td><td class="na">dnolen</td><td>gfredericks: no</td></tr>
+<tr id="t1946A" class="h"><td><a href="#t1946A">19:46</a></td><td class="n7">gfredericks</td><td>dnolen: shall I?</td></tr>
+<tr id="t1946A" class="h"><td><a href="#t1946A">19:46</a></td><td class="na">dnolen</td><td>gfredericks: please do.</td></tr>
+<tr id="t1946A" class="h"><td><a href="#t1946A">19:46</a></td><td class="n7">gfredericks</td><td>or are there design questions?</td></tr>
+<tr id="t1946A" class="h"><td><a href="#t1946A">19:46</a></td><td class="nj">mmarczyk</td><td>ibdknox: yeah, I don't have this in my compiled output either</td></tr>
+<tr id="t1946A" class="h"><td><a href="#t1946A">19:46</a></td><td class="n7">gfredericks</td><td>on it</td></tr>
+<tr id="t1947A" class="h"><td><a href="#t1947A">19:47</a></td><td class="nb">ibdknox</td><td>dnolen: mmarczyk: I'm on 1.5, not sure if that might make a difference</td></tr>
+<tr id="t1947A" class="h"><td><a href="#t1947A">19:47</a></td><td class="nj">mmarczyk</td><td>ibdknox: <a href="https://www.refheap.com/paste/3305">https://www.refheap.com/paste/3305</a></td></tr>
+<tr id="t1948A" class="h"><td><a href="#t1948A">19:48</a></td><td class="na">dnolen</td><td>ibdknox: that looks like map destructuring is completely broken.</td></tr>
+<tr id="t1948A" class="h r"><td><a href="#t1948A">19:48</a></td><td class="na">dnolen</td><td>ibdknox: hmm ... that might, on 1.4 here. are you using 1.5 specific things?</td></tr>
+<tr id="t1948A" class="h"><td><a href="#t1948A">19:48</a></td><td class="nb">ibdknox</td><td>yeah</td></tr>
+<tr id="t1949A" class="h"><td><a href="#t1949A">19:49</a></td><td class="nj">mmarczyk</td><td>oh yeah</td></tr>
+<tr id="t1949A" class="h r"><td><a href="#t1949A">19:49</a></td><td class="nj">mmarczyk</td><td>replacing clojure.jar in lib with 1.5.0-alpha1 breaks things for me</td></tr>
+<tr id="t1949A" class="h r"><td><a href="#t1949A">19:49</a></td><td class="nj">mmarczyk</td><td>*but*</td></tr>
+<tr id="t1949A" class="h r"><td><a href="#t1949A">19:49</a></td><td class="nj">mmarczyk</td><td>not in the same way :-P</td></tr>
+<tr id="t1949A" class="h"><td><a href="#t1949A">19:49</a></td><td class="nb">ibdknox</td><td>lol</td></tr>
+<tr id="t1950A" class="r"><td><a href="#t1950A">19:50</a></td><td class="nb">ibdknox</td><td>I'm using clojure master</td></tr>
+<tr id="t1951A" class="h"><td><a href="#t1951A">19:51</a></td><td class="na">dnolen</td><td>ibdknox: yeah destructuring macro changed.</td></tr>
+<tr id="t1951A" class="h"><td><a href="#t1951A">19:51</a></td><td class="n7">gfredericks</td><td>cljs.core/format sounds like a good target for the macro-and-function pattern</td></tr>
+<tr id="t1951A" class="h"><td><a href="#t1951A">19:51</a></td><td class="na">dnolen</td><td>ibdknox: inline clojure.lang.PersistentHashMap/create reference in Clojure HEAD</td></tr>
+<tr id="t1951A" class="h r"><td><a href="#t1951A">19:51</a></td><td class="na">dnolen</td><td>ibdknox: which of course does not exist in CLJS.</td></tr>
+<tr id="t1951A" class="h"><td><a href="#t1951A">19:51</a></td><td class="nb">ibdknox</td><td>dnolen: right</td></tr>
+<tr id="t1952A" class="h"><td><a href="#t1952A">19:52</a></td><td class="nj">mmarczyk</td><td>hah</td></tr>
+<tr id="t1952A" class="h"><td><a href="#t1952A">19:52</a></td><td class="na">dnolen</td><td>this a pretty argument for continuing with static fields pattern even though not necessary for JS target ...</td></tr>
+<tr id="t1953A" class="h"><td><a href="#t1953A">19:53</a></td><td class="nb">ibdknox</td><td>dnolen: suggestion? If necessary I can likely recreate my changes on 1.4 instead. If there's a straightforward path to a fix, I can work on that instead though.</td></tr>
+<tr id="t1954A" class="h"><td><a href="#t1954A">19:54</a></td><td class="nj">mmarczyk</td><td>this is also possibly an argument in favour of bbloom 's host-specific-macro-based approach to map creation, although here I guess it wouldn't help (since any macros imported from clojure.core would still have been compiled to use clojure.core's helpers)</td></tr>
+<tr id="t1954A" class="h"><td><a href="#t1954A">19:54</a></td><td class="na">dnolen</td><td>mmarczyk: ibdknox: <a href="http://dev.clojure.org/jira/browse/CLJS-325">http://dev.clojure.org/jira/browse/CLJS-325</a></td></tr>
+<tr id="t1954A" class="h r"><td><a href="#t1954A">19:54</a></td><td class="na">dnolen</td><td>ibdknox: seems like a simple patch.</td></tr>
+<tr id="t1954A" class="h r"><td><a href="#t1954A">19:54</a></td><td class="na">dnolen</td><td>mmarczyk: how was the 1.5 breakage you were seeing different from ibdknox's?</td></tr>
+<tr id="t1955A" class="h"><td><a href="#t1955A">19:55</a></td><td class="nj">mmarczyk</td><td>dnolen: Reflection warning, cljs/analyzer.clj:234 - call to create can't be resolved.</td></tr>
+<tr id="t1955A" class="h r"><td><a href="#t1955A">19:55</a></td><td class="nj">mmarczyk</td><td>dnolen: Reflection warning, cljs/compiler.clj:500 - call to create can't be resolved.</td></tr>
+<tr id="t1955A" class="h r"><td><a href="#t1955A">19:55</a></td><td class="nj">mmarczyk</td><td>dnolen: and loads more with different line numbers</td></tr>
+<tr id="t1956A" class="h r"><td><a href="#t1956A">19:56</a></td><td class="nj">mmarczyk</td><td>dnolen: compiled output looked ok at first (cursory) glance</td></tr>
+<tr id="t1956A" class="h"><td><a href="#t1956A">19:56</a></td><td class="na">dnolen</td><td>mmarczyk: oh right ...</td></tr>
+<tr id="t1956A" class="h r"><td><a href="#t1956A">19:56</a></td><td class="na">dnolen</td><td>mmarczyk: that's a Java class reference.</td></tr>
+<tr id="t1956A" class="h"><td><a href="#t1956A">19:56</a></td><td class="nj">mmarczyk</td><td>yeah</td></tr>
+<tr id="t1956A" class="h r"><td><a href="#t1956A">19:56</a></td><td class="nj">mmarczyk</td><td>freaked me out though</td></tr>
+<tr id="t1956A" class="h r"><td><a href="#t1956A">19:56</a></td><td class="nj">mmarczyk</td><td>until I looked at the output :-P</td></tr>
+<tr id="t1957A" class="h"><td><a href="#t1957A">19:57</a></td><td class="na">dnolen</td><td>mmarczyk: we probably need to move destructure into core.clj macros file.</td></tr>
+<tr id="t1958A" class="h"><td><a href="#t1958A">19:58</a></td><td class="nj">mmarczyk</td><td>dnolen: ...and possibly revisit :properties destructuring? :-)</td></tr>
+<tr id="t1958A" class="h r"><td><a href="#t1958A">19:58</a></td><td class="nj">mmarczyk</td><td>dnolen: wouldn't that entail moving let, loop, fn, defn, defmacro (... ?) into cljs also?</td></tr>
+<tr id="t1959A" class="h r"><td><a href="#t1959A">19:59</a></td><td class="nj">mmarczyk</td><td>not that I necessarily see a problem with that</td></tr>
+<tr id="t1959A" class="h"><td><a href="#t1959A">19:59</a></td><td class="na">dnolen</td><td>mmarczyk: ah ... yeah since they will be calling the wrong destructure.</td></tr>
+<tr id="t2000A"><td><a href="#t2000A">20:00</a></td><td class="nj">mmarczyk</td><td>also, with cljs-specific macros c.l.PHM/create wouldn't be needed</td></tr>
+<tr id="t2001A" class="h"><td><a href="#t2001A">20:01</a></td><td class="na">dnolen</td><td>mmarczyk: yeah</td></tr>
+<tr id="t2002A" class="h"><td><a href="#t2002A">20:02</a></td><td class="nj">mmarczyk</td><td>at some point those macros may simply need to be imported -- certainly if cljs were to become *the* Clojure compiler (w/ a JVM backend), possibly if non-JVM cross-host issues or something else of importance required cljs-specific changes</td></tr>
+<tr id="t2004A" class="h"><td><a href="#t2004A">20:04</a></td><td class="na">dnolen</td><td>mmarczyk: I don't think we need to move that many macros. only let and loop far as I can tell.</td></tr>
+<tr id="t2009A" class="h"><td><a href="#t2009A">20:09</a></td><td class="nj">mmarczyk</td><td>dnolen: oh, it does look that way</td></tr>
+<tr id="t2018A" class="r"><td><a href="#t2018A">20:18</a></td><td class="nj">mmarczyk</td><td>was there a ticket for 93c795fe10ee5c92a36b6ec6373b3c80a31135c4 (in Clojure)?</td></tr>
+<tr id="t2018A" class="h r"><td><a href="#t2018A">20:18</a></td><td class="nj">mmarczyk</td><td>I'd like to read the rationale</td></tr>
+<tr id="t2022A"><td><a href="#t2022A">20:22</a></td><td class="ns">technomancy</td><td>rlb: yeah, I don't envy anyone who has to get in the middle of the dfsg and the gfdl.</td></tr>
+<tr id="t2022A" class="h r"><td><a href="#t2022A">20:22</a></td><td class="ns">technomancy</td><td>I'd imagine it's something like <a href="http://wondermark.com/657/">http://wondermark.com/657/</a></td></tr>
+<tr id="t2026A" class="h"><td><a href="#t2026A">20:26</a></td><td class="na">dnolen</td><td>mmarczyk: hmm I vaguely recall something</td></tr>
+<tr id="t2027A" class="h"><td><a href="#t2027A">20:27</a></td><td class="nj">mmarczyk</td><td>dnolen: ?</td></tr>
+<tr id="t2027A" class="h"><td><a href="#t2027A">20:27</a></td><td class="n7">gfredericks</td><td>it looks like the example test sort of uses it as a way to provide default values?</td></tr>
+<tr id="t2027A" class="h"><td><a href="#t2027A">20:27</a></td><td class="nv">SrPx</td><td>is there any way to save REPL state?</td></tr>
+<tr id="t2027A" class="h"><td><a href="#t2027A">20:27</a></td><td class="na">dnolen</td><td>mmarczyk: <a href="http://dev.clojure.org/jira/browse/CLJ-763">http://dev.clojure.org/jira/browse/CLJ-763</a></td></tr>
+<tr id="t2028A" class="h"><td><a href="#t2028A">20:28</a></td><td class="nj">mmarczyk</td><td>dnolen: thanks!</td></tr>
+<tr id="t2029A" class="h r"><td><a href="#t2029A">20:29</a></td><td class="nj">mmarczyk</td><td>now this really makes me see bbloom's emitter idea in a new light</td></tr>
+<tr id="t2030A"><td><a href="#t2030A">20:30</a></td><td class="ny">bbloom</td><td>mmarczyk: :-)</td></tr>
+<tr id="t2030A" class="h"><td><a href="#t2030A">20:30</a></td><td class="nj">mmarczyk</td><td>expanding to (unchecked-create-map ...) w/ unchecked-create-map inlined on the JVM would save as some hassle</td></tr>
+<tr id="t2030A" class="h r"><td><a href="#t2030A">20:30</a></td><td class="nj">mmarczyk</td><td>bbloom: :-)</td></tr>
+<tr id="t2030A" class="h r"><td><a href="#t2030A">20:30</a></td><td class="nj">mmarczyk</td><td>bbloom: thanks for the extensive reply, by the way, I'll be answering soon</td></tr>
+<tr id="t2030A" class="h"><td><a href="#t2030A">20:30</a></td><td class="ny">bbloom</td><td>what did i miss?</td></tr>
+<tr id="t2031A" class="h"><td><a href="#t2031A">20:31</a></td><td class="nj">mmarczyk</td><td>bbloom: I do think I came across in a more negative way than I aimed for -- I just think macro-based constant handling should happen no sooner than generic factories are in place</td></tr>
+<tr id="t2031A" class="h r"><td><a href="#t2031A">20:31</a></td><td class="nj">mmarczyk</td><td>bbloom: cljs breaks with Clojure 1.5 because of a change to clojure.core/destructure</td></tr>
+<tr id="t2032A" class="h r"><td><a href="#t2032A">20:32</a></td><td class="nj">mmarczyk</td><td>bbloom: which now calls clojure.lang.PersistentHashMap/create directly</td></tr>
+<tr id="t2032A" class="h"><td><a href="#t2032A">20:32</a></td><td class="ny">bbloom</td><td>mmarczyk: ah. yes, need a generic factory function for it to call directly?</td></tr>
+<tr id="t2032A" class="h"><td><a href="#t2032A">20:32</a></td><td class="nj">mmarczyk</td><td>bbloom: ah, also, set is comparable to vec, not vector... hash-set is the analogue of hash-map</td></tr>
+<tr id="t2032A" class="h r"><td><a href="#t2032A">20:32</a></td><td class="nj">mmarczyk</td><td>bbloom: right</td></tr>
+<tr id="t2033A" class="h"><td><a href="#t2033A">20:33</a></td><td class="ny">bbloom</td><td>mmarczyk: yeah, in that patch, i used set*</td></tr>
+<tr id="t2033A" class="h"><td><a href="#t2033A">20:33</a></td><td class="nj">mmarczyk</td><td>set* ?</td></tr>
+<tr id="t2033A" class="h"><td><a href="#t2033A">20:33</a></td><td class="ny">bbloom</td><td>mmarczyk: yeah, didn't know what else to call it to differentiate the same was as vec vs vector</td></tr>
+<tr id="t2034A" class="h"><td><a href="#t2034A">20:34</a></td><td class="nj">mmarczyk</td><td>bbloom: ah, right</td></tr>
+<tr id="t2034A" class="h"><td><a href="#t2034A">20:34</a></td><td class="ny">bbloom</td><td>mmarczyk: because you need the vector-version of set to work well with a macro otherwise you need to break down the form to get the tems</td></tr>
+<tr id="t2034A" class="h r"><td><a href="#t2034A">20:34</a></td><td class="ny">bbloom</td><td>and the form might just be a symbol! which is no good</td></tr>
+<tr id="t2034A" class="h r"><td><a href="#t2034A">20:34</a></td><td class="ny">bbloom</td><td>tems -&gt; items</td></tr>
+<tr id="t2035A" class="h r"><td><a href="#t2035A">20:35</a></td><td class="ny">bbloom</td><td>simply (defn set* [&amp; items] (set items))</td></tr>
+<tr id="t2035A" class="h r"><td><a href="#t2035A">20:35</a></td><td class="ny">bbloom</td><td>and then you can define a set* macro</td></tr>
+<tr id="t2035A" class="h r"><td><a href="#t2035A">20:35</a></td><td class="ny">bbloom</td><td>probably needs a better name :-P</td></tr>
+<tr id="t2035A" class="h r"><td><a href="#t2035A">20:35</a></td><td class="ny">bbloom</td><td>i guess could use hash-set directly</td></tr>
+<tr id="t2037A" class="h"><td><a href="#t2037A">20:37</a></td><td class="nj">mmarczyk</td><td>create-$foo ?</td></tr>
+<tr id="t2038A" class="h r"><td><a href="#t2038A">20:38</a></td><td class="nj">mmarczyk</td><td>and unchecked-create-foo for places where the standard ctor / factory objects to some kind of errors (like duplicate keys in sets/maps)</td></tr>
+<tr id="t2039A" class="h r"><td><a href="#t2039A">20:39</a></td><td class="nj">mmarczyk</td><td>bbloom: incidentally, that PHSet/fromArray thing could be a separate patch -- should be a 100% clear gain right now, I think</td></tr>
+<tr id="t2039A" class="h r"><td><a href="#t2039A">20:39</a></td><td class="nj">mmarczyk</td><td>imo, at any rate</td></tr>
+<tr id="t2039A" class="h"><td><a href="#t2039A">20:39</a></td><td class="ny">bbloom</td><td>mmarczyk:  ok ill look at that in a sec</td></tr>
+<tr id="t2039A" class="h"><td><a href="#t2039A">20:39</a></td><td class="nj">mmarczyk</td><td>cool</td></tr>
+<tr id="t2054A"><td><a href="#t2054A">20:54</a></td><td class="ny">bbloom</td><td>mmarczyk: <a href="https://www.refheap.com/paste/3306">https://www.refheap.com/paste/3306</a> what do you think? that's just the fromArray bit</td></tr>
+<tr id="t2055A" class="h r"><td><a href="#t2055A">20:55</a></td><td class="ny">bbloom</td><td>seems like a win to me :-)</td></tr>
+<tr id="t2056A" class="h"><td><a href="#t2056A">20:56</a></td><td class="nj">mmarczyk</td><td>bbloom: hah! cool :-)</td></tr>
+<tr id="t2056A" class="h"><td><a href="#t2056A">20:56</a></td><td class="ny">bbloom</td><td>ignore that -equiv thing on string</td></tr>
+<tr id="t2056A" class="h r"><td><a href="#t2056A">20:56</a></td><td class="ny">bbloom</td><td>didn't mean to have that in there :-P</td></tr>
+<tr id="t2100A"><td><a href="#t2100A">21:00</a></td><td class="nj">mmarczyk</td><td>dnolen: so I have a working version of cljs with destructure, let and loop in cljs.core; tests pass</td></tr>
+<tr id="t2100A" class="h"><td><a href="#t2100A">21:00</a></td><td class="na">dnolen</td><td>mmarczyk: great make a ticket and a patch and I'll take a look.</td></tr>
+<tr id="t2100A" class="h"><td><a href="#t2100A">21:00</a></td><td class="nj">mmarczyk</td><td>dnolen: k, just a sec</td></tr>
+<tr id="t2101A" class="h"><td><a href="#t2101A">21:01</a></td><td class="na">dnolen</td><td>mmarczyk: er I mean attach patch to existing ticket :)</td></tr>
+<tr id="t2101A" class="h"><td><a href="#t2101A">21:01</a></td><td class="ny">bbloom</td><td>mmarczyk: dnolen: <a href="http://dev.clojure.org/jira/browse/CLJS-326">http://dev.clojure.org/jira/browse/CLJS-326</a></td></tr>
+<tr id="t2101A" class="h"><td><a href="#t2101A">21:01</a></td><td class="nv">SrPx</td><td>Okay after playing with windows command prompt I really need an editor for the REPL</td></tr>
+<tr id="t2101A" class="h r"><td><a href="#t2101A">21:01</a></td><td class="nv">SrPx</td><td>are you guys all using emacs?</td></tr>
+<tr id="t2102A" class="h"><td><a href="#t2102A">21:02</a></td><td class="nz">leo2007</td><td>it is the only sensible option.</td></tr>
+<tr id="t2102A" class="h"><td><a href="#t2102A">21:02</a></td><td class="ny">bbloom</td><td>mmarczyk: you mean let and loop implemented as macros? or just namespaced? or what?</td></tr>
+<tr id="t2102A" class="h"><td><a href="#t2102A">21:02</a></td><td class="nj">mmarczyk</td><td>bbloom: I mean copy &amp; paste + adjustments to make them work again (because some things they use are on the :refer-clojure :exclude list)</td></tr>
+<tr id="t2103A" class="h r"><td><a href="#t2103A">21:03</a></td><td class="nj">mmarczyk</td><td>bbloom: <a href="http://dev.clojure.org/jira/browse/CLJS-325">http://dev.clojure.org/jira/browse/CLJS-325</a></td></tr>
+<tr id="t2103A" class="h r"><td><a href="#t2103A">21:03</a></td><td class="nj">mmarczyk</td><td>bbloom: part of cljs's struggle for independence ;-)</td></tr>
+<tr id="t2103A" class="h"><td><a href="#t2103A">21:03</a></td><td class="ny">bbloom</td><td>mmarczyk: yup :-) hence why i keep adding missing bits and pieces from clj proper heh</td></tr>
+<tr id="t2103A" class="h"><td><a href="#t2103A">21:03</a></td><td class="nj">mmarczyk</td><td>right</td></tr>
+<tr id="t2103A" class="h r"><td><a href="#t2103A">21:03</a></td><td class="nj">mmarczyk</td><td>SrPx: that's one good choice</td></tr>
+<tr id="t2103A" class="h"><td><a href="#t2103A">21:03</a></td><td class="ny">bbloom</td><td>mmarczyk: one small step at a time towards the canonical CinC ;-)</td></tr>
+<tr id="t2104A" class="h"><td><a href="#t2104A">21:04</a></td><td class="nj">mmarczyk</td><td>I don't know of another one</td></tr>
+<tr id="t2104A" class="h r"><td><a href="#t2104A">21:04</a></td><td class="nj">mmarczyk</td><td>bbloom: totally! :-)</td></tr>
+<tr id="t2104A" class="h"><td><a href="#t2104A">21:04</a></td><td class="nv">SrPx</td><td>mmarczyk: I can't install it u.u</td></tr>
+<tr id="t2105A" class="h"><td><a href="#t2105A">21:05</a></td><td class="nj">mmarczyk</td><td>(actually I do like my Vim, used it to write thousands of lines of Scheme, but Paredit put me under a spell)</td></tr>
+<tr id="t2105A" class="h r"><td><a href="#t2105A">21:05</a></td><td class="nj">mmarczyk</td><td>SrPx: what OS?</td></tr>
+<tr id="t2105A" class="h"><td><a href="#t2105A">21:05</a></td><td class="nv">SrPx</td><td>xp</td></tr>
+<tr id="t2105A" class="h"><td><a href="#t2105A">21:05</a></td><td class="ny">bbloom</td><td>i'm still wed to vim… haven't tried the vimparedit thing yet</td></tr>
+<tr id="t2106A" class="h"><td><a href="#t2106A">21:06</a></td><td class="nj">mmarczyk</td><td>bbloom: don't try the Emacs version if you want to stay faithful</td></tr>
+<tr id="t2106A" class="h"><td><a href="#t2106A">21:06</a></td><td class="nv">SrPx</td><td>mmarczyk: is it bad?</td></tr>
+<tr id="t2107A" class="h"><td><a href="#t2107A">21:07</a></td><td class="nj">mmarczyk</td><td>(actually I haven't tried Vim's paredit impls, but I'm told they don't implement the full range of functionality -- and I think I use most of what's available)</td></tr>
+<tr id="t2107A" class="h"><td><a href="#t2107A">21:07</a></td><td class="nv">SrPx</td><td>oh nvm</td></tr>
+<tr id="t2107A" class="h"><td><a href="#t2107A">21:07</a></td><td class="ny">bbloom</td><td>mmarczyk: i figure i need to try emacs&amp;slime at some point but the last time i tried i wanted to cry b/c my vim muscle memory is very very deep. also i do *a lot* of different languages in any given coding session, so i just need my vim bindings and no vim-emulation mode will ever cut it</td></tr>
+<tr id="t2107A" class="h"><td><a href="#t2107A">21:07</a></td><td class="nv">SrPx</td><td>anyway</td></tr>
+<tr id="t2108A" class="h"><td><a href="#t2108A">21:08</a></td><td class="nj">mmarczyk</td><td>SrPx: hm, I'm not sure I can be much help except to say I have run Emacs on XP with no problems</td></tr>
+<tr id="t2108A" class="h"><td><a href="#t2108A">21:08</a></td><td class="nv">SrPx</td><td>I've cloned slime, swank clojure, clojure mode... I have slime working... no idea what to do with that code, though</td></tr>
+<tr id="t2108A" class="h"><td><a href="#t2108A">21:08</a></td><td class="nj">mmarczyk</td><td>SrPx: slime on the other hand... would you be willing to try cygwin?</td></tr>
+<tr id="t2109A" class="h"><td><a href="#t2109A">21:09</a></td><td class="nv">SrPx</td><td>why not?</td></tr>
+<tr id="t2109A" class="h"><td><a href="#t2109A">21:09</a></td><td class="nj">mmarczyk</td><td>bbloom: I know what you mean, Vim is absolutely the best editor</td></tr>
+<tr id="t2110A"><td><a href="#t2110A">21:10</a></td><td class="nv">SrPx</td><td>I'm under an impression that vim doesn't matter that much for lisp</td></tr>
+<tr id="t2110A" class="h"><td><a href="#t2110A">21:10</a></td><td class="ny">bbloom</td><td>minus vimscript… *cringe*</td></tr>
+<tr id="t2110A" class="h"><td><a href="#t2110A">21:10</a></td><td class="nj">mmarczyk</td><td>bbloom: supposedly evil (latest vim emulator for emacs) is very good -- I must give it a try, but I'll be really surprised if it solves the problem</td></tr>
+<tr id="t2110A" class="h"><td><a href="#t2110A">21:10</a></td><td class="nv">SrPx</td><td>All your code is small s-expressions, right?</td></tr>
+<tr id="t2110A" class="h"><td><a href="#t2110A">21:10</a></td><td class="nj">mmarczyk</td><td>ah, vimscript doesn't come into it for me</td></tr>
+<tr id="t2110A" class="h r"><td><a href="#t2110A">21:10</a></td><td class="nj">mmarczyk</td><td>I said &quot;editor&quot; :-)</td></tr>
+<tr id="t2110A" class="h"><td><a href="#t2110A">21:10</a></td><td class="ny">bbloom</td><td>heh</td></tr>
+<tr id="t2110A" class="h"><td><a href="#t2110A">21:10</a></td><td class="nj">mmarczyk</td><td>so the Emacs text editing experience is somewhat inferior imo</td></tr>
+<tr id="t2110A" class="h r"><td><a href="#t2110A">21:10</a></td><td class="nj">mmarczyk</td><td>in general</td></tr>
+<tr id="t2110A" class="h"><td><a href="#t2110A">21:10</a></td><td class="ny">bbloom</td><td>i don't know of any hardcore vim guys who have tried evil and stuck</td></tr>
+<tr id="t2110A" class="h r"><td><a href="#t2110A">21:10</a></td><td class="ny">bbloom</td><td>and i know a few who tried hard</td></tr>
+<tr id="t2111A" class="h r"><td><a href="#t2111A">21:11</a></td><td class="ny">bbloom</td><td>but it was a while ago</td></tr>
+<tr id="t2111A" class="h"><td><a href="#t2111A">21:11</a></td><td class="nj">mmarczyk</td><td>certain modes offer so much on top of the basics though</td></tr>
+<tr id="t2111A" class="h"><td><a href="#t2111A">21:11</a></td><td class="ny">bbloom</td><td>maybe i'll try it sometime</td></tr>
+<tr id="t2111A" class="h"><td><a href="#t2111A">21:11</a></td><td class="nv">SrPx</td><td>but mmarczyk does it matter that much for clojure?</td></tr>
+<tr id="t2111A" class="h"><td><a href="#t2111A">21:11</a></td><td class="nj">mmarczyk</td><td>plus there are fantastic emacs &quot;apps&quot; -- org mode etc.</td></tr>
+<tr id="t2111A" class="h r"><td><a href="#t2111A">21:11</a></td><td class="nj">mmarczyk</td><td>magit</td></tr>
+<tr id="t2112A" class="h"><td><a href="#t2112A">21:12</a></td><td class="nv">SrPx</td><td>)=</td></tr>
+<tr id="t2112A" class="h"><td><a href="#t2112A">21:12</a></td><td class="nj">mmarczyk</td><td>SrPx: as mentioned above, I've written thousands of lines of scheme in Vim and I loved that experience</td></tr>
+<tr id="t2112A" class="h r"><td><a href="#t2112A">21:12</a></td><td class="nj">mmarczyk</td><td>I switched to Emacs for a number of reasons</td></tr>
+<tr id="t2113A" class="h r"><td><a href="#t2113A">21:13</a></td><td class="nj">mmarczyk</td><td>but for lisp editing paredit made the most difference</td></tr>
+<tr id="t2113A" class="h r"><td><a href="#t2113A">21:13</a></td><td class="nj">mmarczyk</td><td>plus the fact that I simply came to prefer a workflow where I have hundreds of buffers in a single editor session :-P</td></tr>
+<tr id="t2113A" class="h r"><td><a href="#t2113A">21:13</a></td><td class="nj">mmarczyk</td><td>a server running in the background, clients -- X and terminal -- coming and going...</td></tr>
+<tr id="t2113A" class="h r"><td><a href="#t2113A">21:13</a></td><td class="nj">mmarczyk</td><td>ah, the Emacs life</td></tr>
+<tr id="t2114A" class="h r"><td><a href="#t2114A">21:14</a></td><td class="nj">mmarczyk</td><td>anyway. there are new addons for Vim which introduce stuff like text objects useful in lisp, some subset of paredit functionality etc.</td></tr>
+<tr id="t2115A" class="h r"><td><a href="#t2115A">21:15</a></td><td class="nj">mmarczyk</td><td>it's well worth a try</td></tr>
+<tr id="t2115A" class="h"><td><a href="#t2115A">21:15</a></td><td class="ny">bbloom</td><td>i use the shit out of text objects in vim</td></tr>
+<tr id="t2115A" class="h"><td><a href="#t2115A">21:15</a></td><td class="n7">gfredericks</td><td>mmarczyk: I work with a bunch of vimmy folk and they're always closing vim and CDing somewhere and opening another file in a new vim session...........it pains me to watch it</td></tr>
+<tr id="t2115A" class="h"><td><a href="#t2115A">21:15</a></td><td class="ny">bbloom</td><td>dap baby dap all the way</td></tr>
+<tr id="t2115A" class="h"><td><a href="#t2115A">21:15</a></td><td class="nj">mmarczyk</td><td>gfredericks: yeah :-)</td></tr>
+<tr id="t2116A" class="h"><td><a href="#t2116A">21:16</a></td><td class="ny">bbloom</td><td>gfredericks: why is that painful? i don't do that when working on a project, but on a server editing configs? i do that non stop</td></tr>
+<tr id="t2116A" class="h"><td><a href="#t2116A">21:16</a></td><td class="nj">mmarczyk</td><td>gfredericks: I used to open loads of files in Vim too -- with tabs, NERDtree -- but it never felt as natural as it does in Emadcs</td></tr>
+<tr id="t2116A" class="h r"><td><a href="#t2116A">21:16</a></td><td class="nj">mmarczyk</td><td>Emacs.</td></tr>
+<tr id="t2116A" class="h"><td><a href="#t2116A">21:16</a></td><td class="n7">gfredericks</td><td>bbloom: because they do it when working on a project</td></tr>
+<tr id="t2116A" class="h"><td><a href="#t2116A">21:16</a></td><td class="ny">bbloom</td><td>heh</td></tr>
+<tr id="t2116A" class="h"><td><a href="#t2116A">21:16</a></td><td class="n7">gfredericks</td><td>mmarczyk: yeah I was using nerdtree during my last few months of vim</td></tr>
+<tr id="t2116A" class="h"><td><a href="#t2116A">21:16</a></td><td class="ny">bbloom</td><td>luckily vim starts fast :-)</td></tr>
+<tr id="t2117A" class="h"><td><a href="#t2117A">21:17</a></td><td class="nj">mmarczyk</td><td>SrPx: but if you want slime, I think cygwin might help</td></tr>
+<tr id="t2117A" class="h r"><td><a href="#t2117A">21:17</a></td><td class="nj">mmarczyk</td><td>gfredericks: well, I actually still use Vim a fair bit -- I'd really love it for Evil to be as good as it's made out to be</td></tr>
+<tr id="t2118A" class="h"><td><a href="#t2118A">21:18</a></td><td class="ny">bbloom</td><td>i've even got one of those kenisis concave keyboards with the modifiers on the thumbs… people assume i'm an emacs guy :-P</td></tr>
+<tr id="t2118A" class="h"><td><a href="#t2118A">21:18</a></td><td class="nj">mmarczyk</td><td>I was planning to give it a spin come end of June, so I guess I'll find out soon :-P</td></tr>
+<tr id="t2119A" class="h r"><td><a href="#t2119A">21:19</a></td><td class="nj">mmarczyk</td><td>bbloom: oh cool, always wanted to touch one of those things</td></tr>
+<tr id="t2119A" class="h"><td><a href="#t2119A">21:19</a></td><td class="ny">bbloom</td><td>mmarczyk: took about 1 week to get back up to speed a few years ago</td></tr>
+<tr id="t2119A" class="h"><td><a href="#t2119A">21:19</a></td><td class="nj">mmarczyk</td><td>I don't believe they're stocked by any brick &amp; mortar 'round here :-(</td></tr>
+<tr id="t2119A" class="h"><td><a href="#t2119A">21:19</a></td><td class="ny">bbloom</td><td>mmarczyk: love this dopey thing</td></tr>
+<tr id="t2120A"><td><a href="#t2120A">21:20</a></td><td class="nj">mmarczyk</td><td>:-)</td></tr>
+<tr id="t2120A" class="h"><td><a href="#t2120A">21:20</a></td><td class="ny">bbloom</td><td>yeah, i ordered online</td></tr>
+<tr id="t2120A" class="h"><td><a href="#t2120A">21:20</a></td><td class="nj">mmarczyk</td><td>I think it'd be slightly dangerous in my current situation</td></tr>
+<tr id="t2120A" class="h"><td><a href="#t2120A">21:20</a></td><td class="nv">SrPx</td><td>no idea how to use it sigh</td></tr>
+<tr id="t2122A" class="h"><td><a href="#t2122A">21:22</a></td><td class="nj">mmarczyk</td><td>moving around with a laptop quite a lot, I mean</td></tr>
+<tr id="t2123A" class="h r"><td><a href="#t2123A">21:23</a></td><td class="nj">mmarczyk</td><td>the switch from a MS keyboard to the laptop keyboard was already painful, if the kinesis thing is anywhere near as good as it looks ... :-P</td></tr>
+<tr id="t2123A" class="h r"><td><a href="#t2123A">21:23</a></td><td class="nj">mmarczyk</td><td>SrPx: cygwin?</td></tr>
+<tr id="t2124A" class="h"><td><a href="#t2124A">21:24</a></td><td class="ny">bbloom</td><td>*cringe* @ cygwin</td></tr>
+<tr id="t2125A" class="h"><td><a href="#t2125A">21:25</a></td><td class="nm">Hodapp</td><td>cygwin helps keep my sanity on my Windows box at work</td></tr>
+<tr id="t2126A" class="h"><td><a href="#t2126A">21:26</a></td><td class="nv">SrPx</td><td>õo</td></tr>
+<tr id="t2126A" class="h"><td><a href="#t2126A">21:26</a></td><td class="nm">S11001001</td><td>truth</td></tr>
+<tr id="t2128A" class="h"><td><a href="#t2128A">21:28</a></td><td class="n7">gfredericks</td><td>mmarczyk: I never even considered being proficient at both editors simultaneously</td></tr>
+<tr id="t2128A" class="h r"><td><a href="#t2128A">21:28</a></td><td class="n7">gfredericks</td><td>that sounds like a recipe for confusion and frustration</td></tr>
+<tr id="t2128A" class="h r"><td><a href="#t2128A">21:28</a></td><td class="n7">gfredericks</td><td>ditto for qwerty and dvorak</td></tr>
+<tr id="t2129A" class="h"><td><a href="#t2129A">21:29</a></td><td class="n0">y3di</td><td>have you guys tried out haskell? and if so, why do you like clojure better?</td></tr>
+<tr id="t2130A"><td><a href="#t2130A">21:30</a></td><td class="ny">bbloom</td><td>gfredericks: probably pretty easily overcome. i used to think the same thing when i started doing a few different languages for a few different projects at the same time or in the same file. HOW DO I KEEP ALL THESE ESCAPE SEQUENCES RIGHT!?! but eventually you just get good at it</td></tr>
+<tr id="t2131A" class="h"><td><a href="#t2131A">21:31</a></td><td class="nj">mmarczyk</td><td>y3di: I have, I love it</td></tr>
+<tr id="t2131A" class="h r"><td><a href="#t2131A">21:31</a></td><td class="nj">mmarczyk</td><td>y3di: as for the why question, there are two answers</td></tr>
+<tr id="t2133A" class="h"><td><a href="#t2133A">21:33</a></td><td class="nm">S11001001</td><td>y3di: who said I like clojure better? :?</td></tr>
+<tr id="t2133A" class="h"><td><a href="#t2133A">21:33</a></td><td class="nj">mmarczyk</td><td>the first is that I like the Lisp style of programming best, I find Clojure's design particularly elegant etc. -- could go on</td></tr>
+<tr id="t2133A" class="h r"><td><a href="#t2133A">21:33</a></td><td class="nj">mmarczyk</td><td>the second is Cabal</td></tr>
+<tr id="t2134A" class="h r"><td><a href="#t2134A">21:34</a></td><td class="nj">mmarczyk</td><td>w/o the second answer I think this would be a pretty close call, I absolutely love doing stuff in Haskell when I'm not fighting the packaging facility</td></tr>
+<tr id="t2135A" class="h r"><td><a href="#t2135A">21:35</a></td><td class="nj">mmarczyk</td><td>there's hsenv now and the Yesod thing (cabal-meta?) which I haven't tried yet, so things are getting better</td></tr>
+<tr id="t2138A" class="h"><td><a href="#t2138A">21:38</a></td><td class="nv">SrPx</td><td>What is cabal?</td></tr>
+<tr id="t2139A" class="h"><td><a href="#t2139A">21:39</a></td><td class="nj">mmarczyk</td><td>the blog post on cabal-meta is dated April 5, 2012 and it includes the sentence (describing the pre-cabal-meta state of affairs) &quot;Even with all these tools, one day I found myself completely incapable of installng Yesod from source.&quot;</td></tr>
+<tr id="t2140A" class="r"><td><a href="#t2140A">21:40</a></td><td class="nj">mmarczyk</td><td>I still think Haskell is a marvellous language and an overall glorious achievement, but *argh*</td></tr>
+<tr id="t2140A" class="h r"><td><a href="#t2140A">21:40</a></td><td class="nj">mmarczyk</td><td>SrPx: Haskell package manager</td></tr>
+<tr id="t2140A" class="h r"><td><a href="#t2140A">21:40</a></td><td class="nj">mmarczyk</td><td>SrPx: well, build tool</td></tr>
+<tr id="t2141A" class="h"><td><a href="#t2141A">21:41</a></td><td class="nm">S11001001</td><td>sort of both</td></tr>
+<tr id="t2141A" class="h"><td><a href="#t2141A">21:41</a></td><td class="nj">mmarczyk</td><td>that's actually an acronym</td></tr>
+<tr id="t2141A" class="h"><td><a href="#t2141A">21:41</a></td><td class="nm">S11001001</td><td>fetches deps anyway</td></tr>
+<tr id="t2141A" class="h"><td><a href="#t2141A">21:41</a></td><td class="nj">mmarczyk</td><td><a href="http://www.haskell.org/haskellwiki/Cabal">http://www.haskell.org/haskellwiki/Cabal</a></td></tr>
+<tr id="t2142A" class="h r"><td><a href="#t2142A">21:42</a></td><td class="nj">mmarczyk</td><td>with certain recently developed utilities it can be used sort of like lein</td></tr>
+<tr id="t2143A" class="h r"><td><a href="#t2143A">21:43</a></td><td class="nj">mmarczyk</td><td>but getting the correct versions of deps resolved seems to be more of a problem</td></tr>
+<tr id="t2152A"><td><a href="#t2152A">21:52</a></td><td class="ny">treehug</td><td>how would i go about using goog.dom.query in a clojurescript app? i got this far: <a href="https://gist.github.com/2985921">https://gist.github.com/2985921</a> but i'm confused why it is not finding the right provides even though they are in the deps i listed in project.clj for cljsbuild to use</td></tr>
+<tr id="t2153A" class="h"><td><a href="#t2153A">21:53</a></td><td class="ny">bbloom</td><td>treehug: hmm.. looks like you're getting errors in core, not your code</td></tr>
+<tr id="t2153A" class="h r"><td><a href="#t2153A">21:53</a></td><td class="ny">bbloom</td><td>i see you're using cljsbuild, have you managed to compile an empty project at all?</td></tr>
+<tr id="t2154A" class="h"><td><a href="#t2154A">21:54</a></td><td class="ny">treehug</td><td>yes, if i leave out the deps i have listed there it compiles. even using goog.dom.* functions if i 'require them</td></tr>
+<tr id="t2154A" class="h r"><td><a href="#t2154A">21:54</a></td><td class="ny">treehug</td><td>(that is, i remove the reference to good.dom.query from mutest.cljs)</td></tr>
+<tr id="t2154A" class="h"><td><a href="#t2154A">21:54</a></td><td class="ns">technomancy</td><td>mmarczyk: it's funny that build nightmares are also my biggest complaint with ocaml</td></tr>
+<tr id="t2154A" class="h r"><td><a href="#t2154A">21:54</a></td><td class="ns">technomancy</td><td>the general advice is &quot;just use apt&quot;</td></tr>
+<tr id="t2155A" class="h"><td><a href="#t2155A">21:55</a></td><td class="nj">mmarczyk</td><td>ouch</td></tr>
+<tr id="t2156A" class="h"><td><a href="#t2156A">21:56</a></td><td class="n8">jhowarth</td><td>Is there an equivalent in emacs for M+( that will wrap an s-exp in brackets instead?</td></tr>
+<tr id="t2156A" class="h"><td><a href="#t2156A">21:56</a></td><td class="ny">bbloom</td><td>treehug: is that the right sep? do you want  (:use [goog.dom :only [query]]))</td></tr>
+<tr id="t2157A" class="h r"><td><a href="#t2157A">21:57</a></td><td class="ny">bbloom</td><td>or (:require [goog.dom.query :as query])</td></tr>
+<tr id="t2157A" class="h r"><td><a href="#t2157A">21:57</a></td><td class="ny">bbloom</td><td>i think you're running into the export == module name issue</td></tr>
+<tr id="t2157A" class="h"><td><a href="#t2157A">21:57</a></td><td class="nj">mmarczyk</td><td>jhowarth: there's no default binding, but the function is called paredit-wrap-square</td></tr>
+<tr id="t2158A" class="h"><td><a href="#t2158A">21:58</a></td><td class="ny">bbloom</td><td>treehug: let me know if either of those work</td></tr>
+<tr id="t2158A" class="h"><td><a href="#t2158A">21:58</a></td><td class="n8">jhowarth</td><td>mmarczyk: Thanks!</td></tr>
+<tr id="t2202A"><td><a href="#t2202A">22:02</a></td><td class="nu">cgag</td><td>i'm messing with aleph and my code looks like this: <a href="https://www.refheap.com/paste/3307,">https://www.refheap.com/paste/3307,</a> but when i open up three tabs and send 3 requests, rather than all of them finishing around the same time, it looks like it's just chugging through them synchronously</td></tr>
+<tr id="t2202A" class="h"><td><a href="#t2202A">22:02</a></td><td class="nx">rlb</td><td>technomancy: yeah, it's unfortunate, but I understand how we got here, and at the moment, it's the situation we have.</td></tr>
+<tr id="t2203A" class="h r"><td><a href="#t2203A">22:03</a></td><td class="nx">rlb</td><td>technomancy: though I was very happy when guile dropped the non-dfsg bits.</td></tr>
+<tr id="t2203A" class="h r"><td><a href="#t2203A">22:03</a></td><td class="nx">rlb</td><td>(Running candidate 24.4+1-1 build now...)</td></tr>
+<tr id="t2205A" class="h"><td><a href="#t2205A">22:05</a></td><td class="nu">cgag</td><td>anyone know if my that code looks reasonable?</td></tr>
+<tr id="t2206A" class="h"><td><a href="#t2206A">22:06</a></td><td class="ny">treehug</td><td>bbloom: i tried (:require [goog.dom.query :as query]) w/ (query/query …), also (:use [goog.dom.query :only [query]) w/ (query …) and (:use [goog.dom :only [query]) w/ (query …) -- basically the same error message with only the namespace text different</td></tr>
+<tr id="t2207A" class="h"><td><a href="#t2207A">22:07</a></td><td class="ny">bbloom</td><td>treehug: what version of cljs are you using?</td></tr>
+<tr id="t2207A" class="h r"><td><a href="#t2207A">22:07</a></td><td class="ny">bbloom</td><td>treehug: or, i guess revision</td></tr>
+<tr id="t2208A" class="h"><td><a href="#t2208A">22:08</a></td><td class="nb">ibdknox</td><td>I have very exciting news for tomorrow :)</td></tr>
+<tr id="t2209A" class="h"><td><a href="#t2209A">22:09</a></td><td class="nj">mmarczyk</td><td>ibdknox: <a href="http://dev.clojure.org/jira/browse/CLJS-325">http://dev.clojure.org/jira/browse/CLJS-325</a></td></tr>
+<tr id="t2209A" class="h"><td><a href="#t2209A">22:09</a></td><td class="ny">bbloom</td><td>treehug: are you sure you have the right namespace? i think it's good.dojo.dom.query</td></tr>
+<tr id="t2209A" class="h"><td><a href="#t2209A">22:09</a></td><td class="nb">ibdknox</td><td>mmarczyk: ah, thank you!</td></tr>
+<tr id="t2209A" class="h"><td><a href="#t2209A">22:09</a></td><td class="ny">bbloom</td><td>treehug: <a href="http://closure-library.googlecode.com/svn/docs/closure_third_party_closure_goog_dojo_dom_query.js.html">http://closure-library.googlecode.com/svn/docs/closure_third_party_closure_goog_dojo_dom_query.js.html</a></td></tr>
+<tr id="t2209A" class="h"><td><a href="#t2209A">22:09</a></td><td class="ny">treehug</td><td>bbloom: interesting question… i take it that cljsbuild provided me lein-cljsbuild-compiler-0/cljs/core.cljs but i'm not sure where from</td></tr>
+<tr id="t2210A"><td><a href="#t2210A">22:10</a></td><td class="ny">bbloom</td><td>hmm maybe there is goog.dom.query too</td></tr>
+<tr id="t2210A" class="h"><td><a href="#t2210A">22:10</a></td><td class="ny">treehug</td><td>ok i'll try that</td></tr>
+<tr id="t2210A" class="h"><td><a href="#t2210A">22:10</a></td><td class="ny">bbloom</td><td>is there a git repo in there? what revision is it?</td></tr>
+<tr id="t2210A" class="h"><td><a href="#t2210A">22:10</a></td><td class="nj">mmarczyk</td><td>ibdknox: now I'm going to wonder what kind of news :-P</td></tr>
+<tr id="t2210A" class="h r"><td><a href="#t2210A">22:10</a></td><td class="nj">mmarczyk</td><td>is tomorrow many hours away in your TZ? :-)</td></tr>
+<tr id="t2211A" class="h"><td><a href="#t2211A">22:11</a></td><td class="nb">ibdknox</td><td>I'll be releasing the playground tomorrow :)</td></tr>
+<tr id="t2211A" class="h"><td><a href="#t2211A">22:11</a></td><td class="ny">treehug</td><td>nothing in it, i'll try a clean &amp; deps and see where it downloads from</td></tr>
+<tr id="t2211A" class="h"><td><a href="#t2211A">22:11</a></td><td class="ny">bbloom</td><td>ibdknox: ah, cool.</td></tr>
+<tr id="t2211A" class="h"><td><a href="#t2211A">22:11</a></td><td class="nb">ibdknox</td><td>I suspect there will be a sudden spike in interest for &quot;learning clojure&quot; materials</td></tr>
+<tr id="t2211A" class="h"><td><a href="#t2211A">22:11</a></td><td class="nj">mmarczyk</td><td>ibdknox: oh great, now you've ruined my start-of-week productivity :-D</td></tr>
+<tr id="t2212A" class="h"><td><a href="#t2212A">22:12</a></td><td class="nb">ibdknox</td><td>haha</td></tr>
+<tr id="t2212A" class="h"><td><a href="#t2212A">22:12</a></td><td class="ny">bbloom</td><td>ibdknox: presumably only to kickstarter backers? or more boradly?</td></tr>
+<tr id="t2212A" class="h r"><td><a href="#t2212A">22:12</a></td><td class="ny">bbloom</td><td>broadly*</td></tr>
+<tr id="t2212A" class="h"><td><a href="#t2212A">22:12</a></td><td class="nb">ibdknox</td><td>the playground will go out to the world</td></tr>
+<tr id="t2212A" class="h"><td><a href="#t2212A">22:12</a></td><td class="nj">mmarczyk</td><td>seriously though, can't wait to have a look :-)</td></tr>
+<tr id="t2214A" class="h"><td><a href="#t2214A">22:14</a></td><td class="nk">gtuckerkellogg</td><td>is anyone here using clojure in with org-babel?</td></tr>
+<tr id="t2216A" class="h"><td><a href="#t2216A">22:16</a></td><td class="ny">treehug</td><td>bbloom: looks like org/clojure/clojurescript/0.0-1236/clojurescript-0.0-1236 is downloaded by cljsbuild</td></tr>
+<tr id="t2219A" class="h r"><td><a href="#t2219A">22:19</a></td><td class="ny">treehug</td><td>i think it must be my project.clj -- even if i just have (ns mytest) and that</td></tr>
+<tr id="t2220A" class="r"><td><a href="#t2220A">22:20</a></td><td class="ny">treehug</td><td>'s all i get the same kind of error</td></tr>
+<tr id="t2220A" class="h"><td><a href="#t2220A">22:20</a></td><td class="ny">bbloom</td><td>treehug: oh, heh, that's what i was asking about before…. like i said: you're getting errors loading stuff at the top of cljs core… you're not importing goog.string for example, but core is</td></tr>
+<tr id="t2221A" class="h"><td><a href="#t2221A">22:21</a></td><td class="n2">pterygota</td><td>hello, anyone working with overtone in here?</td></tr>
+<tr id="t2221A" class="h"><td><a href="#t2221A">22:21</a></td><td class="ny">treehug</td><td>bbloom: yeah sorry, i've been messing around with my project and at one point a simple empty file did compile properly…</td></tr>
+<tr id="t2222A" class="h"><td><a href="#t2222A">22:22</a></td><td class="ny">bbloom</td><td>treehug: try to break it down to a minimal repo &amp; the problem will hopefully become more apparent :-)</td></tr>
+<tr id="t2224A" class="h"><td><a href="#t2224A">22:24</a></td><td class="ny">treehug</td><td>bbloom: ok <a href="https://gist.github.com/2986062">https://gist.github.com/2986062</a> does compile simple (ns mutest) file, but uncommenting any comination of those google-closure-library deps will break it</td></tr>
+<tr id="t2225A" class="h"><td><a href="#t2225A">22:25</a></td><td class="ny">bbloom</td><td>i don't use cljsbuild myself, so i don't know: do you need a gclosure dep? or is that implicitly provided by leon?</td></tr>
+<tr id="t2225A" class="h r"><td><a href="#t2225A">22:25</a></td><td class="ny">bbloom</td><td>lein* stupid apple auto correct</td></tr>
+<tr id="t2228A" class="h"><td><a href="#t2228A">22:28</a></td><td class="ny">treehug</td><td>it looks like leon cljsbuild is downloading a clojurescript and a closure-library to ~/.m2/repository and then compiling a cljs.js info ./.lein-cljsbuild-compiler-0/cljs/core.js maybe my explicitly including closure-library/closure-library-thirdparty on top of the gclosure bits compiled into cljs.js conflict</td></tr>
+<tr id="t2229A" class="h"><td><a href="#t2229A">22:29</a></td><td class="ny">bbloom</td><td>maybe. again, i don't use cljsbuild… have you tried just using query without the deps in project.clj ?</td></tr>
+<tr id="t2231A"><td><a href="#t2231A">22:31</a></td><td class="ns">technomancy</td><td>clojurebot: leon is a good sign it's time to turn off auto-&quot;correct&quot;</td></tr>
+<tr id="t2231A" class="h"><td><a href="#t2231A">22:31</a></td><td class="nl">clojurebot</td><td>c'est bon!</td></tr>
+<tr id="t2231A" class="h"><td><a href="#t2231A">22:31</a></td><td class="ny">bbloom</td><td>leon.</td></tr>
+<tr id="t2231A" class="h"><td><a href="#t2231A">22:31</a></td><td class="nn">xeqi</td><td>~leon</td></tr>
+<tr id="t2231A" class="h"><td><a href="#t2231A">22:31</a></td><td class="ny">bbloom</td><td>no? :-P</td></tr>
+<tr id="t2231A" class="h"><td><a href="#t2231A">22:31</a></td><td class="nl">clojurebot</td><td>leon is a good sign it's time to turn off auto-&quot;correct&quot;</td></tr>
+<tr id="t2231A" class="h"><td><a href="#t2231A">22:31</a></td><td class="ns">technomancy</td><td>I should write a library named after Ponce de Leon just to mess with people</td></tr>
+<tr id="t2231A" class="h"><td><a href="#t2231A">22:31</a></td><td class="ny">bbloom</td><td>heh.</td></tr>
+<tr id="t2232A" class="h r"><td><a href="#t2232A">22:32</a></td><td class="ny">bbloom</td><td>i use Textual irc which doesn't disable auto correct in it's little message box, it's pretty much the only time i ever encounter a normal cocoa text box</td></tr>
+<tr id="t2233A" class="h r"><td><a href="#t2233A">22:33</a></td><td class="ny">bbloom</td><td>chrome, terminal, and vim is pretty much the only other times i type anything :-P</td></tr>
+<tr id="t2234A" class="h"><td><a href="#t2234A">22:34</a></td><td class="nv">SrPx</td><td><a href="https://github.com/technomancy/swank-clojure">https://github.com/technomancy/swank-clojure</a> &lt;- Add [lein-swank &quot;1.4.4&quot;] to the :plugins section of either project.clj or your user profile. &lt;- what does this mean?</td></tr>
+<tr id="t2235A" class="h"><td><a href="#t2235A">22:35</a></td><td class="nl">abp</td><td>ibdknox: Holding my breath. ;D</td></tr>
+<tr id="t2235A" class="h"><td><a href="#t2235A">22:35</a></td><td class="ny">bbloom</td><td>SrPx: what does which part mean?</td></tr>
+<tr id="t2236A" class="h r"><td><a href="#t2236A">22:36</a></td><td class="ny">bbloom</td><td>SrPx: do you have a project.clj file?</td></tr>
+<tr id="t2236A" class="h"><td><a href="#t2236A">22:36</a></td><td class="nv">SrPx</td><td>No, I don't even know what this is?</td></tr>
+<tr id="t2236A" class="h"><td><a href="#t2236A">22:36</a></td><td class="ny">bbloom</td><td>leon, er i mean lein</td></tr>
+<tr id="t2236A" class="h"><td><a href="#t2236A">22:36</a></td><td class="n2">pterygota</td><td>SrPx: if you create a project with lein new projectname, you should get a directory with a project.clj in it called projectname</td></tr>
+<tr id="t2236A" class="h"><td><a href="#t2236A">22:36</a></td><td class="ny">bbloom</td><td>SrPx: it's clojure's project system <a href="https://github.com/technomancy/leiningen">https://github.com/technomancy/leiningen</a></td></tr>
+<tr id="t2237A" class="h"><td><a href="#t2237A">22:37</a></td><td class="ny">treehug</td><td>bbloom: no doesn't work either - i think because clojurescript doesn't use the thirdpaty closure stuff. anyway i just discovered domina uses good.dom.query and depends on a goog.jar for it and does some magic :libs [&quot;goog/dom/query.js&quot;] in the project.clj. i'll experiment a bit more with that</td></tr>
+<tr id="t2237A" class="h"><td><a href="#t2237A">22:37</a></td><td class="n2">pterygota</td><td>and in project.clj there will be a plugins section</td></tr>
+<tr id="t2237A" class="h"><td><a href="#t2237A">22:37</a></td><td class="ny">treehug</td><td>bbloom thanks for your help and ideas</td></tr>
+<tr id="t2238A" class="h"><td><a href="#t2238A">22:38</a></td><td class="nv">SrPx</td><td>but how can I install it? I don't have any of those package manages</td></tr>
+<tr id="t2238A" class="h r"><td><a href="#t2238A">22:38</a></td><td class="nv">SrPx</td><td>managers</td></tr>
+<tr id="t2238A" class="h"><td><a href="#t2238A">22:38</a></td><td class="n2">pterygota</td><td>just install lein by downloading it as described on that page and running it</td></tr>
+<tr id="t2257A"><td><a href="#t2257A">22:57</a></td><td class="na">dnolen</td><td>mmarczyk: ping</td></tr>
+<tr id="t2257A" class="h"><td><a href="#t2257A">22:57</a></td><td class="nz">wolgo</td><td>hi</td></tr>
+<tr id="t2257A" class="h"><td><a href="#t2257A">22:57</a></td><td class="nj">mmarczyk</td><td>dnolen: pong</td></tr>
+<tr id="t2257A" class="h"><td><a href="#t2257A">22:57</a></td><td class="na">dnolen</td><td>mmarczyk: see my comment on 325?</td></tr>
+<tr id="t2258A" class="h"><td><a href="#t2258A">22:58</a></td><td class="nz">wolgo</td><td>I want to start learning clojure. Outside of writing, programs what is recommended as a decent first read for someone that has some lisp exposure and can program in other languages?</td></tr>
+<tr id="t2258A" class="h"><td><a href="#t2258A">22:58</a></td><td class="nj">mmarczyk</td><td>dnolen: assert-args was already in cljs.core, I just moved it to the top of the file</td></tr>
+<tr id="t2259A" class="h r"><td><a href="#t2259A">22:59</a></td><td class="nj">mmarczyk</td><td>dnolen: it's only used to validate macro args, not in the expansion</td></tr>
+<tr id="t2259A" class="h"><td><a href="#t2259A">22:59</a></td><td class="ni">scottj</td><td>wolgo: fav book of the channel is clojurebook.com</td></tr>
+<tr id="t2259A" class="h"><td><a href="#t2259A">22:59</a></td><td class="nj">mmarczyk</td><td>expansions</td></tr>
+<tr id="t2259A" class="h"><td><a href="#t2259A">22:59</a></td><td class="na">dnolen</td><td>mmarczyk: oh right, gotcha.</td></tr>
+<tr id="t2300A"><td><a href="#t2300A">23:00</a></td><td class="nz">wolgo</td><td>okay thanks</td></tr>
+<tr id="t2300A" class="h r"><td><a href="#t2300A">23:00</a></td><td class="nz">wolgo</td><td>I will be back when I have questions. You have been warned!</td></tr>
+<tr id="t2303A" class="h"><td><a href="#t2303A">23:03</a></td><td class="na">dnolen</td><td>mmarczyk: ibdknox: CLJS-325 resolved.</td></tr>
+<tr id="t2304A" class="h"><td><a href="#t2304A">23:04</a></td><td class="nj">mmarczyk</td><td>great!</td></tr>
+<tr id="t2304A" class="h"><td><a href="#t2304A">23:04</a></td><td class="nx">rlb</td><td>technomancy: probably won't upload emacs24 until at least tomorrow fwiw -- everything looks good, but I need to test the install a bit more.</td></tr>
+<tr id="t2327A"><td><a href="#t2327A">23:27</a></td><td class="ns">technomancy</td><td>rlb: no worries; I'm on testing anyway</td></tr>
+</tbody></table></main></body></html>

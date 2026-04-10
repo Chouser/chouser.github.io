@@ -1,0 +1,567 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#clojure – 2009-04-17</title><link rel="stylesheet" href="../style.css"></head><body>
+<header class="sh"><a class="st" href="../index.html">#clojure logs</a><nav class="dn"><a href="2009-04-16.html">&larr;</a><span>2009-04-17</span><a href="2009-04-18.html">&rarr;</a></nav></header>
+<main><p class="dh">2009-04-17</p><table class="lg"><tbody>
+<tr id="t0024A"><td><a href="#t0024A">00:24</a></td><td class="ns">pjb3</td><td>I posted this little snippet of Haskell on Twitter earlier:</td></tr>
+<tr id="t0024A" class="h r"><td><a href="#t0024A">00:24</a></td><td class="ns">pjb3</td><td>takeWhile (&lt; 5) (foldr (:) [] [1..])</td></tr>
+<tr id="t0025A" class="h r"><td><a href="#t0025A">00:25</a></td><td class="ns">pjb3</td><td>Something sort of equivalent in Clojure is:</td></tr>
+<tr id="t0025A" class="h r"><td><a href="#t0025A">00:25</a></td><td class="ns">pjb3</td><td>(take-while #(&lt; % 5) (reduce conj [] (iterate inc 1)))</td></tr>
+<tr id="t0025A" class="h r"><td><a href="#t0025A">00:25</a></td><td class="ns">pjb3</td><td>But the problem is the Clojure one doesn't work</td></tr>
+<tr id="t0026A" class="h r"><td><a href="#t0026A">00:26</a></td><td class="ns">pjb3</td><td>The reason is that reduce does not produce a lazy sequence</td></tr>
+<tr id="t0026A" class="h r"><td><a href="#t0026A">00:26</a></td><td class="ns">pjb3</td><td>In Haskell, foldr is lazy, so it works</td></tr>
+<tr id="t0026A" class="h"><td><a href="#t0026A">00:26</a></td><td class="n6">durka42</td><td>wait, is #(reduce conj %) a nop?</td></tr>
+<tr id="t0028A" class="h"><td><a href="#t0028A">00:28</a></td><td class="ns">pjb3</td><td>Well, in this case it doesn't really do anything except realize the lazy sequence</td></tr>
+<tr id="t0028A" class="h r"><td><a href="#t0028A">00:28</a></td><td class="ns">pjb3</td><td>,(take-while #(&lt; % 5) (iterate inc 1))</td></tr>
+<tr id="t0028A" class="h"><td><a href="#t0028A">00:28</a></td><td class="nl">clojurebot</td><td>(1 2 3 4)</td></tr>
+<tr id="t0029A" class="h"><td><a href="#t0029A">00:29</a></td><td class="nd">hiredman</td><td>I just fail to understand how reduce can be lazy</td></tr>
+<tr id="t0029A" class="h"><td><a href="#t0029A">00:29</a></td><td class="ns">pjb3</td><td>,(take-while #(&lt; % 5) (map (fn [x] x) (iterate inc 1)))</td></tr>
+<tr id="t0029A" class="h"><td><a href="#t0029A">00:29</a></td><td class="nl">clojurebot</td><td>(1 2 3 4)</td></tr>
+<tr id="t0030A"><td><a href="#t0030A">00:30</a></td><td class="ns">pjb3</td><td>hiredman: It ends up being lazy in Haskell because function application and sequences are lazy</td></tr>
+<tr id="t0031A" class="h"><td><a href="#t0031A">00:31</a></td><td class="nb">devinus</td><td>Does anybody use any specific Java -switches to increase the performance of Clojure?</td></tr>
+<tr id="t0031A" class="h"><td><a href="#t0031A">00:31</a></td><td class="ns">pjb3</td><td>I think Clojure's reduce is actually like Haskell's foldl, which isn't lazy even in Haskell</td></tr>
+<tr id="t0032A" class="h"><td><a href="#t0032A">00:32</a></td><td class="nd">hiredman</td><td>pjb3: but, I mean, if the reduce is done at all, should it all get done, and it all is a infinite list, does not compute</td></tr>
+<tr id="t0032A" class="h r"><td><a href="#t0032A">00:32</a></td><td class="nd">hiredman</td><td>devinus: -server</td></tr>
+<tr id="t0033A" class="h"><td><a href="#t0033A">00:33</a></td><td class="nb">devinus</td><td>hiredman: does -server imply 64-bit, or should i use -d64 ?</td></tr>
+<tr id="t0035A" class="h"><td><a href="#t0035A">00:35</a></td><td class="nd">hiredman</td><td>java ships with two jvms</td></tr>
+<tr id="t0035A" class="h r"><td><a href="#t0035A">00:35</a></td><td class="nd">hiredman</td><td>-server enables hotspot, which is the ony with all the JIT goodies</td></tr>
+<tr id="t0044A"><td><a href="#t0044A">00:44</a></td><td class="ns">pjb3</td><td>Here's an implementation of foldr in Clojure: <a href="http://gist.github.com/96861">http://gist.github.com/96861</a></td></tr>
+<tr id="t0046A" class="h r"><td><a href="#t0046A">00:46</a></td><td class="ns">pjb3</td><td>So if you try to evaluate</td></tr>
+<tr id="t0046A" class="h"><td><a href="#t0046A">00:46</a></td><td class="nd">hiredman</td><td>I just don't see how an operation that uses an accumulator can be lazy</td></tr>
+<tr id="t0047A" class="h"><td><a href="#t0047A">00:47</a></td><td class="ns">pjb3</td><td>(foldr cons '() (range 1 3))</td></tr>
+<tr id="t0047A" class="h r"><td><a href="#t0047A">00:47</a></td><td class="ns">pjb3</td><td>At some point in the evaluation it looks like this:</td></tr>
+<tr id="t0047A" class="h r"><td><a href="#t0047A">00:47</a></td><td class="ns">pjb3</td><td>(cons 1 (cons 2 (foldr cons '() '(3))))</td></tr>
+<tr id="t0047A" class="h"><td><a href="#t0047A">00:47</a></td><td class="nd">hiredman</td><td>hmmmm</td></tr>
+<tr id="t0047A" class="h"><td><a href="#t0047A">00:47</a></td><td class="ns">pjb3</td><td>But eventually for it to finish, it has to continue the recursive calls</td></tr>
+<tr id="t0048A" class="h r"><td><a href="#t0048A">00:48</a></td><td class="ns">pjb3</td><td>and boil it down to (1 2 3)</td></tr>
+<tr id="t0048A" class="h r"><td><a href="#t0048A">00:48</a></td><td class="ns">pjb3</td><td>What happens in Haskell is that the expression evaluation is lazy</td></tr>
+<tr id="t0048A" class="h r"><td><a href="#t0048A">00:48</a></td><td class="ns">pjb3</td><td>so if nothing ever asks it to evaluate the expressions</td></tr>
+<tr id="t0049A" class="h r"><td><a href="#t0049A">00:49</a></td><td class="ns">pjb3</td><td>it can stop at:</td></tr>
+<tr id="t0049A" class="h r"><td><a href="#t0049A">00:49</a></td><td class="ns">pjb3</td><td>(cons 1 (cons 2 (foldr cons '() '(3))))</td></tr>
+<tr id="t0049A" class="h r"><td><a href="#t0049A">00:49</a></td><td class="ns">pjb3</td><td>If for example</td></tr>
+<tr id="t0049A" class="h r"><td><a href="#t0049A">00:49</a></td><td class="ns">pjb3</td><td>it is called like</td></tr>
+<tr id="t0049A" class="h r"><td><a href="#t0049A">00:49</a></td><td class="ns">pjb3</td><td>(take-while #(&lt; % 2) (cons 1 (cons 2 (foldr cons '() '(3)))))</td></tr>
+<tr id="t0050A" class="r"><td><a href="#t0050A">00:50</a></td><td class="ns">pjb3</td><td>So anyway, that's how</td></tr>
+<tr id="t0050A" class="h r"><td><a href="#t0050A">00:50</a></td><td class="ns">pjb3</td><td>takeWhile (&lt; 5) (foldr (:) [] [1..])</td></tr>
+<tr id="t0050A" class="h"><td><a href="#t0050A">00:50</a></td><td class="nd">hiredman</td><td>ok</td></tr>
+<tr id="t0050A" class="h"><td><a href="#t0050A">00:50</a></td><td class="ns">pjb3</td><td>in Haskell works</td></tr>
+<tr id="t0050A" class="h"><td><a href="#t0050A">00:50</a></td><td class="nd">hiredman</td><td>interesting</td></tr>
+<tr id="t0051A" class="h"><td><a href="#t0051A">00:51</a></td><td class="ns">pjb3</td><td>It's pretty interesting, with all expression evaluation being lazy what you can do</td></tr>
+<tr id="t0316A"><td><a href="#t0316A">03:16</a></td><td class="nn">AWizzArd</td><td>Moin moin</td></tr>
+<tr id="t0320A"><td><a href="#t0320A">03:20</a></td><td class="nj">cgrand</td><td>Hi AWizzArd!</td></tr>
+<tr id="t0348A"><td><a href="#t0348A">03:48</a></td><td class="n7">bOR_</td><td>does any vimclojuran recognize this error?</td></tr>
+<tr id="t0348A" class="h r"><td><a href="#t0348A">03:48</a></td><td class="n7">bOR_</td><td>  /hosts/linuxhome/falcon/boris2/programs/src/vimclojure-2.1.0/build.xml:104: The &lt;jar&gt; type doesn't support the nested &quot;path&quot; element.</td></tr>
+<tr id="t0348A" class="h"><td><a href="#t0348A">03:48</a></td><td class="nv">kotarak</td><td>You ant is to old.</td></tr>
+<tr id="t0348A" class="h r"><td><a href="#t0348A">03:48</a></td><td class="nv">kotarak</td><td>Your ant...</td></tr>
+<tr id="t0348A" class="h"><td><a href="#t0348A">03:48</a></td><td class="n7">bOR_</td><td>ah. will install a new ant then.</td></tr>
+<tr id="t0349A" class="h r"><td><a href="#t0349A">03:49</a></td><td class="n7">bOR_</td><td>thanks :)</td></tr>
+<tr id="t0349A" class="h"><td><a href="#t0349A">03:49</a></td><td class="nv">kotarak</td><td>np</td></tr>
+<tr id="t0354A"><td><a href="#t0354A">03:54</a></td><td class="n7">bOR_</td><td>Apache Ant version 1.6.5 compiled on January 6 2007</td></tr>
+<tr id="t0355A" class="h"><td><a href="#t0355A">03:55</a></td><td class="nv">kotarak</td><td>bOR_: Apache Ant version 1.7.0 compiled on August 25 2008</td></tr>
+<tr id="t0355A" class="h"><td><a href="#t0355A">03:55</a></td><td class="n7">bOR_</td><td>hmm. that is the ant version in the (latest) binary 1.7.1 ant package.</td></tr>
+<tr id="t0356A" class="h r"><td><a href="#t0356A">03:56</a></td><td class="n7">bOR_</td><td>I'll install the source ant.</td></tr>
+<tr id="t0356A" class="h r"><td><a href="#t0356A">03:56</a></td><td class="n7">bOR_</td><td>nod.</td></tr>
+<tr id="t0420A" class="r"><td><a href="#t0420A">04:20</a></td><td class="n7">bOR_</td><td>kotarak - downloading ant 1.7.1, both binary or source, gives me an ant that reports version 1.6.5</td></tr>
+<tr id="t0421A" class="h r"><td><a href="#t0421A">04:21</a></td><td class="n7">bOR_</td><td>hmpf. I'll look on the net if I can find anything about that.</td></tr>
+<tr id="t0421A" class="h"><td><a href="#t0421A">04:21</a></td><td class="nv">kotarak</td><td>bOR_: Then check which ant is actually invoked.</td></tr>
+<tr id="t0421A" class="h r"><td><a href="#t0421A">04:21</a></td><td class="nv">kotarak</td><td>Maybe some PATH issue.</td></tr>
+<tr id="t0422A" class="h"><td><a href="#t0422A">04:22</a></td><td class="n7">bOR_</td><td>seems logical, and I've made that error before.</td></tr>
+<tr id="t0422A" class="h r"><td><a href="#t0422A">04:22</a></td><td class="n7">bOR_</td><td>boris:falcon:~/.local/bin:cp ant ant2</td></tr>
+<tr id="t0422A" class="h r"><td><a href="#t0422A">04:22</a></td><td class="n7">bOR_</td><td>boris:falcon:~/.local/bin:ant2 -version</td></tr>
+<tr id="t0422A" class="h r"><td><a href="#t0422A">04:22</a></td><td class="n7">bOR_</td><td>Apache Ant version 1.6.5 compiled on January 6 2007</td></tr>
+<tr id="t0422A" class="h r"><td><a href="#t0422A">04:22</a></td><td class="n7">bOR_</td><td>I might just need a coffee and the problem will be solved :)</td></tr>
+<tr id="t0423A" class="h"><td><a href="#t0423A">04:23</a></td><td class="nv">kotarak</td><td>Hmmm... ./ant probably gives the same. (Considering the very absurd case, that there is also an ant2 on your system. ;) )</td></tr>
+<tr id="t0424A" class="h r"><td><a href="#t0424A">04:24</a></td><td class="nv">kotarak</td><td>Just try the version. Maybe it works although it reports a wrong version?</td></tr>
+<tr id="t0424A" class="h"><td><a href="#t0424A">04:24</a></td><td class="n7">bOR_</td><td>good one.</td></tr>
+<tr id="t0424A" class="h r"><td><a href="#t0424A">04:24</a></td><td class="n7">bOR_</td><td>nope, genuine error.</td></tr>
+<tr id="t0425A" class="h"><td><a href="#t0425A">04:25</a></td><td class="nv">kotarak</td><td>hrmpf</td></tr>
+<tr id="t0425A" class="h"><td><a href="#t0425A">04:25</a></td><td class="n7">bOR_</td><td>might ask our sysadmin to look into it.</td></tr>
+<tr id="t0425A" class="h r"><td><a href="#t0425A">04:25</a></td><td class="n7">bOR_</td><td>it worked nicely on ubuntu, but here we are running a different flavor.</td></tr>
+<tr id="t0425A" class="h r"><td><a href="#t0425A">04:25</a></td><td class="n7">bOR_</td><td>maybe he can just update the ant :). delegate the problem.</td></tr>
+<tr id="t0426A" class="h r"><td><a href="#t0426A">04:26</a></td><td class="n7">bOR_</td><td><a href="http://ant.apache.org/faq.html#RedHat_ES_3">http://ant.apache.org/faq.html#RedHat_ES_3</a></td></tr>
+<tr id="t0426A" class="h r"><td><a href="#t0426A">04:26</a></td><td class="n7">bOR_</td><td>that might be the answer.</td></tr>
+<tr id="t0426A" class="h"><td><a href="#t0426A">04:26</a></td><td class="nv">kotarak</td><td>Hmm.. Check where your ANT_HOME env var points to.</td></tr>
+<tr id="t0426A" class="h"><td><a href="#t0426A">04:26</a></td><td class="n7">bOR_</td><td>we're running centos, which I think is derived from redhat</td></tr>
+<tr id="t0427A" class="h r"><td><a href="#t0427A">04:27</a></td><td class="n7">bOR_</td><td>sysadmin time. I don't have su here</td></tr>
+<tr id="t0622A"><td><a href="#t0622A">06:22</a></td><td class="nu">cemerick</td><td>I guess I never internalized that PersistentQueue existed.  Lovely little thing, it is.</td></tr>
+<tr id="t0627A" class="h"><td><a href="#t0627A">06:27</a></td><td class="nu">rhickey</td><td>cemerick: I keep needing to get around to putting some wrappers in the library for it</td></tr>
+<tr id="t0628A" class="h"><td><a href="#t0628A">06:28</a></td><td class="nu">cemerick</td><td>yeah, it's quite the gem, IMO.  I spent about 10 minute figuring out how/whether I'd implement a clojure-y queue, when I had the stroke of genius to *search the internet*! :-)</td></tr>
+<tr id="t0631A" class="r"><td><a href="#t0631A">06:31</a></td><td class="nu">cemerick</td><td>rhickey: what would you think of a patch that would add &quot;prefix-rest&quot; destructuring?  i.e. (let [[prefix &gt; a b c] [1 2 3 4 5 6]] [prefix a b c]) =&gt; [[1 2 3] 4 5 6]</td></tr>
+<tr id="t0633A" class="h"><td><a href="#t0633A">06:33</a></td><td class="nu">rhickey</td><td>cemerick: sounds really special purpose - I can't think of a single time I've desired that</td></tr>
+<tr id="t0635A" class="h"><td><a href="#t0635A">06:35</a></td><td class="nu">cemerick</td><td>I bump into situations where it'd be handy every now and then...I generally just rearrange the order of the args to the fn.</td></tr>
+<tr id="t0635A" class="h"><td><a href="#t0635A">06:35</a></td><td class="nu">rhickey</td><td>one issue I have with exposing persistent queue is that I also want to provide wrappers for other queues - java.util, JMS et al, so how to best name them?</td></tr>
+<tr id="t0635A" class="h"><td><a href="#t0635A">06:35</a></td><td class="nu">cemerick</td><td>That obviously works, but often the arg order then doesn't entirely make sense given the fn's purpose.</td></tr>
+<tr id="t0638A" class="h r"><td><a href="#t0638A">06:38</a></td><td class="nu">cemerick</td><td>rhickey: why do you want to provide wrapper for queues from java-land?  There's a *lot* of list/vector impls in java-land, with no wrappers in clojure.</td></tr>
+<tr id="t0645A"><td><a href="#t0645A">06:45</a></td><td class="nu">rhickey</td><td>cemerick: because stateful queues are an important part of workflow, Clojure doesn't provide them natively, people that don't know Java don't know they are there, there are opportunities to add value in abstracting away some differences and standardizing e.g. timeouts, they will form the basis of any distributed story for Clojure...</td></tr>
+<tr id="t0647A" class="h"><td><a href="#t0647A">06:47</a></td><td class="nu">cemerick</td><td>rhickey: fair enough.  Wrappers are a tough business though, leaky abstractions and all.  I guess where there's muck, there's brass, and all that.</td></tr>
+<tr id="t0650A" class="r"><td><a href="#t0650A">06:50</a></td><td class="nu">cemerick</td><td>FWIW, I'd like to consider c.l.PQ to be the &quot;primary&quot; queue impl -- it likely suits a majority of use cases, and is far less environment-dependent than other queue impls (JMS, j.u.concurrent queues, etc).</td></tr>
+<tr id="t0651A" class="h r"><td><a href="#t0651A">06:51</a></td><td class="nu">cemerick</td><td>(especially in terracotta :-D)</td></tr>
+<tr id="t0740A" class="r"><td><a href="#t0740A">07:40</a></td><td class="nu">cemerick</td><td>hrm, one cannot use set! to change *print-length* and such anymore?</td></tr>
+<tr id="t0747A" class="h"><td><a href="#t0747A">07:47</a></td><td class="nu">rhickey</td><td>cemerick: I consider c.l.PQ to be an entirely different beast than stateful blocking queues and would rarely consider one useful where the other is</td></tr>
+<tr id="t0750A"><td><a href="#t0750A">07:50</a></td><td class="nu">cemerick</td><td>rhickey: sure, so would I.  I was only saying that a POQ (plain ol' queue) is generally required in more situations than anything else.</td></tr>
+<tr id="t0752A" class="h"><td><a href="#t0752A">07:52</a></td><td class="nu">rhickey</td><td>cemerick: depends on what you are doing. I find queues as I/O more frequently used than queues as data structure</td></tr>
+<tr id="t0753A" class="h r"><td><a href="#t0753A">07:53</a></td><td class="nu">rhickey</td><td>anyway, it's not either/or, but given the need for both, names are an issue</td></tr>
+<tr id="t0757A" class="h"><td><a href="#t0757A">07:57</a></td><td class="n7">aperotte</td><td>hello everyone!  I'm working on a data structure for clojure and wanted to know if anyone (rhickey in particular) had any input.  It's an n-dimensional array in some ways similar to python's ndarray.</td></tr>
+<tr id="t0757A" class="h"><td><a href="#t0757A">07:57</a></td><td class="na">Raynes</td><td>&quot;What is a good starter language for a 10 year old? I want to teach my 10 year old daughter to program.&quot; &quot;Assembly.&quot;</td></tr>
+<tr id="t0757A" class="h"><td><a href="#t0757A">07:57</a></td><td class="nu">cemerick</td><td>yeah...my comments were mostly made assuming there will be a 'queue' fn, with the only question being, what does it produce?  I think making it so that it produces a LBQ or somesuch would be unfortunate.  Clojure's impl of persistent data structures and their 'first class' status is arguably its best feature.</td></tr>
+<tr id="t0758A" class="h"><td><a href="#t0758A">07:58</a></td><td class="nn">gregh</td><td>I learned assembly when I was 10, but it was a lot more fun on the apple ][ than it would be now</td></tr>
+<tr id="t0800A"><td><a href="#t0800A">08:00</a></td><td class="nu">rhickey</td><td>cemerick: I don't disagree, but if queue returns a c.l.PQ, then what lingo should we use for I/O queues? - channel?</td></tr>
+<tr id="t0801A" class="h r"><td><a href="#t0801A">08:01</a></td><td class="nu">rhickey</td><td>aperotte: are you trying to make a persistent data structure?</td></tr>
+<tr id="t0802A" class="h"><td><a href="#t0802A">08:02</a></td><td class="n7">aperotte</td><td>rhickey: yes</td></tr>
+<tr id="t0803A" class="h"><td><a href="#t0803A">08:03</a></td><td class="nu">cemerick</td><td>rhickey: well, if you're making wrappers that interoperate with peek, pop, etc, then I'd be happy enough to see them go into clojure.core.queues/linked-blocking-queue, etc.  Then if you really want to be fancy about it, you could exclude clojure.core.queue and use the linked-blocking-queue :renamed to queue.</td></tr>
+<tr id="t0803A" class="h"><td><a href="#t0803A">08:03</a></td><td class="n7">aperotte</td><td>rhickey: I wish there were a way to make java arrays immutable though</td></tr>
+<tr id="t0803A" class="h"><td><a href="#t0803A">08:03</a></td><td class="nu">rhickey</td><td>aperotte: me too</td></tr>
+<tr id="t0805A" class="h r"><td><a href="#t0805A">08:05</a></td><td class="nu">rhickey</td><td>cemerick: the semantics of stateful blocking queues and persistent queues are totally different, despite any apparent similarities</td></tr>
+<tr id="t0806A" class="h r"><td><a href="#t0806A">08:06</a></td><td class="nu">rhickey</td><td>thus, I think only one should get the name queue</td></tr>
+<tr id="t0806A" class="h"><td><a href="#t0806A">08:06</a></td><td class="nu">cemerick</td><td>indeed.  I just didn't know how far you wanted to try to paper over the differences.</td></tr>
+<tr id="t0808A" class="h"><td><a href="#t0808A">08:08</a></td><td class="n7">aperotte</td><td>rhickey: as it stands I'm implementing most of the interfaces of the other data structures (PersistentVector in particular).</td></tr>
+<tr id="t0808A" class="h"><td><a href="#t0808A">08:08</a></td><td class="nu">cemerick</td><td>IMO, there are far too many possible (and actual) queue impls for various concurrency use-cases to do anything other than be very specific about each wrapper you want to have.  Blessing just one of them doesn't seem right.</td></tr>
+<tr id="t0814A"><td><a href="#t0814A">08:14</a></td><td class="nu">rhickey</td><td>cemerick: I'll be happy to prove you wrong about that. It's not a matter of blessing an impl (e.g. from a factory/ctor perspective), but rather one of defining some simple protocol that can be widely supported, thus making it easy to write impl-ignorant code. This in line with the Clojure model elsewhere. If someone wants to fully leverage something specific they can always do so explicitly</td></tr>
+<tr id="t0815A" class="h"><td><a href="#t0815A">08:15</a></td><td class="nu">cemerick</td><td>rhickey: oh, so you're looking to fashion a corollary to seqs for queues?</td></tr>
+<tr id="t0815A" class="h"><td><a href="#t0815A">08:15</a></td><td class="nu">rhickey</td><td>yes, io-queues are one area where I think it would be valid to unify the local and distributed models, as they are substantially similar</td></tr>
+<tr id="t0816A" class="h r"><td><a href="#t0816A">08:16</a></td><td class="nu">rhickey</td><td>asynchrony, blocking, remote failure, timeouts etc</td></tr>
+<tr id="t0818A" class="h r"><td><a href="#t0818A">08:18</a></td><td class="nu">rhickey</td><td>I've done some thinking about it, and would like to try at some point to at least see how much can be factored out of j.u.c.BlockingQueue and JMS queues</td></tr>
+<tr id="t0819A" class="h r"><td><a href="#t0819A">08:19</a></td><td class="nu">rhickey</td><td>I consider such queues an essential architectural element in most systems</td></tr>
+<tr id="t0821A"><td><a href="#t0821A">08:21</a></td><td class="nu">cemerick</td><td>In that case, I retract all of my previous statements  :-)</td></tr>
+<tr id="t0821A" class="h"><td><a href="#t0821A">08:21</a></td><td class="nu">rhickey</td><td>When I see people polling on refs I realize that they need more support here, and I'm afraid if I only give them c.l.PQ they'll do even more of that</td></tr>
+<tr id="t0821A" class="h"><td><a href="#t0821A">08:21</a></td><td class="nu">cemerick</td><td>I think I was thrown off by the 'wrapper' term.</td></tr>
+<tr id="t0822A" class="h r"><td><a href="#t0822A">08:22</a></td><td class="nu">cemerick</td><td>rhickey: well, see, I underestimated your ambition.  I figured once 1.0 was out the door, you were just going to sit around, hang out on the channel, and argue with people on proggit ;-)</td></tr>
+<tr id="t0823A" class="h"><td><a href="#t0823A">08:23</a></td><td class="nu">rhickey</td><td>:)</td></tr>
+<tr id="t0825A" class="h"><td><a href="#t0825A">08:25</a></td><td class="nu">cemerick</td><td>understand that even though clojure has advanced so much, so quickly, old habits die hard w.r.t. expecting languages/frameworks to idle.  Not many people keep reaching.</td></tr>
+<tr id="t0827A" class="h"><td><a href="#t0827A">08:27</a></td><td class="nu">rhickey</td><td>I have so many things I want to do, I think now I just need 1.0 so I can do them without pissing anyone off with Clojure's &quot;rapid change&quot;</td></tr>
+<tr id="t0827A" class="h"><td><a href="#t0827A">08:27</a></td><td class="nu">cemerick</td><td>do you still have a long-term todo floating around?</td></tr>
+<tr id="t0829A" class="h"><td><a href="#t0829A">08:29</a></td><td class="na">Raynes</td><td>I'm going to put it in a flash drive and mount it on my wall.</td></tr>
+<tr id="t0829A" class="h"><td><a href="#t0829A">08:29</a></td><td class="nu">rhickey</td><td>cemerick: I do, but it's not a fixed roadmap. I made it non-public as I wanted to move it to issues, now I think issues shouldn't have wishlist items, so I may re-expose</td></tr>
+<tr id="t0830A" class="r"><td><a href="#t0830A">08:30</a></td><td class="nu">rhickey</td><td>Raynes: I don't see a lot of people clamoring for 1.0 in the gg thread, just requests for more stuff...</td></tr>
+<tr id="t0830A" class="h"><td><a href="#t0830A">08:30</a></td><td class="nu">cemerick</td><td>yeah, the issue tracker is a little too concrete for such things</td></tr>
+<tr id="t0831A" class="h"><td><a href="#t0831A">08:31</a></td><td class="na">Raynes</td><td>rhickey: It's just a huge milestone for Clojure, I'm in no hurry to slow down the rapid change, I just love the numbers one and zero.</td></tr>
+<tr id="t0832A" class="h"><td><a href="#t0832A">08:32</a></td><td class="nu">rhickey</td><td>Holcxjo: There's a tradeoff, in that it will limit the Clojure user base to those willing to contend with trunk for an extended period. Obviously there's more work to do, and probably a (very) few breaking changes still to come, but if people expect things not to change they can just stick with a version indefinitely</td></tr>
+<tr id="t0836A" class="h"><td><a href="#t0836A">08:36</a></td><td class="nu">cemerick</td><td>rhickey: indeed, I've not seen anyone volunteer to &quot;backport&quot; fixes and such.</td></tr>
+<tr id="t0837A" class="h"><td><a href="#t0837A">08:37</a></td><td class="nc">Holcxjo</td><td>rhickey: The problem is people sticking with an old version and developers then having to write sw that works with that old version -- not being able to use newer features...</td></tr>
+<tr id="t0837A" class="h"><td><a href="#t0837A">08:37</a></td><td class="nu">rhickey</td><td>I'd very much like Stuart's book to correspond to a release of Clojure - we both worked pretty hard on our ends of that, and it would be huge for newcomers</td></tr>
+<tr id="t0837A" class="h"><td><a href="#t0837A">08:37</a></td><td class="nu">cemerick</td><td>I continue to be skeptical of the 1.0 &quot;process&quot;.  Those who want it likely aren't going to help maintain it.</td></tr>
+<tr id="t0838A" class="h"><td><a href="#t0838A">08:38</a></td><td class="nc">Holcxjo</td><td>You don't want to know how long I had to write sw to Python 1.4 standards... :-/</td></tr>
+<tr id="t0838A" class="h"><td><a href="#t0838A">08:38</a></td><td class="nu">cemerick</td><td>1.4? ouch.</td></tr>
+<tr id="t0839A" class="h"><td><a href="#t0839A">08:39</a></td><td class="nu">rhickey</td><td>One difference with Clojure is that it is 99% library, with very fine granularity. It's not like syntax changes in other langs</td></tr>
+<tr id="t0839A" class="h"><td><a href="#t0839A">08:39</a></td><td class="nc">Holcxjo</td><td>Once it's out there it'll live and live and live...</td></tr>
+<tr id="t0840A"><td><a href="#t0840A">08:40</a></td><td class="na">Raynes</td><td>rhickey: *cough*scala*cough*</td></tr>
+<tr id="t0841A" class="h"><td><a href="#t0841A">08:41</a></td><td class="nu">cemerick</td><td>Holcxjo: some shops are still on java 1.1.7, and they like it that way.  I'd love to see clojure 1.0 being used similarly by the same sorts of people 10 years from now. :-)</td></tr>
+<tr id="t0843A" class="h"><td><a href="#t0843A">08:43</a></td><td class="nu">rhickey</td><td>if no one produces bugfix patches for 1.0 then there won't be a 1.0.1, it's that simple. Doesn't completely negate the value of 1.0, but means that people that want fixes only get them with enhancements/changes in trunk</td></tr>
+<tr id="t0844A" class="h"><td><a href="#t0844A">08:44</a></td><td class="nu">cemerick</td><td>rhickey: maybe those that are using clojure in some production capacity could pool their resources to support a guy (or half or quarter of one) that is responsible for the patching.</td></tr>
+<tr id="t0845A" class="h r"><td><a href="#t0845A">08:45</a></td><td class="nu">cemerick</td><td>We're certainly not there yet, but I'd be willing to underwrite that kind of effort.</td></tr>
+<tr id="t0846A" class="h r"><td><a href="#t0846A">08:46</a></td><td class="nu">cemerick</td><td>well, presumably someone will make it big using clojure, then hire you (or something).  That seems to be the general arc of such things.</td></tr>
+<tr id="t0902A"><td><a href="#t0902A">09:02</a></td><td class="nj">cgrand</td><td>Hi! About c.l.PersistentQueue, should I be worried about it being used in c.l.Agent? I mean, it seems that it can keep references on actions after they are executed.</td></tr>
+<tr id="t0904A" class="h"><td><a href="#t0904A">09:04</a></td><td class="nu">rhickey</td><td>cgrand: it can, but not doing so is not guaranteed. Is this causing an actual problem?</td></tr>
+<tr id="t0907A" class="h"><td><a href="#t0907A">09:07</a></td><td class="nj">cgrand</td><td>I thought about it two months ago and wondered whether it could be correlated to my widefinde2 code being a memory hog... but I never tested this hypothesis</td></tr>
+<tr id="t0908A" class="h"><td><a href="#t0908A">09:08</a></td><td class="nu">cemerick</td><td>speaking of agents, this is the third time I've seen this talked about (two other times in the channel): <a href="http://groups.google.com/group/clojure/browse_frm/thread/409054e3542adc1f?hl=en">http://groups.google.com/group/clojure/browse_frm/thread/409054e3542adc1f?hl=en</a></td></tr>
+<tr id="t0912A"><td><a href="#t0912A">09:12</a></td><td class="nv">kotarak</td><td>Has anyone hashdot running with Clojure on OS X?</td></tr>
+<tr id="t0913A" class="h"><td><a href="#t0913A">09:13</a></td><td class="nu">rhickey</td><td>cemerick: no one replied if shutdown-agents was sufficient or not</td></tr>
+<tr id="t0913A" class="h"><td><a href="#t0913A">09:13</a></td><td class="nv">kotarak</td><td>rhickey: he calls shutdown-agents in his exit function, no?</td></tr>
+<tr id="t0915A" class="h"><td><a href="#t0915A">09:15</a></td><td class="nu">cemerick</td><td>Indeed, and I think he's saying in msg #4 that the behaviour I predicted does happen interactively, but not when the thing is init'ed by cron (which I don't have any theories about).</td></tr>
+<tr id="t0915A" class="h"><td><a href="#t0915A">09:15</a></td><td class="nu">rhickey</td><td>kotarak: I didn't see enough info to further pursue it - e.g. are his agents still active?</td></tr>
+<tr id="t0915A" class="h"><td><a href="#t0915A">09:15</a></td><td class="nu">cemerick</td><td>modulo the cron bit, the other two cases I helped with in the channel saw the same behaviour.</td></tr>
+<tr id="t0916A" class="h r"><td><a href="#t0916A">09:16</a></td><td class="nu">cemerick</td><td>but then, like I said, I don't use agents, so I'm mostly speculating based on looking at the docs around the default threadpool impls.</td></tr>
+<tr id="t0918A" class="h"><td><a href="#t0918A">09:18</a></td><td class="nu">powr-toc</td><td>Is there an easy way to determine dependencies between functions, for refactoring?  I have about 2 dozen functions, many of which have been superceeded... Is the best thing to interactively evaluate and run them and see where they break?</td></tr>
+<tr id="t0918A" class="h"><td><a href="#t0918A">09:18</a></td><td class="nl">clojurebot</td><td>functions are maps</td></tr>
+<tr id="t0918A" class="h"><td><a href="#t0918A">09:18</a></td><td class="nu">powr-toc</td><td>I think I need to move to use the test suite in contrib...</td></tr>
+<tr id="t0928A"><td><a href="#t0928A">09:28</a></td><td class="n7">aperotte</td><td>rhickey: I'm nearing the point where I can share what I have, but I wanted to make sure you don't have any more suggestions re: an ndarray/matrix datatype</td></tr>
+<tr id="t0930A"><td><a href="#t0930A">09:30</a></td><td class="nv">kotarak</td><td>Is anyone using hashdot with Clojure on OS X?</td></tr>
+<tr id="t0931A" class="h"><td><a href="#t0931A">09:31</a></td><td class="nu">rhickey</td><td>aperotte: probably easier for me to give feedback on what you've got</td></tr>
+<tr id="t0933A" class="h"><td><a href="#t0933A">09:33</a></td><td class="n7">aperotte</td><td>rhickey: would you prefer to wait until I think it's more shareable, or would you rather see it now</td></tr>
+<tr id="t0934A" class="h"><td><a href="#t0934A">09:34</a></td><td class="nu">rhickey</td><td>aperotte: up to you, I wasn't thinkisg about it until you mentioned your work, so I don't have any ideas at the moment</td></tr>
+<tr id="t0935A" class="h"><td><a href="#t0935A">09:35</a></td><td class="n7">aperotte</td><td>rhickey: ok, I'll come back with a link to what I've done in a few days</td></tr>
+<tr id="t0935A" class="h"><td><a href="#t0935A">09:35</a></td><td class="nu">rhickey</td><td>great</td></tr>
+<tr id="t0941A"><td><a href="#t0941A">09:41</a></td><td class="nu">powr-toc</td><td>kotarak: no, not seen it before... looks usefull... is it?</td></tr>
+<tr id="t0942A" class="h"><td><a href="#t0942A">09:42</a></td><td class="nv">kotarak</td><td>powr-toc: Don't know. I can't compile it with the standard VM and with soylatte it shouts errors at me when I try to run it.</td></tr>
+<tr id="t0942A" class="h r"><td><a href="#t0942A">09:42</a></td><td class="nv">kotarak</td><td>powr-toc: That's why I asked..</td></tr>
+<tr id="t0948A" class="h"><td><a href="#t0948A">09:48</a></td><td class="nu">powr-toc</td><td>kotarak: is it implemented in pure Java or something else?</td></tr>
+<tr id="t0948A" class="h"><td><a href="#t0948A">09:48</a></td><td class="nv">kotarak</td><td>powr-toc: It has a C part as it seems.</td></tr>
+<tr id="t0948A" class="h r"><td><a href="#t0948A">09:48</a></td><td class="nv">kotarak</td><td>Doing stuff with JNI.</td></tr>
+<tr id="t0951A" class="r"><td><a href="#t0951A">09:51</a></td><td class="nv">kotarak</td><td>-.-</td></tr>
+<tr id="t0952A" class="h r"><td><a href="#t0952A">09:52</a></td><td class="nv">kotarak</td><td>powr-toc: I have it running. Compiled with soylatte, but running with stock VM.... But it works and seems a way to start scripts while doing some configuration...</td></tr>
+<tr id="t0955A" class="h"><td><a href="#t0955A">09:55</a></td><td class="nu">powr-toc</td><td>neat</td></tr>
+<tr id="t1001A"><td><a href="#t1001A">10:01</a></td><td class="n6">Chouser_</td><td>I don't see a whole lot of people contributing patches for Issues that they haven't run into themselves.</td></tr>
+<tr id="t1002A" class="h"><td><a href="#t1002A">10:02</a></td><td class="nu">rhickey</td><td>Chouser: nope</td></tr>
+<tr id="t1002A" class="h"><td><a href="#t1002A">10:02</a></td><td class="n6">Chouser_</td><td>I wonder if that suggests anything about how hard it may be to get backport patches from anyone once there's a 1.0 branch.</td></tr>
+<tr id="t1003A" class="h"><td><a href="#t1003A">10:03</a></td><td class="n1">cconstantine</td><td>I think it does</td></tr>
+<tr id="t1004A" class="h"><td><a href="#t1004A">10:04</a></td><td class="n6">Chouser_</td><td>personally, the thought or watching trunk patches going in, trying to spot which are non-breaking-change no-new-feature low-risk (etc.) bug fixes vs. not, and creating an backport issue for each just sounds like work.</td></tr>
+<tr id="t1004A" class="h r"><td><a href="#t1004A">10:04</a></td><td class="n6">Chouser_</td><td>like a Job</td></tr>
+<tr id="t1004A" class="h"><td><a href="#t1004A">10:04</a></td><td class="n1">cconstantine</td><td>Sounds like more fun than the code I'm working with now... but yea</td></tr>
+<tr id="t1005A" class="h"><td><a href="#t1005A">10:05</a></td><td class="nd">hiredman</td><td>wait</td></tr>
+<tr id="t1005A" class="h"><td><a href="#t1005A">10:05</a></td><td class="n6">Chouser_</td><td>though I suppose if someone shows up in IRC saying &quot;I'm using 1.0 and foo breaks&quot;, and foo has been fixed in trunk, I might be motivated to spin a backport patch right then.</td></tr>
+<tr id="t1005A" class="h"><td><a href="#t1005A">10:05</a></td><td class="nu">rhickey</td><td>At this point I see it as a way I can keep innovating in trunk without hindrance. If people don't want to contend with change, they can look into the 1.0 branch, if they want fixes there, they can submit patches. I don't want to apologize for improving Clojure, or have Clojure be perceived negatively because it is &quot;changing&quot;</td></tr>
+<tr id="t1005A" class="h"><td><a href="#t1005A">10:05</a></td><td class="nd">hiredman</td><td>I've got it</td></tr>
+<tr id="t1006A" class="h r"><td><a href="#t1006A">10:06</a></td><td class="nd">hiredman</td><td>have all the svn commits listed on a webpage where people can tag them as &quot;fix&quot; or &quot;breaking change&quot;</td></tr>
+<tr id="t1006A" class="h r"><td><a href="#t1006A">10:06</a></td><td class="nd">hiredman</td><td>crowd source it out</td></tr>
+<tr id="t1007A" class="h"><td><a href="#t1007A">10:07</a></td><td class="n1">cconstantine</td><td>eep, that''d be terrifying if I had to rely on clojure to make a living</td></tr>
+<tr id="t1007A" class="h"><td><a href="#t1007A">10:07</a></td><td class="nd">hiredman</td><td>:P</td></tr>
+<tr id="t1007A" class="h"><td><a href="#t1007A">10:07</a></td><td class="n1">cconstantine</td><td>make it web 2.0?</td></tr>
+<tr id="t1007A" class="h"><td><a href="#t1007A">10:07</a></td><td class="nj">Chousuke</td><td>:P</td></tr>
+<tr id="t1007A" class="h r"><td><a href="#t1007A">10:07</a></td><td class="nj">Chousuke</td><td>that'd require keeping commits small though.</td></tr>
+<tr id="t1007A" class="h"><td><a href="#t1007A">10:07</a></td><td class="n1">cconstantine</td><td>I like the idea of just using the release number to encode what kind of differences there are between release</td></tr>
+<tr id="t1008A" class="h r"><td><a href="#t1008A">10:08</a></td><td class="n1">cconstantine</td><td>I think someone else recommended an x.y.z... z is bugfixes, y is new features, x is breaking changes</td></tr>
+<tr id="t1008A" class="h"><td><a href="#t1008A">10:08</a></td><td class="n6">Chouser_</td><td>I think rhickey's perspective is good for now.  Branch 1.0, then keep moving on trunk, while being open to accepting backport patches for 1.0</td></tr>
+<tr id="t1009A" class="h r"><td><a href="#t1009A">10:09</a></td><td class="n6">Chouser_</td><td>then what happens, happens.  Clojure's done quite well so far not over-planning process or community details.</td></tr>
+<tr id="t1009A" class="h"><td><a href="#t1009A">10:09</a></td><td class="n1">cconstantine</td><td>true</td></tr>
+<tr id="t1009A" class="h"><td><a href="#t1009A">10:09</a></td><td class="nd">hiredman</td><td>~map</td></tr>
+<tr id="t1009A" class="h"><td><a href="#t1009A">10:09</a></td><td class="nl">clojurebot</td><td>map is *LAZY*</td></tr>
+<tr id="t1009A" class="h"><td><a href="#t1009A">10:09</a></td><td class="n6">Chouser_</td><td>I think it's likely that some set of people will start using 1.0 (perhaps people not currently using Clojure)</td></tr>
+<tr id="t1009A" class="h r"><td><a href="#t1009A">10:09</a></td><td class="n6">Chouser_</td><td>they will find bugs</td></tr>
+<tr id="t1010A" class="r"><td><a href="#t1010A">10:10</a></td><td class="n6">Chouser_</td><td>they may submit patches for those bugs, either by backporting existing trunk patches, or just plain fixing them.</td></tr>
+<tr id="t1010A" class="h r"><td><a href="#t1010A">10:10</a></td><td class="n6">Chouser_</td><td>why should anyone not using 1.0 work on keeping it fixed up?</td></tr>
+<tr id="t1011A" class="h"><td><a href="#t1011A">10:11</a></td><td class="n1">cconstantine</td><td>Chouser_: because there are new features that are irresistible.</td></tr>
+<tr id="t1011A" class="h"><td><a href="#t1011A">10:11</a></td><td class="nx">danlarkin</td><td>Chouser_: because it's the Right Thing To Do(TM(TM)</td></tr>
+<tr id="t1011A" class="h"><td><a href="#t1011A">10:11</a></td><td class="n1">cconstantine</td><td>I see future new compelling features as the biggest threat to 1.0; if 1.x is better enough no bug fixes will move back to 1.0 forcing everyone to upgrade out of 1.0</td></tr>
+<tr id="t1012A" class="h"><td><a href="#t1012A">10:12</a></td><td class="nx">danlarkin</td><td>cconstantine: I mostly agree</td></tr>
+<tr id="t1013A" class="h"><td><a href="#t1013A">10:13</a></td><td class="n1">cconstantine</td><td>thats the reason I'm on trunk of svn</td></tr>
+<tr id="t1013A" class="h r"><td><a href="#t1013A">10:13</a></td><td class="n1">cconstantine</td><td>my usage of clojure is mostly educational/recreational though.  I'm not doing anything *really* important with it yet</td></tr>
+<tr id="t1013A" class="h"><td><a href="#t1013A">10:13</a></td><td class="n6">Chouser_</td><td>but if everyone moves to trunk or 1.x because of new features (which aren't even on the table for 1.0.x), then isn't that even more reason that nobody should waste their time backporting fixes to 1.0?</td></tr>
+<tr id="t1014A" class="h"><td><a href="#t1014A">10:14</a></td><td class="n1">cconstantine</td><td>yes</td></tr>
+<tr id="t1014A" class="h r"><td><a href="#t1014A">10:14</a></td><td class="n1">cconstantine</td><td>I think you just restated the problem</td></tr>
+<tr id="t1014A" class="h"><td><a href="#t1014A">10:14</a></td><td class="n6">Chouser_</td><td>oh</td></tr>
+<tr id="t1015A" class="h r"><td><a href="#t1015A">10:15</a></td><td class="n6">Chouser_</td><td>it doesn't sound like a problem to me</td></tr>
+<tr id="t1015A" class="h"><td><a href="#t1015A">10:15</a></td><td class="nx">danlarkin</td><td>I look at it from this perspective: If I were to try to convince my boss to let us use clojure for work projects and I recommended to the team that we start off with 1.0, except there won't be any bugfixes unless we write them up with patches, they would question my sanity</td></tr>
+<tr id="t1015A" class="h"><td><a href="#t1015A">10:15</a></td><td class="n6">Chouser_</td><td>hm, we should have a matching branch of contrib.</td></tr>
+<tr id="t1015A" class="h"><td><a href="#t1015A">10:15</a></td><td class="n1">cconstantine</td><td>without backported fixes people who do find problems with 1.0 will be forced to upgrade; perhaps past a non-backwards-compatible change</td></tr>
+<tr id="t1015A" class="h r"><td><a href="#t1015A">10:15</a></td><td class="n1">cconstantine</td><td>danlarkin: exactly</td></tr>
+<tr id="t1016A" class="h"><td><a href="#t1016A">10:16</a></td><td class="n6">Chouser_</td><td>danlarkin: who would you *want* to be responsible for writing those patches, that would satisfy your team?</td></tr>
+<tr id="t1016A" class="h"><td><a href="#t1016A">10:16</a></td><td class="n1">cconstantine</td><td>The &quot;Clojure development team&quot;</td></tr>
+<tr id="t1016A" class="h"><td><a href="#t1016A">10:16</a></td><td class="nu">rhickey</td><td>oh, them</td></tr>
+<tr id="t1017A" class="h"><td><a href="#t1017A">10:17</a></td><td class="n1">cconstantine</td><td>The 'Them'</td></tr>
+<tr id="t1017A" class="h"><td><a href="#t1017A">10:17</a></td><td class="nx">danlarkin</td><td>well other projects assign a release manager for each release (not saying that's the only way)</td></tr>
+<tr id="t1017A" class="h"><td><a href="#t1017A">10:17</a></td><td class="n1">cconstantine</td><td>right</td></tr>
+<tr id="t1017A" class="h"><td><a href="#t1017A">10:17</a></td><td class="nx">danlarkin</td><td>so in essence, someone would have to volunteer for clojure to follow the release-manager model</td></tr>
+<tr id="t1018A" class="h"><td><a href="#t1018A">10:18</a></td><td class="n1">cconstantine</td><td>If there aren't any compelling new features for the language in the pipeline maybe it is time for a 1.0 *shrug* I don't know what is in development</td></tr>
+<tr id="t1018A" class="h r"><td><a href="#t1018A">10:18</a></td><td class="n1">cconstantine</td><td>danlarkin: having never participated in an open source project, my experience tells me yes</td></tr>
+<tr id="t1019A" class="h"><td><a href="#t1019A">10:19</a></td><td class="nu">rhickey</td><td>cconstantine: abstractions over queues, streams, scopes, clojure-in-clojure, improved modularity, easier porting, a new &quot;make&quot; construct, more targets, improved numerics...</td></tr>
+<tr id="t1019A" class="h"><td><a href="#t1019A">10:19</a></td><td class="n6">Chouser_</td><td>well, if anyone wants to hire to me backport trunk patches to 1.0, drop me a line.</td></tr>
+<tr id="t1020A"><td><a href="#t1020A">10:20</a></td><td class="n1">cconstantine</td><td>rhickey: what kind of timeframe on that, and how reasonable would it be to have them be released in chunks?</td></tr>
+<tr id="t1021A" class="h"><td><a href="#t1021A">10:21</a></td><td class="nx">danlarkin</td><td>heh well that's just it... if none of us have any interest in maintaining a 1.0, what is the point of releasing it?</td></tr>
+<tr id="t1021A" class="h"><td><a href="#t1021A">10:21</a></td><td class="nu">rhickey</td><td>Chouser_: yes, Clojure development sponsors welcome</td></tr>
+<tr id="t1021A" class="h"><td><a href="#t1021A">10:21</a></td><td class="n6">Chouser_</td><td>heh. I bet.</td></tr>
+<tr id="t1022A" class="h"><td><a href="#t1022A">10:22</a></td><td class="n1">cconstantine</td><td>Clojure; sponsored by Dr. Pepper!</td></tr>
+<tr id="t1023A" class="h r"><td><a href="#t1023A">10:23</a></td><td class="n1">cconstantine</td><td>I think things like backports won't happen until there is a need for bugfixes without major upgrades</td></tr>
+<tr id="t1023A" class="h r"><td><a href="#t1023A">10:23</a></td><td class="n1">cconstantine</td><td>that won't happen until people make a living off it, which won't happen until there are known stable releases and few breaking changes</td></tr>
+<tr id="t1023A" class="h"><td><a href="#t1023A">10:23</a></td><td class="n0">digash</td><td>I am trying to push Clojure in the enterprise and 1.0 will make it easier for me to make my case.</td></tr>
+<tr id="t1023A" class="h"><td><a href="#t1023A">10:23</a></td><td class="n1">cconstantine</td><td>this sounds like a chicken-egg problem</td></tr>
+<tr id="t1023A" class="h"><td><a href="#t1023A">10:23</a></td><td class="n0">digash</td><td>2.0 and 3.0 will make it even more easier.</td></tr>
+<tr id="t1024A" class="h"><td><a href="#t1024A">10:24</a></td><td class="no">vegai</td><td>why not go to 4.0 straight away :)</td></tr>
+<tr id="t1024A" class="h"><td><a href="#t1024A">10:24</a></td><td class="nx">danlarkin</td><td>but it's all so arbitrary :(</td></tr>
+<tr id="t1024A" class="h"><td><a href="#t1024A">10:24</a></td><td class="n1">cconstantine</td><td>MS model?  not really stable until 3.0?</td></tr>
+<tr id="t1024A" class="h"><td><a href="#t1024A">10:24</a></td><td class="n0">digash</td><td>yes, you got it.</td></tr>
+<tr id="t1024A" class="h"><td><a href="#t1024A">10:24</a></td><td class="no">vegai</td><td>Clojure Vista</td></tr>
+<tr id="t1024A" class="h"><td><a href="#t1024A">10:24</a></td><td class="n1">cconstantine</td><td>'normal people' pay attention to the numbers way too much</td></tr>
+<tr id="t1024A" class="h"><td><a href="#t1024A">10:24</a></td><td class="n6">Chouser_</td><td>maybe not a chicken-egg problem.  a 1.0 branch can be created today</td></tr>
+<tr id="t1024A" class="h"><td><a href="#t1024A">10:24</a></td><td class="n1">cconstantine</td><td>true, though this goes back to the problem of 1.0 not meaning much if there are no backported bug fixes</td></tr>
+<tr id="t1025A" class="h"><td><a href="#t1025A">10:25</a></td><td class="nu">rhickey</td><td>Chouser_: exactly, and people for whom it is important will have to step up after that</td></tr>
+<tr id="t1025A" class="h"><td><a href="#t1025A">10:25</a></td><td class="nj">Chousuke</td><td>is there symbol/keywords validation yet? :P</td></tr>
+<tr id="t1025A" class="h"><td><a href="#t1025A">10:25</a></td><td class="n6">Chouser_</td><td>some selfless souls may backport some fixes.  maybe that would be enough to create an impression of stability to get kind of users who need that</td></tr>
+<tr id="t1025A" class="h"><td><a href="#t1025A">10:25</a></td><td class="nx">danlarkin</td><td>cconstantine: exactly</td></tr>
+<tr id="t1026A" class="h"><td><a href="#t1026A">10:26</a></td><td class="nu">rhickey</td><td>or maybe I just need to thrash around in trunk to force people to care about the stable branch :)</td></tr>
+<tr id="t1026A" class="h"><td><a href="#t1026A">10:26</a></td><td class="n6">Chouser_</td><td>there you go</td></tr>
+<tr id="t1026A" class="h"><td><a href="#t1026A">10:26</a></td><td class="n1">cconstantine</td><td>is it reasonable to tell early adopters of 1.0 that they may need to do their own backporting for now?</td></tr>
+<tr id="t1026A" class="h"><td><a href="#t1026A">10:26</a></td><td class="nj">Chousuke</td><td>heh</td></tr>
+<tr id="t1026A" class="h"><td><a href="#t1026A">10:26</a></td><td class="nv">kotarak</td><td>Is there a way to specify an entry point for clojure.main?</td></tr>
+<tr id="t1027A" class="h"><td><a href="#t1027A">10:27</a></td><td class="n6">Chouser_</td><td>a few more &quot;Interim checkin - DO NOT USE!!&quot; could get ball rolling</td></tr>
+<tr id="t1027A" class="h"><td><a href="#t1027A">10:27</a></td><td class="n1">cconstantine</td><td>hehe</td></tr>
+<tr id="t1028A" class="h"><td><a href="#t1028A">10:28</a></td><td class="nx">danlarkin</td><td>I wonder, is the plan eventually to have most users on a release? Like not many people run from Python trunk, or Ruby trunk</td></tr>
+<tr id="t1029A" class="h"><td><a href="#t1029A">10:29</a></td><td class="nv">kotarak</td><td>rhickey: please don't! I use it for completion in vimclojure!</td></tr>
+<tr id="t1029A" class="h"><td><a href="#t1029A">10:29</a></td><td class="nx">chessguy_work</td><td>'morning ya'all</td></tr>
+<tr id="t1029A" class="h"><td><a href="#t1029A">10:29</a></td><td class="n6">Chouser_</td><td>could all-ns be thread-local?</td></tr>
+<tr id="t1030A"><td><a href="#t1030A">10:30</a></td><td class="n1">cconstantine</td><td>danlarkin: I would hope the goal is to get everyone on a release</td></tr>
+<tr id="t1031A" class="h"><td><a href="#t1031A">10:31</a></td><td class="n0">digash</td><td>does anybody uses inspector-tree? i have a patch to add a path to the selected node in the bottom of the screen. would it be usefull to anyone?</td></tr>
+<tr id="t1031A" class="h"><td><a href="#t1031A">10:31</a></td><td class="nv">kotarak</td><td>No way to specify a function which should be called *after* loading the script file in clojure.main?</td></tr>
+<tr id="t1031A" class="h"><td><a href="#t1031A">10:31</a></td><td class="nu">rhickey</td><td>Chouser_: it's orthogonal to threads - the problem is that modular Clojure will have some namespaces not visible from others and no global registry necessarily</td></tr>
+<tr id="t1032A" class="h r"><td><a href="#t1032A">10:32</a></td><td class="nu">rhickey</td><td>digash: sounds nice - post 1.0</td></tr>
+<tr id="t1033A" class="h r"><td><a href="#t1033A">10:33</a></td><td class="nu">rhickey</td><td>inspector could definitely use some love - the multimethods predate the hierarchy enhancements</td></tr>
+<tr id="t1033A" class="h"><td><a href="#t1033A">10:33</a></td><td class="n6">Chouser_</td><td>oh, right, it's class visibility from *classes* not from *threads*.  bleh</td></tr>
+<tr id="t1034A" class="h"><td><a href="#t1034A">10:34</a></td><td class="n0">digash</td><td> /me need to learn about the new hierarchy enhancements.</td></tr>
+<tr id="t1121A"><td><a href="#t1121A">11:21</a></td><td class="n7">djpowell</td><td>i think just-in-time backporting of fixes could work.  Just wait until someone asks for a fix on the mailing list, and hope that someone will be nice enough to make a patch, then push it out quickly as a minor point release.</td></tr>
+<tr id="t1124A" class="h"><td><a href="#t1124A">11:24</a></td><td class="nu">powr-toc</td><td>when working at the REPL in clojure-mode (Emacs) does anyone have any tips on the workflow around re-evaluating a function in its namespace?  manually changing the ns in the repl, then evaluating the modified function and then switch back is a pain</td></tr>
+<tr id="t1126A" class="h"><td><a href="#t1126A">11:26</a></td><td class="ns">Cark</td><td>powr-toc : do you mean without slime ?</td></tr>
+<tr id="t1126A" class="h"><td><a href="#t1126A">11:26</a></td><td class="n7">djpowell</td><td>yeah - i've just tended to stick all the code in one namespace, and then switch to that namespace in the repl.  can slime automatically switch namespaces?</td></tr>
+<tr id="t1128A" class="h"><td><a href="#t1128A">11:28</a></td><td class="ns">Cark</td><td>i use clojure mode without slime, and here is what i do : i have a (comment section at the end of the file, with an in-ns form ...so i can eval it when i'm close to the end, or the top ns form when i'm close to the top ....i usually will be to the end of the file, using my test forms in the comment section</td></tr>
+<tr id="t1129A" class="h r"><td><a href="#t1129A">11:29</a></td><td class="ns">Cark</td><td>b ut yes, i think slime does this automagically</td></tr>
+<tr id="t1133A"><td><a href="#t1133A">11:33</a></td><td class="nu">powr-toc</td><td>Cark: yeah</td></tr>
+<tr id="t1134A" class="h r"><td><a href="#t1134A">11:34</a></td><td class="nu">powr-toc</td><td>ok... was trying to avoid the complexities of slime until I've got more experience with clojure and know that I need the features</td></tr>
+<tr id="t1134A" class="h"><td><a href="#t1134A">11:34</a></td><td class="n7">djpowell</td><td>i don't use slime either.  i think because i have a fear of it breaking, and me wasting hours trying to get it working again, and also cause I seem to cope well enough with inferior-lisp mode.  is it worth upgrading?</td></tr>
+<tr id="t1135A" class="h"><td><a href="#t1135A">11:35</a></td><td class="nu">powr-toc</td><td>djpowell: same</td></tr>
+<tr id="t1135A" class="h r"><td><a href="#t1135A">11:35</a></td><td class="nu">powr-toc</td><td>though the ns thing I've just run into is annoying</td></tr>
+<tr id="t1135A" class="h"><td><a href="#t1135A">11:35</a></td><td class="np">kensanata</td><td>Does anybody know how I can get the clojure docs I see on clojure.org as a PDF or a similar format so that I can read it offline?</td></tr>
+<tr id="t1136A" class="h"><td><a href="#t1136A">11:36</a></td><td class="nu">powr-toc</td><td>kensanata: I'd second that... but I'd just be happy with an offline version of the site... are the site docs generated at all?</td></tr>
+<tr id="t1137A" class="h"><td><a href="#t1137A">11:37</a></td><td class="np">kensanata</td><td>powr-toc: I feel bad starting wget and leeching the site if there is an alternative...</td></tr>
+<tr id="t1137A" class="h"><td><a href="#t1137A">11:37</a></td><td class="nj">drewr</td><td>kensanata: There's one on the google group, but it's old IIRC.</td></tr>
+<tr id="t1138A" class="h"><td><a href="#t1138A">11:38</a></td><td class="nu">powr-toc</td><td>kensanata: I wouldn't feel bad about it... It'd just be nice to have a better way :-)</td></tr>
+<tr id="t1138A" class="h"><td><a href="#t1138A">11:38</a></td><td class="n7">djpowell</td><td>yeah, i'd quite like the docs to be part of the release bundle somehow</td></tr>
+<tr id="t1139A" class="h"><td><a href="#t1139A">11:39</a></td><td class="ns">Cark</td><td>the api page is generated, also there must be tools that can take a web site and make it a pdf</td></tr>
+<tr id="t1148A"><td><a href="#t1148A">11:48</a></td><td class="n8">arohner</td><td>djpowell: I'd recommend slime</td></tr>
+<tr id="t1149A" class="h r"><td><a href="#t1149A">11:49</a></td><td class="n8">arohner</td><td>actually wait</td></tr>
+<tr id="t1149A" class="h r"><td><a href="#t1149A">11:49</a></td><td class="n8">arohner</td><td>are you using (ns) declarations at the top of your files?</td></tr>
+<tr id="t1149A" class="h r"><td><a href="#t1149A">11:49</a></td><td class="n8">arohner</td><td>you should be, and then you can just (load 'filename) from the repl, and the code will end up in the correct ns</td></tr>
+<tr id="t1157A"><td><a href="#t1157A">11:57</a></td><td class="np">kensanata</td><td>I decided to just print <a href="http://jnb.ociweb.com/jnb/jnbMar2009.html">http://jnb.ociweb.com/jnb/jnbMar2009.html</a> to a PDF file... :/</td></tr>
+<tr id="t1230A"><td><a href="#t1230A">12:30</a></td><td class="nj">pjstadig</td><td>anyone know of a &quot;swing repl&quot;?</td></tr>
+<tr id="t1231A" class="h r"><td><a href="#t1231A">12:31</a></td><td class="nj">pjstadig</td><td>i.e. something that pops open a swing window that contains a repl</td></tr>
+<tr id="t1233A" class="h"><td><a href="#t1233A">12:33</a></td><td class="ns">Cark</td><td>you might be able to reuse clojure.main/repl to that effect</td></tr>
+<tr id="t1233A" class="h r"><td><a href="#t1233A">12:33</a></td><td class="ns">Cark</td><td>,(doc repl)</td></tr>
+<tr id="t1233A" class="h"><td><a href="#t1233A">12:33</a></td><td class="nl">clojurebot</td><td>java.lang.Exception: Unable to resolve var: repl in this context</td></tr>
+<tr id="t1234A" class="h"><td><a href="#t1234A">12:34</a></td><td class="ns">Cark</td><td>,(doc clojure.main/repl)</td></tr>
+<tr id="t1234A" class="h"><td><a href="#t1234A">12:34</a></td><td class="nl">clojurebot</td><td>&quot;([&amp; options]); Generic, reusable, read-eval-print loop. By default, reads from *in*, writes to *out*, and prints exception summaries to *err*. If you use the default :read hook, *in* must either be an instance of LineNumberingPushbackReader or duplicate its behavior of both supporting .unread and collapsing CR, LF, and CRLF into a single \\newline. Options are sequential keyword-value pairs. Available options and their d</td></tr>
+<tr id="t1253A"><td><a href="#t1253A">12:53</a></td><td class="nj">pjstadig</td><td>Cark: yeah i was just wondering if someone had done something similar already</td></tr>
+<tr id="t1253A" class="h r"><td><a href="#t1253A">12:53</a></td><td class="nj">pjstadig</td><td>wanted to be non-duplicative</td></tr>
+<tr id="t1259A" class="h"><td><a href="#t1259A">12:59</a></td><td class="nv">kotarak</td><td>pjstadig: there was a graphical repl in the files section of the google group</td></tr>
+<tr id="t1259A" class="h r"><td><a href="#t1259A">12:59</a></td><td class="nv">kotarak</td><td>But I'm not sure about its status</td></tr>
+<tr id="t1333A"><td><a href="#t1333A">13:33</a></td><td class="n6">Chouser_</td><td>pjstadig: there's also &quot;texture&quot; -- it was meant to be a text editor, but so far is mainly just a repl</td></tr>
+<tr id="t1353A"><td><a href="#t1353A">13:53</a></td><td class="nu">powr-toc</td><td>I forget how you print the last exception at the REPL... can anyone enlighten me? :-)</td></tr>
+<tr id="t1353A" class="h"><td><a href="#t1353A">13:53</a></td><td class="nv">kotarak</td><td>*1</td></tr>
+<tr id="t1353A" class="h"><td><a href="#t1353A">13:53</a></td><td class="nj">Chousuke</td><td>*e :P</td></tr>
+<tr id="t1353A" class="h"><td><a href="#t1353A">13:53</a></td><td class="nv">kotarak</td><td>Oops. Sorry. I read &quot;the last expression&quot;</td></tr>
+<tr id="t1356A" class="h"><td><a href="#t1356A">13:56</a></td><td class="nu">powr-toc</td><td>ahh thanks :-) (. *e printStackTrace)</td></tr>
+<tr id="t1356A" class="h"><td><a href="#t1356A">13:56</a></td><td class="nv">kotarak</td><td>powr-toc: you might be also interested in clojure.contrib.stacktrace</td></tr>
+<tr id="t1402A"><td><a href="#t1402A">14:02</a></td><td class="n4">cp2</td><td>someone should write a nice bytecode library in clojure</td></tr>
+<tr id="t1402A" class="h r"><td><a href="#t1402A">14:02</a></td><td class="n4">cp2</td><td>so i dont have to work on my own projects</td></tr>
+<tr id="t1402A" class="h r"><td><a href="#t1402A">14:02</a></td><td class="n4">cp2</td><td>:)</td></tr>
+<tr id="t1407A" class="h"><td><a href="#t1407A">14:07</a></td><td class="nv">kotarak</td><td>Could rhickey's defnk be added to clojure.contrib.def? <a href="http://paste.lisp.org/display/69347">http://paste.lisp.org/display/69347</a></td></tr>
+<tr id="t1414A"><td><a href="#t1414A">14:14</a></td><td class="na">Raynes</td><td>rhickey: You're right. They hardly even talked directly about the road to 1.0 at all. They mostly just complained about SVN and whined because Clojure isn't using Git.</td></tr>
+<tr id="t1414A" class="h r"><td><a href="#t1414A">14:14</a></td><td class="na">Raynes</td><td>:\</td></tr>
+<tr id="t1418A" class="h"><td><a href="#t1418A">14:18</a></td><td class="nu">mattrepl</td><td>bah, the VCS is a part of the road ahead and _is_ pertinent to the discussion as the management of backporting fixes to release versions was mentioned</td></tr>
+<tr id="t1419A" class="h"><td><a href="#t1419A">14:19</a></td><td class="na">Raynes</td><td>But shouldn't someone have made another thread if concerned about that?</td></tr>
+<tr id="t1421A" class="r"><td><a href="#t1421A">14:21</a></td><td class="na">Raynes</td><td>Either way. Rich will have to change to something else eventually, because Git-zealots are already rounding up pitchforks and torches ready to raid his home.</td></tr>
+<tr id="t1421A" class="h r"><td><a href="#t1421A">14:21</a></td><td class="na">Raynes</td><td>:p</td></tr>
+<tr id="t1422A" class="h"><td><a href="#t1422A">14:22</a></td><td class="nu">mattrepl</td><td>hehe, I'd be hesitant to start a thread on it until Rich shows interest since he's shut down the idea in the past</td></tr>
+<tr id="t1423A" class="h"><td><a href="#t1423A">14:23</a></td><td class="n4">cp2</td><td>im gitting angry, rhickey!</td></tr>
+<tr id="t1424A" class="h"><td><a href="#t1424A">14:24</a></td><td class="na">Raynes</td><td>Oh I see. He stated that Git wont happen any time soon.</td></tr>
+<tr id="t1424A" class="h"><td><a href="#t1424A">14:24</a></td><td class="nu">rhickey</td><td>whatever the benefits of Git, it's not a contender until it is available on a credible host with attributes similar to Google Code, and has decent tool support a la SVN - it's simply not there yet AFAICT.</td></tr>
+<tr id="t1425A" class="h r"><td><a href="#t1425A">14:25</a></td><td class="nu">rhickey</td><td>oh please</td></tr>
+<tr id="t1425A" class="h"><td><a href="#t1425A">14:25</a></td><td class="n4">cp2</td><td>heh</td></tr>
+<tr id="t1425A" class="h"><td><a href="#t1425A">14:25</a></td><td class="na">Raynes</td><td>rhickey: Yeah, I see Ozzy has demanded that you not use subversion.</td></tr>
+<tr id="t1426A" class="h r"><td><a href="#t1426A">14:26</a></td><td class="na">Raynes</td><td>Even Stuart is asking for Git. What is so great about Git?</td></tr>
+<tr id="t1426A" class="h"><td><a href="#t1426A">14:26</a></td><td class="nu">rhickey</td><td>I think Git has great ideas, everyone mentions it to me after my talks as having a kindred spirit with Clojure's persistent data structures, it's not a technical issue but an environmental one</td></tr>
+<tr id="t1427A" class="h"><td><a href="#t1427A">14:27</a></td><td class="na">Raynes</td><td>Seriously, I'm wondering. I don't know much about it. All I know is that it hardly works on Windows.</td></tr>
+<tr id="t1427A" class="h"><td><a href="#t1427A">14:27</a></td><td class="nb">rsynnott</td><td>so many things use it now</td></tr>
+<tr id="t1427A" class="h r"><td><a href="#t1427A">14:27</a></td><td class="nb">rsynnott</td><td>I'm more used to svn, though</td></tr>
+<tr id="t1428A" class="h"><td><a href="#t1428A">14:28</a></td><td class="n4">cp2</td><td>Raynes: oh yea</td></tr>
+<tr id="t1428A" class="h r"><td><a href="#t1428A">14:28</a></td><td class="n4">cp2</td><td>git sucks on windows</td></tr>
+<tr id="t1428A" class="h r"><td><a href="#t1428A">14:28</a></td><td class="n4">cp2</td><td>msysgit is decent, but still lacking</td></tr>
+<tr id="t1428A" class="h r"><td><a href="#t1428A">14:28</a></td><td class="n4">cp2</td><td>tortoisegit is just completely lame (at the moment)</td></tr>
+<tr id="t1428A" class="h"><td><a href="#t1428A">14:28</a></td><td class="nu">rhickey</td><td>cp2: that's enough reason against it right there, sucks on the 90% share OS</td></tr>
+<tr id="t1429A" class="h"><td><a href="#t1429A">14:29</a></td><td class="n6">Chouser_</td><td>I think there are some people who have been burned by svn in certain demanding environments, and have found git to be a helpful.  It think these are most likely to be militant.</td></tr>
+<tr id="t1429A" class="h"><td><a href="#t1429A">14:29</a></td><td class="n4">cp2</td><td>for the moment</td></tr>
+<tr id="t1429A" class="h"><td><a href="#t1429A">14:29</a></td><td class="na">Raynes</td><td>Command-line tools would be nice, like the Scala compiler. Being able to compile something by saying &quot;cljc teh.clj&quot;</td></tr>
+<tr id="t1429A" class="h r"><td><a href="#t1429A">14:29</a></td><td class="na">Raynes</td><td>But I believe there was a discussion here stating that that would be difficult.</td></tr>
+<tr id="t1429A" class="h"><td><a href="#t1429A">14:29</a></td><td class="n4">cp2</td><td>Raynes: bash + alias perhaps</td></tr>
+<tr id="t1429A" class="h"><td><a href="#t1429A">14:29</a></td><td class="nb">rsynnott</td><td>rhickey: Windows is probably a minority share on development machines, though</td></tr>
+<tr id="t1430A"><td><a href="#t1430A">14:30</a></td><td class="nj">Chousuke</td><td>the README file lists nice features but fails to mention how to use them</td></tr>
+<tr id="t1430A" class="h"><td><a href="#t1430A">14:30</a></td><td class="n6">Chouser_</td><td>I've never been burned by svn, and don't see how a single-user commit structure like clojure core has is ever going to stress it.  I personally prefer git and use git-svn quite happily.</td></tr>
+<tr id="t1430A" class="h"><td><a href="#t1430A">14:30</a></td><td class="nb">rsynnott</td><td>(especially if you ignore the in-house corporate app market)</td></tr>
+<tr id="t1430A" class="h"><td><a href="#t1430A">14:30</a></td><td class="na">Raynes</td><td>That's not the point. People /do/ still use Windows despite it's issues.</td></tr>
+<tr id="t1430A" class="h"><td><a href="#t1430A">14:30</a></td><td class="n4">cp2</td><td>i heard using linux supports socialism</td></tr>
+<tr id="t1430A" class="h r"><td><a href="#t1430A">14:30</a></td><td class="n4">cp2</td><td>so i use windows</td></tr>
+<tr id="t1430A" class="h"><td><a href="#t1430A">14:30</a></td><td class="nu">rhickey</td><td>rsynnott: Clojure does not ignore the in-house corporate market</td></tr>
+<tr id="t1430A" class="h"><td><a href="#t1430A">14:30</a></td><td class="nb">rsynnott</td><td>I suspect that the inhouse corporate market ignores clojure :)</td></tr>
+<tr id="t1430A" class="h"><td><a href="#t1430A">14:30</a></td><td class="nu">rhickey</td><td>true</td></tr>
+<tr id="t1431A" class="h"><td><a href="#t1431A">14:31</a></td><td class="np">kensanata</td><td>It doesn't hurt to be ready, though.</td></tr>
+<tr id="t1431A" class="h"><td><a href="#t1431A">14:31</a></td><td class="na">Raynes</td><td>I can get msysgit to clone, but not commit or anything of that sort.</td></tr>
+<tr id="t1431A" class="h"><td><a href="#t1431A">14:31</a></td><td class="nb">rsynnott</td><td>the inhouse corporate market still seems uncomfortable with Java and C#; pre .NET VB is still a very big part of it</td></tr>
+<tr id="t1431A" class="h"><td><a href="#t1431A">14:31</a></td><td class="n4">cp2</td><td>Raynes: weird, works for me</td></tr>
+<tr id="t1432A" class="h"><td><a href="#t1432A">14:32</a></td><td class="na">Raynes</td><td>cp2: I tested it by making a github project, after the master stuff, it complained about some linux-specific stuff, and apparently I'm the only one who has ever had the issue because I couldn't find anything about it.</td></tr>
+<tr id="t1432A" class="h r"><td><a href="#t1432A">14:32</a></td><td class="na">Raynes</td><td>I just decided it wasn't worth worrying about.</td></tr>
+<tr id="t1432A" class="h"><td><a href="#t1432A">14:32</a></td><td class="nb">rsynnott</td><td>Chouser_: some early versions of svn built against certain versions of bdb had a very high-profile problem where they would occasionally irreversably corrupt themselves, often in suchh a way that it wasn't initially obvious</td></tr>
+<tr id="t1432A" class="h r"><td><a href="#t1432A">14:32</a></td><td class="nb">rsynnott</td><td>this has set some people against svn for life :)</td></tr>
+<tr id="t1432A" class="h"><td><a href="#t1432A">14:32</a></td><td class="n4">cp2</td><td>odd :|</td></tr>
+<tr id="t1432A" class="h"><td><a href="#t1432A">14:32</a></td><td class="na">Raynes</td><td>At least I can clone without having to wade through linux crap. :D</td></tr>
+<tr id="t1432A" class="h"><td><a href="#t1432A">14:32</a></td><td class="nb">rsynnott</td><td>&quot;linux supports socialism&quot; - what on earth?</td></tr>
+<tr id="t1433A" class="h"><td><a href="#t1433A">14:33</a></td><td class="nu">powr-toc</td><td>What does %&amp; do?</td></tr>
+<tr id="t1433A" class="h"><td><a href="#t1433A">14:33</a></td><td class="n6">durka42</td><td>powr-toc: it's a seq of the remaining parameters</td></tr>
+<tr id="t1434A" class="h"><td><a href="#t1434A">14:34</a></td><td class="nb">rsynnott</td><td>(linux isn't even my OS, but I hardly think that political principles are an issue with it :) )</td></tr>
+<tr id="t1435A" class="h"><td><a href="#t1435A">14:35</a></td><td class="n4">cp2</td><td>rsynnott: hehe, im not serious of course</td></tr>
+<tr id="t1435A" class="h"><td><a href="#t1435A">14:35</a></td><td class="nu">powr-toc</td><td>cool</td></tr>
+<tr id="t1435A" class="h"><td><a href="#t1435A">14:35</a></td><td class="nb">rsynnott</td><td>has anyone ever said that seriously, though?</td></tr>
+<tr id="t1435A" class="h r"><td><a href="#t1435A">14:35</a></td><td class="nb">rsynnott</td><td>the very idea seems weird</td></tr>
+<tr id="t1436A" class="h"><td><a href="#t1436A">14:36</a></td><td class="n4">cp2</td><td>i hope not</td></tr>
+<tr id="t1443A"><td><a href="#t1443A">14:43</a></td><td class="nb">rsynnott</td><td>but yes, really, what is wrong with svn? :)</td></tr>
+<tr id="t1446A" class="h"><td><a href="#t1446A">14:46</a></td><td class="n4">cp2</td><td>i dont really see anything _wrong_ with it</td></tr>
+<tr id="t1446A" class="h r"><td><a href="#t1446A">14:46</a></td><td class="n4">cp2</td><td>its just not ideal for gigantic projects</td></tr>
+<tr id="t1446A" class="h r"><td><a href="#t1446A">14:46</a></td><td class="n4">cp2</td><td>for example, the linux kernel</td></tr>
+<tr id="t1447A" class="h r"><td><a href="#t1447A">14:47</a></td><td class="n4">cp2</td><td>but clojure isnt a gigantic project, so svn works fine i would say</td></tr>
+<tr id="t1514A"><td><a href="#t1514A">15:14</a></td><td class="nv">kotarak</td><td>Chousuke: there is some documentation in the doc subdirectory</td></tr>
+<tr id="t1515A" class="h r"><td><a href="#t1515A">15:15</a></td><td class="nv">kotarak</td><td>Chousuke: Short tour: start the ng-server, open a clojure file, type r-s and hit &lt;C-x&gt;&lt;C-o&gt; in insert mode</td></tr>
+<tr id="t1515A" class="h r"><td><a href="#t1515A">15:15</a></td><td class="nv">kotarak</td><td>Chousuke: in normal mode type \sr and enjoy the repl</td></tr>
+<tr id="t1515A" class="h r"><td><a href="#t1515A">15:15</a></td><td class="nv">kotarak</td><td>Chousuke: Other things are explained in said documentation file</td></tr>
+<tr id="t1519A" class="h r"><td><a href="#t1519A">15:19</a></td><td class="nv">kotarak</td><td>Chousuke: And for the SLIME question on the list: Write some macro call, eg. (defn foo [] :xxx) place the cursor inside the parens and hit \me or \m1. The preview window might closed with \p.</td></tr>
+<tr id="t1525A"><td><a href="#t1525A">15:25</a></td><td class="nl">jwinter_</td><td>just got bit by the fact that println flushes output, but print doesn't</td></tr>
+<tr id="t1526A" class="h r"><td><a href="#t1526A">15:26</a></td><td class="nl">jwinter_</td><td>is there a reason why clojure.lang.Script wouldn't flush output when it finishes?</td></tr>
+<tr id="t1527A" class="h"><td><a href="#t1527A">15:27</a></td><td class="nd">hiredman</td><td>jwinter_: have you tried clojure.main instead?</td></tr>
+<tr id="t1527A" class="h"><td><a href="#t1527A">15:27</a></td><td class="nl">jwinter_</td><td>no, would that make more sense for shell scripts?</td></tr>
+<tr id="t1528A" class="h"><td><a href="#t1528A">15:28</a></td><td class="nd">hiredman</td><td>jwinter_: take a look at java clojure.main --help</td></tr>
+<tr id="t1528A" class="h"><td><a href="#t1528A">15:28</a></td><td class="nl">jwinter_</td><td>nice, thanks hiredman</td></tr>
+<tr id="t1529A" class="h"><td><a href="#t1529A">15:29</a></td><td class="nd">hiredman</td><td>well, see if it flushes on exit first :P</td></tr>
+<tr id="t1529A" class="h"><td><a href="#t1529A">15:29</a></td><td class="nl">jwinter_</td><td>yep, it does</td></tr>
+<tr id="t1559A"><td><a href="#t1559A">15:59</a></td><td class="nj">Chousuke</td><td>kotarak: thanks</td></tr>
+<tr id="t1945A"><td><a href="#t1945A">19:45</a></td><td class="nt">gvol</td><td>is anyone successfully using slime with clojure (both from version control?)</td></tr>
+<tr id="t1945A" class="h r"><td><a href="#t1945A">19:45</a></td><td class="nt">gvol</td><td>I keep getting an exception: Caused by: java.lang.Exception: clojure.contrib.javadoc/javadoc can now be found in clojure.contrib.repl-utils. (javadoc.clj:0)</td></tr>
+<tr id="t1945A" class="h"><td><a href="#t1945A">19:45</a></td><td class="ns">technomancy</td><td>gvol: yeah, though I haven't updated in a while</td></tr>
+<tr id="t1946A" class="h"><td><a href="#t1946A">19:46</a></td><td class="nt">gvol</td><td>How recently?</td></tr>
+<tr id="t1946A" class="h"><td><a href="#t1946A">19:46</a></td><td class="ns">technomancy</td><td>are you using git? I could just give you the exact revisions I'm using.</td></tr>
+<tr id="t1946A" class="h"><td><a href="#t1946A">19:46</a></td><td class="nt">gvol</td><td>I'm using bc's build-clj script</td></tr>
+<tr id="t1947A" class="h r"><td><a href="#t1947A">19:47</a></td><td class="nt">gvol</td><td>so some git, some cvs and some svn</td></tr>
+<tr id="t1947A" class="h"><td><a href="#t1947A">19:47</a></td><td class="ns">technomancy</td><td>gvol: that script is unnecessarily complicated since it configures slime to also support Common Lisp</td></tr>
+<tr id="t1947A" class="h r"><td><a href="#t1947A">19:47</a></td><td class="ns">technomancy</td><td>(unless you *want* CL for some reason)</td></tr>
+<tr id="t1948A" class="h"><td><a href="#t1948A">19:48</a></td><td class="nt">gvol</td><td>no</td></tr>
+<tr id="t1948A" class="h"><td><a href="#t1948A">19:48</a></td><td class="nl">clojurebot</td><td>is_rhickey_is_a_minor_god? is yes</td></tr>
+<tr id="t1948A" class="h"><td><a href="#t1948A">19:48</a></td><td class="ns">technomancy</td><td>gvol: try the installation directions here: <a href="http://technomancy.us/122">http://technomancy.us/122</a></td></tr>
+<tr id="t1948A" class="h"><td><a href="#t1948A">19:48</a></td><td class="nt">gvol</td><td>cool, I'll check that out</td></tr>
+<tr id="t1948A" class="h r"><td><a href="#t1948A">19:48</a></td><td class="nt">gvol</td><td>Thanks</td></tr>
+<tr id="t1949A" class="h"><td><a href="#t1949A">19:49</a></td><td class="ns">technomancy</td><td>it's definitely not the best thing for users getting started. =\</td></tr>
+<tr id="t1949A" class="h"><td><a href="#t1949A">19:49</a></td><td class="nt">gvol</td><td>:-)</td></tr>
+<tr id="t2004A" class="r"><td><a href="#t2004A">20:04</a></td><td class="nt">gvol</td><td>beautiful, slime starts etc.</td></tr>
+<tr id="t2004A" class="h r"><td><a href="#t2004A">20:04</a></td><td class="nt">gvol</td><td>now it complains about lazy-cons</td></tr>
+<tr id="t2006A" class="h"><td><a href="#t2006A">20:06</a></td><td class="n4">cp2</td><td>are you using latest svn of clojure (or relatively new)</td></tr>
+<tr id="t2006A" class="h"><td><a href="#t2006A">20:06</a></td><td class="nt">gvol</td><td>java.lang.Exception: Unable to resolve symbol: lazy-cons in this context (probs.clj:56)</td></tr>
+<tr id="t2006A" class="h r"><td><a href="#t2006A">20:06</a></td><td class="nt">gvol</td><td>I assume that I have to add something to some path</td></tr>
+<tr id="t2006A" class="h"><td><a href="#t2006A">20:06</a></td><td class="n4">cp2</td><td>yeah, lazy-cons is gone</td></tr>
+<tr id="t2006A" class="h r"><td><a href="#t2006A">20:06</a></td><td class="n4">cp2</td><td>use cons and lazy-seq</td></tr>
+<tr id="t2006A" class="h"><td><a href="#t2006A">20:06</a></td><td class="nt">gvol</td><td>oh</td></tr>
+<tr id="t2006A" class="h r"><td><a href="#t2006A">20:06</a></td><td class="nt">gvol</td><td>cons works like lazy-cons?</td></tr>
+<tr id="t2007A" class="h"><td><a href="#t2007A">20:07</a></td><td class="n4">cp2</td><td>no, but cons + lazy-seq does</td></tr>
+<tr id="t2007A" class="h"><td><a href="#t2007A">20:07</a></td><td class="nt">gvol</td><td>ok</td></tr>
+<tr id="t2007A" class="h"><td><a href="#t2007A">20:07</a></td><td class="n4">cp2</td><td><a href="http://clojure.org/lazy">http://clojure.org/lazy</a></td></tr>
+<tr id="t2007A" class="h r"><td><a href="#t2007A">20:07</a></td><td class="n4">cp2</td><td>read more</td></tr>
+<tr id="t2007A" class="h"><td><a href="#t2007A">20:07</a></td><td class="nt">gvol</td><td>thx</td></tr>
+<tr id="t2021A"><td><a href="#t2021A">20:21</a></td><td class="nx">danlarkin</td><td>Oh how I wish defmethod accepted a docstring</td></tr>
+<tr id="t2027A" class="h"><td><a href="#t2027A">20:27</a></td><td class="n4">cp2</td><td>wow, i just took a look at the code for filter</td></tr>
+<tr id="t2027A" class="h r"><td><a href="#t2027A">20:27</a></td><td class="n4">cp2</td><td>pretty elegant</td></tr>
+<tr id="t2027A" class="h r"><td><a href="#t2027A">20:27</a></td><td class="n4">cp2</td><td>imo, anyway</td></tr>
+<tr id="t2048A" class="r"><td><a href="#t2048A">20:48</a></td><td class="n4">cp2</td><td>rhickey_: tom hickey is your brother im assuming?</td></tr>
+<tr id="t2101A"><td><a href="#t2101A">21:01</a></td><td class="nx">danlarkin</td><td>cp2: yes</td></tr>
+<tr id="t2101A" class="h"><td><a href="#t2101A">21:01</a></td><td class="n4">cp2</td><td>i like his designs, looks good</td></tr>
+<tr id="t2111A" class="r"><td><a href="#t2111A">21:11</a></td><td class="n4">cp2</td><td>has anyone here used nbgit for netbeans?</td></tr>
+<tr id="t2150A"><td><a href="#t2150A">21:50</a></td><td class="nx">danlarkin</td><td>it would be nice if contrib had an http library</td></tr>
+<tr id="t2155A" class="h"><td><a href="#t2155A">21:55</a></td><td class="nd">hiredman</td><td>there are so many java http libs</td></tr>
+<tr id="t2200A"><td><a href="#t2200A">22:00</a></td><td class="n1">Drakeson</td><td>I know it's embarassing, but I have no choice: why I cannot put (set! *print-lenght* 100) in my user.clj?</td></tr>
+<tr id="t2200A" class="h r"><td><a href="#t2200A">22:00</a></td><td class="n1">Drakeson</td><td>(it says: Can't change/establish root binding of: *print-length*)</td></tr>
+<tr id="t2202A" class="h"><td><a href="#t2202A">22:02</a></td><td class="nx">danlarkin</td><td>because at the time user.clj is evaluated *print-length* has not yet been created</td></tr>
+<tr id="t2203A" class="h"><td><a href="#t2203A">22:03</a></td><td class="n1">Drakeson</td><td>where should I put repl related setting, then?</td></tr>
+<tr id="t2204A" class="h r"><td><a href="#t2204A">22:04</a></td><td class="n1">Drakeson</td><td>is there a repl-hook ?</td></tr>
+<tr id="t2208A" class="h r"><td><a href="#t2208A">22:08</a></td><td class="n1">Drakeson</td><td>how can I disable caching for a lazy seq like: (def N (iterate inc 0))?</td></tr>
+<tr id="t2217A"><td><a href="#t2217A">22:17</a></td><td class="ns">dreish</td><td>I have (def *print-length* 30) in my user.clj</td></tr>
+<tr id="t2218A" class="h"><td><a href="#t2218A">22:18</a></td><td class="n4">cp2</td><td>cool :)</td></tr>
+<tr id="t2218A" class="h"><td><a href="#t2218A">22:18</a></td><td class="nx">danlarkin</td><td>oh? hm maybe I'm wrong</td></tr>
+<tr id="t2218A" class="h r"><td><a href="#t2218A">22:18</a></td><td class="nx">danlarkin</td><td>happens a lot!</td></tr>
+<tr id="t2218A" class="h"><td><a href="#t2218A">22:18</a></td><td class="ns">dreish</td><td>Drakeson: As for disabling caching, I think the short answer is you can't, and the longer answer is you can.</td></tr>
+<tr id="t2219A" class="h r"><td><a href="#t2219A">22:19</a></td><td class="ns">dreish</td><td>danlarkin: I think that's consistent with your answer. But I'm puzzled by how it works for me.</td></tr>
+<tr id="t2219A" class="h r"><td><a href="#t2219A">22:19</a></td><td class="ns">dreish</td><td>What doesn't work for me right now is repl-utils/source. Very sad about that.</td></tr>
+<tr id="t2225A"><td><a href="#t2225A">22:25</a></td><td class="n1">Drakeson</td><td>dreish: does not work for me: Name conflict, can't def *print-length* because namespace: user refers to:#'clojure.core/*print-length*</td></tr>
+<tr id="t2225A" class="h"><td><a href="#t2225A">22:25</a></td><td class="ns">dreish</td><td>What version?</td></tr>
+<tr id="t2226A" class="h"><td><a href="#t2226A">22:26</a></td><td class="n1">Drakeson</td><td>the most recent</td></tr>
+<tr id="t2226A" class="h"><td><a href="#t2226A">22:26</a></td><td class="ns">dreish</td><td>Weird.</td></tr>
+<tr id="t2226A" class="h r"><td><a href="#t2226A">22:26</a></td><td class="ns">dreish</td><td>Wish I could help. Sorry.</td></tr>
+<tr id="t2226A" class="h"><td><a href="#t2226A">22:26</a></td><td class="n1">Drakeson</td><td>(Apr 14 is the last change)</td></tr>
+<tr id="t2226A" class="h r"><td><a href="#t2226A">22:26</a></td><td class="n1">Drakeson</td><td>what version is yours?</td></tr>
+<tr id="t2226A" class="h"><td><a href="#t2226A">22:26</a></td><td class="ns">dreish</td><td>That's about the last time I updated, too.</td></tr>
+<tr id="t2227A" class="h r"><td><a href="#t2227A">22:27</a></td><td class="ns">dreish</td><td>I'm pretty sure the way that works hasn't changed in months.</td></tr>
+<tr id="t2227A" class="h"><td><a href="#t2227A">22:27</a></td><td class="n1">Drakeson</td><td>you just put (def *print-length* 100) in user.clj and that's it?</td></tr>
+<tr id="t2227A" class="h"><td><a href="#t2227A">22:27</a></td><td class="ns">dreish</td><td>Oh! No, I didn't. Sorry.</td></tr>
+<tr id="t2228A" class="h r"><td><a href="#t2228A">22:28</a></td><td class="ns">dreish</td><td>(ns clojure.core)   (def *print-length* 30)   (def *print-level* 10)    (ns user)</td></tr>
+<tr id="t2228A" class="h r"><td><a href="#t2228A">22:28</a></td><td class="ns">dreish</td><td>That can't be the right way to do it, but it works. :)</td></tr>
+<tr id="t2229A" class="h r"><td><a href="#t2229A">22:29</a></td><td class="ns">dreish</td><td>(It has been a long week.)</td></tr>
+<tr id="t2229A" class="h"><td><a href="#t2229A">22:29</a></td><td class="n1">Drakeson</td><td>yay! (iterate inc 0) cannot break my session anymore :D</td></tr>
+<tr id="t2230A" class="r"><td><a href="#t2230A">22:30</a></td><td class="n1">Drakeson</td><td>thanks</td></tr>
+<tr id="t2230A" class="h"><td><a href="#t2230A">22:30</a></td><td class="ns">dreish</td><td>np</td></tr>
+<tr id="t2230A" class="h r"><td><a href="#t2230A">22:30</a></td><td class="ns">dreish</td><td>The other way to protect yourself against iterate is to misspell it.</td></tr>
+<tr id="t2230A" class="h"><td><a href="#t2230A">22:30</a></td><td class="n1">Drakeson</td><td>heh :)</td></tr>
+<tr id="t2230A" class="h"><td><a href="#t2230A">22:30</a></td><td class="ns">dreish</td><td>,(interate inc 0)</td></tr>
+<tr id="t2230A" class="h"><td><a href="#t2230A">22:30</a></td><td class="nl">clojurebot</td><td>java.lang.Exception: Unable to resolve symbol: interate in this context</td></tr>
+<tr id="t2236A" class="h"><td><a href="#t2236A">22:36</a></td><td class="n4">cp2</td><td>i guess when-let doesnt allow multiple bindings</td></tr>
+<tr id="t2237A" class="h"><td><a href="#t2237A">22:37</a></td><td class="nx">danlarkin</td><td>cp2: correct</td></tr>
+<tr id="t2238A" class="h"><td><a href="#t2238A">22:38</a></td><td class="n4">cp2</td><td>question about type hinting</td></tr>
+<tr id="t2238A" class="h r"><td><a href="#t2238A">22:38</a></td><td class="n4">cp2</td><td>if i am doing (defn ... [#^Class clazz value] ...)</td></tr>
+<tr id="t2238A" class="h r"><td><a href="#t2238A">22:38</a></td><td class="n4">cp2</td><td>is there a way to hint that the type of value should be whatever clazz is</td></tr>
+<tr id="t2238A" class="h r"><td><a href="#t2238A">22:38</a></td><td class="n4">cp2</td><td>as in, #^clazz value</td></tr>
+<tr id="t2239A" class="h r"><td><a href="#t2239A">22:39</a></td><td class="n4">cp2</td><td>actually i should have tried that before i asked</td></tr>
+<tr id="t2239A" class="h r"><td><a href="#t2239A">22:39</a></td><td class="n4">cp2</td><td>but im assuming it doesnt work</td></tr>
+<tr id="t2239A" class="h"><td><a href="#t2239A">22:39</a></td><td class="n0">chessguy</td><td>hey what would you guys use in clojure for a bi-directional map? that is, a map whose values are also keys to their keys?</td></tr>
+<tr id="t2240A"><td><a href="#t2240A">22:40</a></td><td class="n4">cp2</td><td>hm, apparently that syntax is valid, doesnt do what i want though</td></tr>
+<tr id="t2241A" class="h r"><td><a href="#t2241A">22:41</a></td><td class="n4">cp2</td><td>user=&gt; (defn testaroo [#^Class clazz #^clazz value] [clazz value])</td></tr>
+<tr id="t2241A" class="h r"><td><a href="#t2241A">22:41</a></td><td class="n4">cp2</td><td>#'user/testaroo</td></tr>
+<tr id="t2241A" class="h r"><td><a href="#t2241A">22:41</a></td><td class="n4">cp2</td><td>user=&gt; (testaroo String 123456)</td></tr>
+<tr id="t2241A" class="h r"><td><a href="#t2241A">22:41</a></td><td class="n4">cp2</td><td>[java.lang.String 123456]</td></tr>
+<tr id="t2242A" class="h r"><td><a href="#t2242A">22:42</a></td><td class="n4">cp2</td><td>shouldnt allow that</td></tr>
+<tr id="t2243A" class="h"><td><a href="#t2243A">22:43</a></td><td class="nx">danlarkin</td><td>String is a class</td></tr>
+<tr id="t2244A" class="h"><td><a href="#t2244A">22:44</a></td><td class="n4">cp2</td><td>yes</td></tr>
+<tr id="t2244A" class="h"><td><a href="#t2244A">22:44</a></td><td class="nx">danlarkin</td><td>orrrr rather String is a Class</td></tr>
+<tr id="t2244A" class="h"><td><a href="#t2244A">22:44</a></td><td class="n4">cp2</td><td>hm, i think i see where you are going</td></tr>
+<tr id="t2247A" class="h r"><td><a href="#t2247A">22:47</a></td><td class="n4">cp2</td><td>alright, not necessary for my code</td></tr>
+<tr id="t2247A" class="h r"><td><a href="#t2247A">22:47</a></td><td class="n4">cp2</td><td>would have just been nice to enforce that with type hinting</td></tr>
+<tr id="t2251A"><td><a href="#t2251A">22:51</a></td><td class="nx">danlarkin</td><td>well you can enforce that the argument is a Class</td></tr>
+<tr id="t2252A" class="h r"><td><a href="#t2252A">22:52</a></td><td class="nx">danlarkin</td><td>but you can't, say, require it implement an interface or something</td></tr>
+<tr id="t2252A" class="h r"><td><a href="#t2252A">22:52</a></td><td class="nx">danlarkin</td><td>that isn't what type hints do</td></tr>
+<tr id="t2252A" class="h"><td><a href="#t2252A">22:52</a></td><td class="n4">cp2</td><td>yeah, i see that now</td></tr>
+<tr id="t2253A" class="h r"><td><a href="#t2253A">22:53</a></td><td class="n4">cp2</td><td>no worries</td></tr>
+<tr id="t2253A" class="h"><td><a href="#t2253A">22:53</a></td><td class="n0">chessguy</td><td>so...any thoughts on a bi-directional map?</td></tr>
+<tr id="t2311A"><td><a href="#t2311A">23:11</a></td><td class="nx">mihand</td><td>I have not seen one in clojure and I think runtime suport is needed . i'd expect (assoc {:a 2} :r 2) to fail for that kind of map</td></tr>
+<tr id="t2311A" class="h r"><td><a href="#t2311A">23:11</a></td><td class="nx">mihand</td><td>but i'm a newbie</td></tr>
+<tr id="t2313A" class="h r"><td><a href="#t2313A">23:13</a></td><td class="nx">mihand</td><td>i'd use regular maps with custom add remove</td></tr>
+<tr id="t2316A" class="h r"><td><a href="#t2316A">23:16</a></td><td class="nx">mihand</td><td>is there a way to implement an Associative in clojure?</td></tr>
+<tr id="t2317A" class="h r"><td><a href="#t2317A">23:17</a></td><td class="nx">mihand</td><td>like you can implement sequences with lazy-seq and cons?</td></tr>
+<tr id="t2318A" class="h"><td><a href="#t2318A">23:18</a></td><td class="n6">durka42</td><td>like proxy?</td></tr>
+<tr id="t2328A"><td><a href="#t2328A">23:28</a></td><td class="nx">mihand</td><td>ignore the question . it was nonsense</td></tr>
+<tr id="t2332A"><td><a href="#t2332A">23:32</a></td><td class="ns">technomancy</td><td>danlarkin: I've been thinking about an http library for contrib</td></tr>
+<tr id="t2332A" class="h"><td><a href="#t2332A">23:32</a></td><td class="nx">danlarkin</td><td>technomancy: I just started one :)</td></tr>
+<tr id="t2332A" class="h"><td><a href="#t2332A">23:32</a></td><td class="ns">technomancy</td><td>danlarkin: ooh; let's see it?</td></tr>
+<tr id="t2332A" class="h"><td><a href="#t2332A">23:32</a></td><td class="nx">danlarkin</td><td>hah, it has GET so far</td></tr>
+<tr id="t2332A" class="h"><td><a href="#t2332A">23:32</a></td><td class="ns">technomancy</td><td>that's a good place to start!</td></tr>
+<tr id="t2333A" class="h r"><td><a href="#t2333A">23:33</a></td><td class="ns">technomancy</td><td>what's the JDK got as far as HTTP? is it just too low-level?</td></tr>
+<tr id="t2333A" class="h"><td><a href="#t2333A">23:33</a></td><td class="nm">generationkill</td><td>,(first ())</td></tr>
+<tr id="t2333A" class="h"><td><a href="#t2333A">23:33</a></td><td class="nl">clojurebot</td><td>nil</td></tr>
+<tr id="t2333A" class="h"><td><a href="#t2333A">23:33</a></td><td class="nm">generationkill</td><td>,(first (list nil))</td></tr>
+<tr id="t2333A" class="h"><td><a href="#t2333A">23:33</a></td><td class="nl">clojurebot</td><td>nil</td></tr>
+<tr id="t2333A" class="h"><td><a href="#t2333A">23:33</a></td><td class="n4">cp2</td><td>URL / URLConnection</td></tr>
+<tr id="t2333A" class="h"><td><a href="#t2333A">23:33</a></td><td class="nx">danlarkin</td><td>URL, HttpURLConnection... it's so stateful and disgusting</td></tr>
+<tr id="t2333A" class="h"><td><a href="#t2333A">23:33</a></td><td class="nm">generationkill</td><td>am i the only one bothered by this?</td></tr>
+<tr id="t2334A" class="h"><td><a href="#t2334A">23:34</a></td><td class="ns">technomancy</td><td>I heard a rumor that Google started using Python because the Java HTTP lib didn't let you set the HTTP user-agent header</td></tr>
+<tr id="t2334A" class="h r"><td><a href="#t2334A">23:34</a></td><td class="ns">technomancy</td><td>(back in the day, of course)</td></tr>
+<tr id="t2334A" class="h"><td><a href="#t2334A">23:34</a></td><td class="nm">generationkill</td><td>likewise:</td></tr>
+<tr id="t2334A" class="h r"><td><a href="#t2334A">23:34</a></td><td class="nm">generationkill</td><td>,({:a nil} :a)</td></tr>
+<tr id="t2334A" class="h"><td><a href="#t2334A">23:34</a></td><td class="nl">clojurebot</td><td>nil</td></tr>
+<tr id="t2334A" class="h"><td><a href="#t2334A">23:34</a></td><td class="nm">generationkill</td><td>,({} :a)</td></tr>
+<tr id="t2334A" class="h"><td><a href="#t2334A">23:34</a></td><td class="nl">clojurebot</td><td>nil</td></tr>
+<tr id="t2334A" class="h"><td><a href="#t2334A">23:34</a></td><td class="ns">technomancy</td><td>aha: <a href="http://groups.google.com/group/comp.lang.java/msg/88fa10845061c8ba?pli=1">http://groups.google.com/group/comp.lang.java/msg/88fa10845061c8ba?pli=1</a></td></tr>
+<tr id="t2335A" class="h"><td><a href="#t2335A">23:35</a></td><td class="nx">danlarkin</td><td>WOW</td></tr>
+<tr id="t2335A" class="h r"><td><a href="#t2335A">23:35</a></td><td class="nx">danlarkin</td><td>that's hilarious</td></tr>
+<tr id="t2336A" class="h"><td><a href="#t2336A">23:36</a></td><td class="nm">generationkill</td><td>  </td></tr>
+<tr id="t2336A" class="h r"><td><a href="#t2336A">23:36</a></td><td class="nm">generationkill</td><td>Lawrence == Larry ?</td></tr>
+<tr id="t2336A" class="h r"><td><a href="#t2336A">23:36</a></td><td class="nm">generationkill</td><td>I didn't know</td></tr>
+<tr id="t2338A" class="h"><td><a href="#t2338A">23:38</a></td><td class="nx">danlarkin</td><td>GET down, moving on to POST, /me cheers</td></tr>
+<tr id="t2339A" class="h"><td><a href="#t2339A">23:39</a></td><td class="ns">technomancy</td><td>danlarkin: be sure to post to the ML once you've got something ready to share; I'd love to help out</td></tr>
+<tr id="t2339A" class="h"><td><a href="#t2339A">23:39</a></td><td class="nx">danlarkin</td><td>technomancy: will-do, I'll gist it or something</td></tr>
+<tr id="t2343A"><td><a href="#t2343A">23:43</a></td><td class="nm">generationkill</td><td>Is Clojure ready to be 1.0?</td></tr>
+<tr id="t2345A" class="h"><td><a href="#t2345A">23:45</a></td><td class="n4">cp2</td><td>heh, funny</td></tr>
+<tr id="t2345A" class="h r"><td><a href="#t2345A">23:45</a></td><td class="n4">cp2</td><td>i was about to write a function 'enumeration-seq' to put the elements in an Enumeration in a sequence</td></tr>
+<tr id="t2346A" class="h r"><td><a href="#t2346A">23:46</a></td><td class="n4">cp2</td><td>but then enclojure highlighted it, so i checked the api</td></tr>
+<tr id="t2346A" class="h r"><td><a href="#t2346A">23:46</a></td><td class="n4">cp2</td><td>already written!</td></tr>
+<tr id="t2349A" class="h"><td><a href="#t2349A">23:49</a></td><td class="nm">generationkill</td><td>,(find-doc enumeration-seq)</td></tr>
+<tr id="t2349A" class="h"><td><a href="#t2349A">23:49</a></td><td class="nl">clojurebot</td><td>java.lang.ClassCastException: clojure.core$enumeration_seq__4930 cannot be cast to java.lang.String</td></tr>
+<tr id="t2351A"><td><a href="#t2351A">23:51</a></td><td class="n6">durka42</td><td>(doc enumeration-seq)</td></tr>
+<tr id="t2351A" class="h"><td><a href="#t2351A">23:51</a></td><td class="nl">clojurebot</td><td>Returns a seq on a java.lang.Enumeration; arglists ([e])</td></tr>
+<tr id="t2351A" class="h"><td><a href="#t2351A">23:51</a></td><td class="n4">cp2</td><td>oh what</td></tr>
+<tr id="t2351A" class="h"><td><a href="#t2351A">23:51</a></td><td class="nm">generationkill</td><td>why?</td></tr>
+<tr id="t2351A" class="h"><td><a href="#t2351A">23:51</a></td><td class="n4">cp2</td><td>java.lang.Enumeration...</td></tr>
+<tr id="t2352A" class="h r"><td><a href="#t2352A">23:52</a></td><td class="n4">cp2</td><td>pretty sure thats a type</td></tr>
+<tr id="t2352A" class="h r"><td><a href="#t2352A">23:52</a></td><td class="n4">cp2</td><td>Enumeration is java.util</td></tr>
+<tr id="t2352A" class="h"><td><a href="#t2352A">23:52</a></td><td class="n6">durka42</td><td>,Enumeration</td></tr>
+<tr id="t2352A" class="h"><td><a href="#t2352A">23:52</a></td><td class="nl">clojurebot</td><td>java.lang.Exception: Unable to resolve symbol: Enumeration in this context</td></tr>
+<tr id="t2352A" class="h"><td><a href="#t2352A">23:52</a></td><td class="n6">durka42</td><td>,java.lang.Enumeration</td></tr>
+<tr id="t2352A" class="h"><td><a href="#t2352A">23:52</a></td><td class="nl">clojurebot</td><td>java.lang.ClassNotFoundException: java.lang.Enumeration</td></tr>
+<tr id="t2352A" class="h"><td><a href="#t2352A">23:52</a></td><td class="n6">durka42</td><td>,java.util.Enumeration</td></tr>
+<tr id="t2352A" class="h"><td><a href="#t2352A">23:52</a></td><td class="nl">clojurebot</td><td>java.util.Enumeration</td></tr>
+<tr id="t2352A" class="h"><td><a href="#t2352A">23:52</a></td><td class="n6">durka42</td><td>fact</td></tr>
+<tr id="t2353A" class="h"><td><a href="#t2353A">23:53</a></td><td class="n3">slashus2</td><td>The doc is wrong?</td></tr>
+<tr id="t2353A" class="h"><td><a href="#t2353A">23:53</a></td><td class="n4">cp2</td><td>(clojure.lang.EnumerationSeq/create e))</td></tr>
+<tr id="t2353A" class="h r"><td><a href="#t2353A">23:53</a></td><td class="n4">cp2</td><td>yes, it is wrong</td></tr>
+<tr id="t2353A" class="h r"><td><a href="#t2353A">23:53</a></td><td class="n4">cp2</td><td>public static EnumerationSeq create(Enumeration iter)</td></tr>
+<tr id="t2353A" class="h r"><td><a href="#t2353A">23:53</a></td><td class="n4">cp2</td><td>er</td></tr>
+<tr id="t2353A" class="h"><td><a href="#t2353A">23:53</a></td><td class="nl">clojurebot</td><td>bender is my idol</td></tr>
+<tr id="t2353A" class="h"><td><a href="#t2353A">23:53</a></td><td class="n4">cp2</td><td>import java.util.Enumeration;</td></tr>
+<tr id="t2358A" class="h"><td><a href="#t2358A">23:58</a></td><td class="nm">generationkill</td><td>(apply * (range 1 1001))</td></tr>
+<tr id="t2358A" class="h r"><td><a href="#t2358A">23:58</a></td><td class="nm">generationkill</td><td>,(apply * (range 1 1001))</td></tr>
+<tr id="t2358A" class="h"><td><a href="#t2358A">23:58</a></td><td class="nl">clojurebot</td><td>40238726007709377354370243392300398571937486421071463254379991042993851239862902059204420848696940480047998861019719605863166687299480855890132382966994459099742450408707375991882362772718873251977950595099527612087497546249704360141827809464649629105639388743788648733711918104582578364784997701247663288983595573543251318532395846307555740911426241747434934755342864657661166779739666882029120737914385371958824980812686783</td></tr>
+<tr id="t2359A" class="h"><td><a href="#t2359A">23:59</a></td><td class="nm">generationkill</td><td>Am I the only one bothered by the ambiguity of the nils?</td></tr>
+</tbody></table></main></body></html>

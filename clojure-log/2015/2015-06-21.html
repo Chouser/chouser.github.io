@@ -1,0 +1,498 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#clojure – 2015-06-21</title><link rel="stylesheet" href="../style.css"></head><body>
+<header class="sh"><a class="st" href="../index.html">#clojure logs</a><nav class="dn"><a href="2015-06-20.html">&larr;</a><span>2015-06-21</span><a href="2015-06-22.html">&rarr;</a></nav></header>
+<main><p class="dh">2015-06-21</p><table class="lg"><tbody>
+<tr id="t0000A"><td><a href="#t0000A">00:00</a></td><td class="n4">zapho53</td><td>I have a function with a let binding followed by 2 function calls which add something to a database. Whichever way round I switch them only the last one executes.</td></tr>
+<tr id="t0001A" class="h"><td><a href="#t0001A">00:01</a></td><td class="nm">amalloy</td><td>zapho53: they are both returning a lazy sequence, which you forget to force any elements from</td></tr>
+<tr id="t0001A" class="h"><td><a href="#t0001A">00:01</a></td><td class="n4">zapho53</td><td>Both functions have a YeSQL &lt;! return value.</td></tr>
+<tr id="t0002A" class="h r"><td><a href="#t0002A">00:02</a></td><td class="n4">zapho53</td><td>amalloy: Then why does 1 execute?</td></tr>
+<tr id="t0002A" class="h"><td><a href="#t0002A">00:02</a></td><td class="nm">amalloy</td><td>because you return it, and whoever is above you in the call hierarchy happens to force it</td></tr>
+<tr id="t0003A" class="h"><td><a href="#t0003A">00:03</a></td><td class="n4">zapho53</td><td>amalloy: How do I get both to execute?</td></tr>
+<tr id="t0003A" class="h"><td><a href="#t0003A">00:03</a></td><td class="nm">amalloy</td><td>i mean there are other possible explanations and i don't know what this yesql thing is, but this is by far the most likely cause for the scenario you are describing, absent any code snippets to the contrary</td></tr>
+<tr id="t0004A" class="h r"><td><a href="#t0004A">00:04</a></td><td class="nm">amalloy</td><td>zapho53: try wrapping them both in (doall ...) to prove or disprove my supposition</td></tr>
+<tr id="t0004A" class="h"><td><a href="#t0004A">00:04</a></td><td class="n4">zapho53</td><td>amalloy: Tried that once but maybe I screwed it up. Will try again.</td></tr>
+<tr id="t0005A" class="h"><td><a href="#t0005A">00:05</a></td><td class="nm">amalloy</td><td>if that isn't the answer you will have to link to some actual code, or find someone who knows what yesql is</td></tr>
+<tr id="t0005A" class="h"><td><a href="#t0005A">00:05</a></td><td class="n0">pranavrc</td><td>Hi. I'm having a little trouble with the syntax for unquote-splicing inside a macro. I've pasted the details here: <a href="http://pastie.org/10251103">http://pastie.org/10251103</a> Can someone suggest what might be wrong?</td></tr>
+<tr id="t0006A" class="h"><td><a href="#t0006A">00:06</a></td><td class="n4">zapho53</td><td>amalloy: doall results in this error: clojure.lang.LazySeq cannot be cast to java.lang.Number</td></tr>
+<tr id="t0007A" class="h"><td><a href="#t0007A">00:07</a></td><td class="nm">amalloy</td><td>zapho53: then we have fixed the problem you asked about, and advanced to some other error</td></tr>
+<tr id="t0007A" class="h"><td><a href="#t0007A">00:07</a></td><td class="n4">zapho53</td><td>amalloy: Which is weird because both functions will execute the desired result if put last in the order.</td></tr>
+<tr id="t0008A" class="h"><td><a href="#t0008A">00:08</a></td><td class="nm">amalloy</td><td>pranavrc: ` is shorthand for writing the tedious (list 'let ...) stuff you are doing by hand. you don't want to use both in most contexts</td></tr>
+<tr id="t0009A" class="h r"><td><a href="#t0009A">00:09</a></td><td class="nm">amalloy</td><td>you could either write `(let [~'time (now)] foo bar baz), possibly with some more quoting depending on what foo/bar/baz actually are, or (list `let ['time `(now)] `foo `bar `baz), possibly with less quoting that again depends on what foo/bar/baz are</td></tr>
+<tr id="t0014A"><td><a href="#t0014A">00:14</a></td><td class="n0">pranavrc</td><td>amalloy, I can't use `foo `bar `baz there as is, because the ~@(list foo bar baz) component I've included is actually a different function call that returns a list. I just used a different function for brevity.</td></tr>
+<tr id="t0015A" class="h"><td><a href="#t0015A">00:15</a></td><td class="nm">amalloy</td><td>okay, so it's `(let [~'time (now)] ~@(whatever))</td></tr>
+<tr id="t0016A" class="h"><td><a href="#t0016A">00:16</a></td><td class="n0">pranavrc</td><td>amalloy, in which case I still get the illegalstateexception error for unbound unquote</td></tr>
+<tr id="t0016A" class="h"><td><a href="#t0016A">00:16</a></td><td class="nm">amalloy</td><td>no you don't. you can't get that exception from the code i pasted, unless (whatever) by itself also throws that exception</td></tr>
+<tr id="t0017A" class="h r"><td><a href="#t0017A">00:17</a></td><td class="nm">amalloy</td><td>in which case, fix whatever</td></tr>
+<tr id="t0026A"><td><a href="#t0026A">00:26</a></td><td class="n0">pranavrc</td><td>amalloy, alright, thanks!</td></tr>
+<tr id="t0026A" class="h"><td><a href="#t0026A">00:26</a></td><td class="nm">amalloy</td><td>pranavrc: i suspect the reason whatever throws is you are trying to unquote stuff inside it, like @(whatever ~foo)</td></tr>
+<tr id="t0027A" class="h r"><td><a href="#t0027A">00:27</a></td><td class="nm">amalloy</td><td>which is not what you want. you have already unquoted the whole expression</td></tr>
+<tr id="t0027A" class="h"><td><a href="#t0027A">00:27</a></td><td class="n0">pranavrc</td><td>amalloy, yeah, that was the problem.</td></tr>
+<tr id="t0247A"><td><a href="#t0247A">02:47</a></td><td class="nx">Thebreaker</td><td>www.VALBOT.COM provides domain valuations. Reporting globally on Site Traffic, Pagerank, Malware, WHOIS data, SEO &amp; even Social Media presence.</td></tr>
+<tr id="t0325A"><td><a href="#t0325A">03:25</a></td><td class="np">kwladyka</td><td>How clojure is developing during all this years? What can we estimate about job and projects in Clojure?</td></tr>
+<tr id="t0411A"><td><a href="#t0411A">04:11</a></td><td class="n3">ttt_fff</td><td>how does one implement tuples in clojure?</td></tr>
+<tr id="t0411A" class="h"><td><a href="#t0411A">04:11</a></td><td class="n3">expez</td><td>by using a vector</td></tr>
+<tr id="t0418A" class="h"><td><a href="#t0418A">04:18</a></td><td class="nd">TEttinger</td><td>(inc expez)</td></tr>
+<tr id="t0418A" class="h"><td><a href="#t0418A">04:18</a></td><td class="nx">lazybot</td><td>⇒ 1</td></tr>
+<tr id="t0419A" class="h"><td><a href="#t0419A">04:19</a></td><td class="nd">TEttinger</td><td>yep, vectors already allow whatever for types, so you have the main advantage of tuples in a statically typed language right there already.  and they're a single value, so that's the other use</td></tr>
+<tr id="t0431A"><td><a href="#t0431A">04:31</a></td><td class="n8">rs0</td><td>also destructuring</td></tr>
+<tr id="t0449A"><td><a href="#t0449A">04:49</a></td><td class="nr">mskoud</td><td>Hi there!</td></tr>
+<tr id="t0501A"><td><a href="#t0501A">05:01</a></td><td class="ng">kaffeeboehnchen</td><td>Good morning. :) I have this macro: <a href="https://paste.xinu.at/dabljg/clojure">https://paste.xinu.at/dabljg/clojure</a> When I call it I get a null pointer. test-auth is working with the data I am calling the macro with  if I call it on its own. What am I doing wrong?</td></tr>
+<tr id="t0503A" class="h"><td><a href="#t0503A">05:03</a></td><td class="nu">Chousuke_</td><td>is authed-header actual clojure code?</td></tr>
+<tr id="t0503A" class="h"><td><a href="#t0503A">05:03</a></td><td class="ng">kaffeeboehnchen</td><td>Yes.</td></tr>
+<tr id="t0503A" class="h"><td><a href="#t0503A">05:03</a></td><td class="nu">Chousuke_</td><td>how does the macro invocation look?</td></tr>
+<tr id="t0503A" class="h"><td><a href="#t0503A">05:03</a></td><td class="ng">kaffeeboehnchen</td><td>it is a map looking like that: {:status 123 :body &quot;hi&quot;}</td></tr>
+<tr id="t0504A" class="h r"><td><a href="#t0504A">05:04</a></td><td class="ng">kaffeeboehnchen</td><td>(handle-request test-request other-fun)</td></tr>
+<tr id="t0504A" class="h"><td><a href="#t0504A">05:04</a></td><td class="nu">Chousuke_</td><td>your macro is passing the symbol 'test-request to test-auth</td></tr>
+<tr id="t0504A" class="h"><td><a href="#t0504A">05:04</a></td><td class="ng">kaffeeboehnchen</td><td>my goal is to call other-fun when authed-header does not have a specific status and give other-fun the same request.</td></tr>
+<tr id="t0505A" class="h r"><td><a href="#t0505A">05:05</a></td><td class="ng">kaffeeboehnchen</td><td>ah, ok</td></tr>
+<tr id="t0505A" class="h"><td><a href="#t0505A">05:05</a></td><td class="nu">Chousuke_</td><td>why does this need to be a macro? :/</td></tr>
+<tr id="t0505A" class="h"><td><a href="#t0505A">05:05</a></td><td class="ng">kaffeeboehnchen</td><td>I have no clue to do it otherwise.</td></tr>
+<tr id="t0505A" class="h r"><td><a href="#t0505A">05:05</a></td><td class="ng">kaffeeboehnchen</td><td>If there is a better way please tell me.</td></tr>
+<tr id="t0506A" class="h r"><td><a href="#t0506A">05:06</a></td><td class="ng">kaffeeboehnchen</td><td>other-fun will not always be other-fun by the way</td></tr>
+<tr id="t0506A" class="h r"><td><a href="#t0506A">05:06</a></td><td class="ng">kaffeeboehnchen</td><td>the function which should be called will change</td></tr>
+<tr id="t0506A" class="h"><td><a href="#t0506A">05:06</a></td><td class="nu">Chousuke_</td><td>can't you just (if (check-status authed-header) blah (other-fun authed-header))?</td></tr>
+<tr id="t0507A" class="h"><td><a href="#t0507A">05:07</a></td><td class="nm">amalloy</td><td>the easiest way to make this macro be a function is to change the defmacro to defn. it would be closer to working that way</td></tr>
+<tr id="t0507A" class="h"><td><a href="#t0507A">05:07</a></td><td class="nu">Chousuke_</td><td>you can pass functions as arguments to other functions</td></tr>
+<tr id="t0507A" class="h"><td><a href="#t0507A">05:07</a></td><td class="ng">kaffeeboehnchen</td><td>But doesn't it get evaluated the moment I pass it?</td></tr>
+<tr id="t0507A" class="h"><td><a href="#t0507A">05:07</a></td><td class="nu">Chousuke_</td><td>evaluated?</td></tr>
+<tr id="t0508A" class="h r"><td><a href="#t0508A">05:08</a></td><td class="nu">Chousuke_</td><td>if you pass it in a variable, why does that matter?</td></tr>
+<tr id="t0508A" class="h"><td><a href="#t0508A">05:08</a></td><td class="ng">kaffeeboehnchen</td><td>It only should be executed if authed-header has the status 202</td></tr>
+<tr id="t0508A" class="h"><td><a href="#t0508A">05:08</a></td><td class="nu">Chousuke_</td><td>it won't be executed.</td></tr>
+<tr id="t0508A" class="h r"><td><a href="#t0508A">05:08</a></td><td class="nu">Chousuke_</td><td>it's just a function</td></tr>
+<tr id="t0508A" class="h"><td><a href="#t0508A">05:08</a></td><td class="ng">kaffeeboehnchen</td><td>ok</td></tr>
+<tr id="t0509A" class="h"><td><a href="#t0509A">05:09</a></td><td class="nu">Chousuke_</td><td>I'm still not sure if I understand your problem correctly</td></tr>
+<tr id="t0509A" class="h"><td><a href="#t0509A">05:09</a></td><td class="ng">kaffeeboehnchen</td><td>Later I wanna call (handle-request request this-fun), (handle-request request that-fun), (handle-request request other-fun).</td></tr>
+<tr id="t0510A"><td><a href="#t0510A">05:10</a></td><td class="nu">Chousuke_</td><td>yeah, that's just fine</td></tr>
+<tr id="t0510A" class="h"><td><a href="#t0510A">05:10</a></td><td class="ng">kaffeeboehnchen</td><td>Ok. Thank you very much!</td></tr>
+<tr id="t0510A" class="h"><td><a href="#t0510A">05:10</a></td><td class="nu">Chousuke_</td><td>I mean, if you do eg. (list + -), that won't actually call the + - functions</td></tr>
+<tr id="t0510A" class="h r"><td><a href="#t0510A">05:10</a></td><td class="nu">Chousuke_</td><td>you just get a list that contains them</td></tr>
+<tr id="t0510A" class="h"><td><a href="#t0510A">05:10</a></td><td class="ng">kaffeeboehnchen</td><td>aaaaahh</td></tr>
+<tr id="t0546A"><td><a href="#t0546A">05:46</a></td><td class="n8">ambrosebs</td><td>what's the current stance on Java 7 support in core/contrib?</td></tr>
+<tr id="t0547A" class="h r"><td><a href="#t0547A">05:47</a></td><td class="n8">ambrosebs</td><td>going away soon?</td></tr>
+<tr id="t0617A"><td><a href="#t0617A">06:17</a></td><td class="nd">TEttinger</td><td>ambrosebs: I wasn't aware core/contrib was still around, tbh</td></tr>
+<tr id="t0618A" class="h"><td><a href="#t0618A">06:18</a></td><td class="n8">ambrosebs</td><td>core+contrib</td></tr>
+<tr id="t0618A" class="h"><td><a href="#t0618A">06:18</a></td><td class="nd">TEttinger</td><td>but unless clojure is specifically moving from 6 compat to 8 compat, I kinda wonder why they would do that</td></tr>
+<tr id="t0619A" class="h r"><td><a href="#t0619A">06:19</a></td><td class="nd">TEttinger</td><td>(did clojure stop supporting JDK6 and thus android?)</td></tr>
+<tr id="t0619A" class="h"><td><a href="#t0619A">06:19</a></td><td class="n8">ambrosebs</td><td>good question</td></tr>
+<tr id="t0619A" class="h"><td><a href="#t0619A">06:19</a></td><td class="np">kwladyka</td><td>Can i discuss with somebody about Ring architecture? My goal is learn about architecture on this project.</td></tr>
+<tr id="t0622A" class="r"><td><a href="#t0622A">06:22</a></td><td class="np">kwladyka</td><td>first of all what determine to separate catalogs core/devel/jetty-adapter/servlet as root direcotries, not as src/* directories?</td></tr>
+<tr id="t0627A" class="h r"><td><a href="#t0627A">06:27</a></td><td class="np">kwladyka</td><td>as i understand ring respository has 4 projects 1 one, why not 4 separater ring repository?</td></tr>
+<tr id="t0634A"><td><a href="#t0634A">06:34</a></td><td class="nb">Jickelsen</td><td>I've included react-with-addons (from CDN) but (aget js/React &quot;addons&quot;) returns nil. Any ideas?</td></tr>
+<tr id="t0649A"><td><a href="#t0649A">06:49</a></td><td class="np">kwladyka</td><td>ok, next step... i understand magic happens because of lein-sub library</td></tr>
+<tr id="t0655A"><td><a href="#t0655A">06:55</a></td><td class="n7">crocket</td><td>clojure repl uses 600MB of RAM from the beginning.</td></tr>
+<tr id="t0655A" class="h r"><td><a href="#t0655A">06:55</a></td><td class="n7">crocket</td><td>How do I tame its memory usage?</td></tr>
+<tr id="t0703A"><td><a href="#t0703A">07:03</a></td><td class="np">kwladyka</td><td>so next... ring project use lein-sub and has :sub in profile.clj for subprojects, but this subprojects doesn't have main function or something like this. Also if i understand then run as casdace one by one, not paraller or... exatly opposite to cascade, because i am not sure how to interpratate &quot;Should you need recursive behavior, consider Leiningen aliases or lein-cascade.&quot; and if not main functions inside... what exatly is running?</td></tr>
+<tr id="t0706A" class="h r"><td><a href="#t0706A">07:06</a></td><td class="np">kwladyka</td><td>crocket, what do you mean clojure repl? &quot;lein repl&quot;? for me 1 136K memory</td></tr>
+<tr id="t0707A" class="h"><td><a href="#t0707A">07:07</a></td><td class="n7">crocket</td><td>yes</td></tr>
+<tr id="t0707A" class="h r"><td><a href="#t0707A">07:07</a></td><td class="n7">crocket</td><td>lein repl</td></tr>
+<tr id="t0707A" class="h r"><td><a href="#t0707A">07:07</a></td><td class="n7">crocket</td><td>It uses 620MB of RAM inside cider repl which is essentially lein repl.</td></tr>
+<tr id="t0708A" class="h"><td><a href="#t0708A">07:08</a></td><td class="np">kwladyka</td><td>crocket, &quot;lein repl&quot; for me on windows get only 1 136k memory</td></tr>
+<tr id="t0709A" class="h r"><td><a href="#t0709A">07:09</a></td><td class="np">kwladyka</td><td>maybe you interpret used memory by process in bad way if you running repl inside another application</td></tr>
+<tr id="t0709A" class="h"><td><a href="#t0709A">07:09</a></td><td class="n7">crocket</td><td>I?</td></tr>
+<tr id="t0709A" class="h r"><td><a href="#t0709A">07:09</a></td><td class="n7">crocket</td><td>not me</td></tr>
+<tr id="t0709A" class="h"><td><a href="#t0709A">07:09</a></td><td class="nl">clojurebot</td><td>I will never forgive that</td></tr>
+<tr id="t0710A"><td><a href="#t0710A">07:10</a></td><td class="np">kwladyka</td><td>mmm?</td></tr>
+<tr id="t0713A" class="h"><td><a href="#t0713A">07:13</a></td><td class="n7">crocket</td><td>Look at <a href="http://imagebin.ca/v/25zcAKgAPHTq">http://imagebin.ca/v/25zcAKgAPHTq</a></td></tr>
+<tr id="t0714A" class="h r"><td><a href="#t0714A">07:14</a></td><td class="n7">crocket</td><td>lein repl ends up using 1GB</td></tr>
+<tr id="t0714A" class="h r"><td><a href="#t0714A">07:14</a></td><td class="n7">crocket</td><td>kwladyka, ^^</td></tr>
+<tr id="t0715A" class="h"><td><a href="#t0715A">07:15</a></td><td class="np">kwladyka</td><td>crocket, i relogin to IRC, i guess i miss something</td></tr>
+<tr id="t0719A" class="h"><td><a href="#t0719A">07:19</a></td><td class="nd">TEttinger</td><td>kwladyka: crocket meant <a href="http://imagebin.ca/v/25zcAKgAPHTq">http://imagebin.ca/v/25zcAKgAPHTq</a></td></tr>
+<tr id="t0720A" class="r"><td><a href="#t0720A">07:20</a></td><td class="nd">TEttinger</td><td>lein repl uses more or less RAM based on the project you're in, IIRC</td></tr>
+<tr id="t0720A" class="h r"><td><a href="#t0720A">07:20</a></td><td class="nd">TEttinger</td><td>since it does load the whole project to make it available, IIRC</td></tr>
+<tr id="t0723A" class="h"><td><a href="#t0723A">07:23</a></td><td class="np">kwladyka</td><td>my mistake, but still i have 200 MB or 250MB, I forgot :)</td></tr>
+<tr id="t0742A"><td><a href="#t0742A">07:42</a></td><td class="n7">crocket</td><td>TEttinger, It is a very minimal leiningen project.</td></tr>
+<tr id="t0742A" class="h r"><td><a href="#t0742A">07:42</a></td><td class="n7">crocket</td><td>It only has 3 functions.</td></tr>
+<tr id="t0743A" class="h"><td><a href="#t0743A">07:43</a></td><td class="n8">ambrosebs</td><td>how can I tell lein to never compile/test a file in my test path</td></tr>
+<tr id="t0743A" class="h"><td><a href="#t0743A">07:43</a></td><td class="nd">TEttinger</td><td>then... just curious, how much free RAM do you have on your machine?</td></tr>
+<tr id="t0743A" class="h r"><td><a href="#t0743A">07:43</a></td><td class="nd">TEttinger</td><td>it's possible Java's gobbling up more than it currently needs in anticipation for later usage</td></tr>
+<tr id="t0744A" class="h"><td><a href="#t0744A">07:44</a></td><td class="n7">crocket</td><td>TEttinger, 8GB of RAM and 13.5GB of swap.</td></tr>
+<tr id="t0744A" class="h"><td><a href="#t0744A">07:44</a></td><td class="nd">TEttinger</td><td>is it swapping now?</td></tr>
+<tr id="t0744A" class="h"><td><a href="#t0744A">07:44</a></td><td class="n7">crocket</td><td>no</td></tr>
+<tr id="t0744A" class="h r"><td><a href="#t0744A">07:44</a></td><td class="n7">crocket</td><td>The system currently uses 2.5GB of RAM in total.</td></tr>
+<tr id="t0745A" class="h r"><td><a href="#t0745A">07:45</a></td><td class="n7">crocket</td><td>And, swapping doesn't necessarily lead to HDD access as far as I know.</td></tr>
+<tr id="t0745A" class="h r"><td><a href="#t0745A">07:45</a></td><td class="n7">crocket</td><td>However, swapping is not desirable.</td></tr>
+<tr id="t0745A" class="h"><td><a href="#t0745A">07:45</a></td><td class="nd">TEttinger</td><td>oh that could be why then, you have enough free that java thinks it can take a whole lot, I guess</td></tr>
+<tr id="t0745A" class="h r"><td><a href="#t0745A">07:45</a></td><td class="nd">TEttinger</td><td>I know modern browsers do this</td></tr>
+<tr id="t0745A" class="h"><td><a href="#t0745A">07:45</a></td><td class="n7">crocket</td><td>It could be -Xms option.</td></tr>
+<tr id="t0746A" class="h r"><td><a href="#t0746A">07:46</a></td><td class="n7">crocket</td><td>-Xms 512M could cause this.</td></tr>
+<tr id="t0746A" class="h"><td><a href="#t0746A">07:46</a></td><td class="nd">TEttinger</td><td>uh yes</td></tr>
+<tr id="t0746A" class="h r"><td><a href="#t0746A">07:46</a></td><td class="nd">TEttinger</td><td>that would make it always start with 512 MB used, do you want to know if it's used by lein?</td></tr>
+<tr id="t0747A" class="h"><td><a href="#t0747A">07:47</a></td><td class="n7">crocket</td><td>The command lines don't specify -Xms or -Xmx.</td></tr>
+<tr id="t0747A" class="h r"><td><a href="#t0747A">07:47</a></td><td class="n7">crocket</td><td>I don't like this.</td></tr>
+<tr id="t0747A" class="h r"><td><a href="#t0747A">07:47</a></td><td class="n7">crocket</td><td>Python wouldn't consume this much.</td></tr>
+<tr id="t0749A" class="h r"><td><a href="#t0749A">07:49</a></td><td class="n7">crocket</td><td>hexchat consumes 23.5MB of RAM.</td></tr>
+<tr id="t0749A" class="h r"><td><a href="#t0749A">07:49</a></td><td class="n7">crocket</td><td>Does anyone plan to port clojure to python 3?</td></tr>
+<tr id="t0749A" class="h r"><td><a href="#t0749A">07:49</a></td><td class="n7">crocket</td><td>It wouldn't make sense for performance reasons, though.</td></tr>
+<tr id="t0749A" class="h"><td><a href="#t0749A">07:49</a></td><td class="nd">TEttinger</td><td>huh, interesting. <a href="https://github.com/technomancy/leiningen/blob/master/bin/lein#L156-L158">https://github.com/technomancy/leiningen/blob/master/bin/lein#L156-L158</a></td></tr>
+<tr id="t0749A" class="h r"><td><a href="#t0749A">07:49</a></td><td class="nd">TEttinger</td><td>crocket:</td></tr>
+<tr id="t0750A" class="r"><td><a href="#t0750A">07:50</a></td><td class="nd">TEttinger</td><td>$google pixie lang</td></tr>
+<tr id="t0750A" class="h"><td><a href="#t0750A">07:50</a></td><td class="nx">lazybot</td><td>[pixie-lang/pixie · GitHub] <a href="https://github.com/pixie-lang/pixie">https://github.com/pixie-lang/pixie</a></td></tr>
+<tr id="t0750A" class="h"><td><a href="#t0750A">07:50</a></td><td class="nd">TEttinger</td><td>it's very close to clojure, implemented in RPython (what PyPy uses) but not meant to call Python code yet</td></tr>
+<tr id="t0750A" class="h r"><td><a href="#t0750A">07:50</a></td><td class="nd">TEttinger</td><td>startup is one of its reasons to exist</td></tr>
+<tr id="t0750A" class="h"><td><a href="#t0750A">07:50</a></td><td class="np">kwladyka</td><td>crocket, i found solution like that about memory &quot;You can set :jvm-opts in the user profile if you're using Leiningen 2. Otherwise set JVM_OPTS as an environment variable.&quot; Did you try that?</td></tr>
+<tr id="t0751A" class="h"><td><a href="#t0751A">07:51</a></td><td class="n7">crocket</td><td>kwladyka, no</td></tr>
+<tr id="t0751A" class="h r"><td><a href="#t0751A">07:51</a></td><td class="n7">crocket</td><td>I didn't know about it.</td></tr>
+<tr id="t0751A" class="h"><td><a href="#t0751A">07:51</a></td><td class="nd">TEttinger</td><td>yeah, I'd check if something else set your JVM_OPTS env var</td></tr>
+<tr id="t0752A" class="h"><td><a href="#t0752A">07:52</a></td><td class="n7">crocket</td><td>I use leiningen 2.5.1 on openjdk 1.8.0_45.</td></tr>
+<tr id="t0752A" class="h r"><td><a href="#t0752A">07:52</a></td><td class="n7">crocket</td><td>Nothing sets JVM_OPTS in the user shell.</td></tr>
+<tr id="t0752A" class="h"><td><a href="#t0752A">07:52</a></td><td class="nd">TEttinger</td><td>hm</td></tr>
+<tr id="t0752A" class="h r"><td><a href="#t0752A">07:52</a></td><td class="nd">TEttinger</td><td>JAVA_OPTS can also do it</td></tr>
+<tr id="t0753A" class="h r"><td><a href="#t0753A">07:53</a></td><td class="nd">TEttinger</td><td>(older java used that, lein treats it as an alias)</td></tr>
+<tr id="t0753A" class="h"><td><a href="#t0753A">07:53</a></td><td class="np">kwladyka</td><td><a href="https://groups.google.com/forum/#!topic/clojure/h3M-LSlE4dw">https://groups.google.com/forum/#!topic/clojure/h3M-LSlE4dw</a> Larry Travis answer - maybe it is solution for you</td></tr>
+<tr id="t0753A" class="h"><td><a href="#t0753A">07:53</a></td><td class="n7">crocket</td><td>I expect pixie to be different from clojure.</td></tr>
+<tr id="t0753A" class="h"><td><a href="#t0753A">07:53</a></td><td class="nd">TEttinger</td><td>yes, no libs for one :)</td></tr>
+<tr id="t0753A" class="h"><td><a href="#t0753A">07:53</a></td><td class="n7">crocket</td><td>No clojar</td></tr>
+<tr id="t0754A" class="h"><td><a href="#t0754A">07:54</a></td><td class="nd">TEttinger</td><td>but it's very very close in terms of language features.  it's also at an early state, (they were doing a major refactor last I checked a few months ago, to try to change how lazy seqs worked or something)</td></tr>
+<tr id="t0757A" class="h"><td><a href="#t0757A">07:57</a></td><td class="n7">crocket</td><td>Ok, I specified :jvm-opts in ~/.lein/profiles.clj</td></tr>
+<tr id="t0757A" class="h r"><td><a href="#t0757A">07:57</a></td><td class="n7">crocket</td><td>Why did they name it pixie?</td></tr>
+<tr id="t0757A" class="h r"><td><a href="#t0757A">07:57</a></td><td class="n7">crocket</td><td>If they wanted it to be a clojure implementation on python, they would have named it accordingly.</td></tr>
+<tr id="t0758A" class="h"><td><a href="#t0758A">07:58</a></td><td class="nd">TEttinger</td><td>I'm working on a clojure-like lisp as well, but using Perl 6's toolchain instead of PyPy. I'm encountering a rare problem in that the tools I am using to implement a new language, already have way more features than my language is going to even plan to have</td></tr>
+<tr id="t0758A" class="h r"><td><a href="#t0758A">07:58</a></td><td class="nd">TEttinger</td><td>it isn't directly clojure, and they planned to diverge in new features</td></tr>
+<tr id="t0758A" class="h r"><td><a href="#t0758A">07:58</a></td><td class="nd">TEttinger</td><td>(they have transducers in from the start, for example)</td></tr>
+<tr id="t0759A" class="h r"><td><a href="#t0759A">07:59</a></td><td class="nd">TEttinger</td><td>^ last 2 lines re: pixie</td></tr>
+<tr id="t0759A" class="h"><td><a href="#t0759A">07:59</a></td><td class="n7">crocket</td><td>I expect clojure to be faster than the perl reincarnation and pixie.</td></tr>
+<tr id="t0759A" class="h r"><td><a href="#t0759A">07:59</a></td><td class="n7">crocket</td><td>python VM is not fast enough.</td></tr>
+<tr id="t0759A" class="h"><td><a href="#t0759A">07:59</a></td><td class="nd">TEttinger</td><td>yes. except for startup and memory usage</td></tr>
+<tr id="t0800A"><td><a href="#t0800A">08:00</a></td><td class="n7">crocket</td><td>pixie would suit command line programs and GUI programs.</td></tr>
+<tr id="t0800A" class="h r"><td><a href="#t0800A">08:00</a></td><td class="n7">crocket</td><td>Because of startup time and memory usage.</td></tr>
+<tr id="t0800A" class="h"><td><a href="#t0800A">08:00</a></td><td class="nd">TEttinger</td><td>java and the JVM have atrocious startup time compared to scripting language VMs.  thankfully, the perl thing I'm using can produce JVM bytecode or a scripty VM's bytecode (MoarVM)</td></tr>
+<tr id="t0801A" class="h"><td><a href="#t0801A">08:01</a></td><td class="n7">crocket</td><td>Will anyone fix clojure's slow startup time?</td></tr>
+<tr id="t0801A" class="h"><td><a href="#t0801A">08:01</a></td><td class="nd">TEttinger</td><td>there are some ways you can mitigate it</td></tr>
+<tr id="t0801A" class="h"><td><a href="#t0801A">08:01</a></td><td class="n7">crocket</td><td>JVM itself is not slow to launch.</td></tr>
+<tr id="t0801A" class="h"><td><a href="#t0801A">08:01</a></td><td class="nd">TEttinger</td><td>starting with the --server JVM will always slow down launch relative to --client</td></tr>
+<tr id="t0802A" class="h r"><td><a href="#t0802A">08:02</a></td><td class="nd">TEttinger</td><td>but --server does way more opts as your program runs</td></tr>
+<tr id="t0802A" class="h"><td><a href="#t0802A">08:02</a></td><td class="n7">crocket</td><td>I heard <a href="http://clojure-android.info/skummet/">http://clojure-android.info/skummet/</a> aims to reduce startup time.</td></tr>
+<tr id="t0802A" class="h"><td><a href="#t0802A">08:02</a></td><td class="nd">TEttinger</td><td>there's a mix in JDK 7 and newer, you can pass the args... let me find em</td></tr>
+<tr id="t0802A" class="h"><td><a href="#t0802A">08:02</a></td><td class="n7">crocket</td><td>skummet</td></tr>
+<tr id="t0804A" class="h"><td><a href="#t0804A">08:04</a></td><td class="nd">TEttinger</td><td>-server -XX:+TieredCompilation</td></tr>
+<tr id="t0804A" class="h r"><td><a href="#t0804A">08:04</a></td><td class="nd">TEttinger</td><td>the second arg is only available for server JVMs, and it gives it -client JVM like startup behavior</td></tr>
+<tr id="t0804A" class="h r"><td><a href="#t0804A">08:04</a></td><td class="nd">TEttinger</td><td>it SHOULD be the default on -server</td></tr>
+<tr id="t0805A" class="h"><td><a href="#t0805A">08:05</a></td><td class="n7">crocket</td><td>It seems leiningen ignores ~/.lein/profiles.clj outside leiningen projects.</td></tr>
+<tr id="t0805A" class="h"><td><a href="#t0805A">08:05</a></td><td class="nd">TEttinger</td><td>low-end machines, particularly 32-bit windows machines, don't always have -server available as an option</td></tr>
+<tr id="t0806A" class="h"><td><a href="#t0806A">08:06</a></td><td class="n7">crocket</td><td>It seems lein repl is beyond hope.</td></tr>
+<tr id="t0807A" class="h r"><td><a href="#t0807A">08:07</a></td><td class="n7">crocket</td><td>It is greedy of RAM.</td></tr>
+<tr id="t0808A" class="h"><td><a href="#t0808A">08:08</a></td><td class="nd">TEttinger</td><td>were you passing an -Xmx option?</td></tr>
+<tr id="t0808A" class="h"><td><a href="#t0808A">08:08</a></td><td class="n7">crocket</td><td>yes</td></tr>
+<tr id="t0808A" class="h r"><td><a href="#t0808A">08:08</a></td><td class="n7">crocket</td><td>-Xmx512m</td></tr>
+<tr id="t0808A" class="h r"><td><a href="#t0808A">08:08</a></td><td class="n7">crocket</td><td>And, it uses 350MB.</td></tr>
+<tr id="t0809A" class="h"><td><a href="#t0809A">08:09</a></td><td class="nd">TEttinger</td><td>well that's not disobeying the -Xmx, but it is still a fair amount...</td></tr>
+<tr id="t0809A" class="h"><td><a href="#t0809A">08:09</a></td><td class="n7">crocket</td><td>Why does leiningen ignore ~/.lein/profiles.clj outside leiningen projects?</td></tr>
+<tr id="t0810A"><td><a href="#t0810A">08:10</a></td><td class="nd">TEttinger</td><td>I don't know if it does, actually -- I think the profile may affect your project when it runs, not the lein program itself</td></tr>
+<tr id="t0810A" class="h r"><td><a href="#t0810A">08:10</a></td><td class="nd">TEttinger</td><td>but I have no idea</td></tr>
+<tr id="t0811A" class="h"><td><a href="#t0811A">08:11</a></td><td class="n7">crocket</td><td>I mean lein repl</td></tr>
+<tr id="t0811A" class="h r"><td><a href="#t0811A">08:11</a></td><td class="n7">crocket</td><td>Why does 'lein repl' ignore ~/.lein/profiles.clj outside leiningen projects?</td></tr>
+<tr id="t0815A" class="h"><td><a href="#t0815A">08:15</a></td><td class="nd">TEttinger</td><td>oh!</td></tr>
+<tr id="t0815A" class="h r"><td><a href="#t0815A">08:15</a></td><td class="nd">TEttinger</td><td>The :base profile provides dependencies necessary for basic repl functionality, adds dev-resources to the :resources-path, and sets defaults for :jvm-opts, :checkout-deps-share and :test-selectors. It is part of Leiningen itself; you shouldn't need to change it.</td></tr>
+<tr id="t0817A" class="h"><td><a href="#t0817A">08:17</a></td><td class="n7">crocket</td><td>TEttinger, What is the clojure-like language that targets perl 6?</td></tr>
+<tr id="t0817A" class="h r"><td><a href="#t0817A">08:17</a></td><td class="n7">crocket</td><td>Does it compile to perl 6?</td></tr>
+<tr id="t0818A" class="h"><td><a href="#t0818A">08:18</a></td><td class="nd">TEttinger</td><td>uhhh I'm making it and I don't know perl 6, don't expect much yet :)</td></tr>
+<tr id="t0818A" class="h r"><td><a href="#t0818A">08:18</a></td><td class="nd">TEttinger</td><td><a href="https://github.com/technomancy/leiningen/blob/9c5192e6520fb96aa625313a468e0143001f54ca/leiningen-core/src/leiningen/core/project.clj#L467-L470">https://github.com/technomancy/leiningen/blob/9c5192e6520fb96aa625313a468e0143001f54ca/leiningen-core/src/leiningen/core/project.clj#L467-L470</a></td></tr>
+<tr id="t0818A" class="h r"><td><a href="#t0818A">08:18</a></td><td class="nd">TEttinger</td><td>that link is the default set of JVM opts that :base adds</td></tr>
+<tr id="t0818A" class="h"><td><a href="#t0818A">08:18</a></td><td class="n7">crocket</td><td>It seems Rakudo Perl targets MoarVM and JVM.</td></tr>
+<tr id="t0818A" class="h"><td><a href="#t0818A">08:18</a></td><td class="nd">TEttinger</td><td>yes</td></tr>
+<tr id="t0818A" class="h r"><td><a href="#t0818A">08:18</a></td><td class="nd">TEttinger</td><td>that's what I will too</td></tr>
+<tr id="t0818A" class="h"><td><a href="#t0818A">08:18</a></td><td class="n7">crocket</td><td>Whut</td></tr>
+<tr id="t0819A" class="h r"><td><a href="#t0819A">08:19</a></td><td class="n7">crocket</td><td>TEttinger, How are you desining your clojure-like language?</td></tr>
+<tr id="t0819A" class="h r"><td><a href="#t0819A">08:19</a></td><td class="n7">crocket</td><td>What does it target?</td></tr>
+<tr id="t0819A" class="h"><td><a href="#t0819A">08:19</a></td><td class="nd">TEttinger</td><td>I'm writing it with NQP, which is Not Quite Perl, a subset of Perl 6 meant for making compilers</td></tr>
+<tr id="t0819A" class="h r"><td><a href="#t0819A">08:19</a></td><td class="nd">TEttinger</td><td>(perl 6 is really really big in terms of feature scope)</td></tr>
+<tr id="t0820A" class="r"><td><a href="#t0820A">08:20</a></td><td class="nd">TEttinger</td><td>(NQP is a smaller subset that they can bootstrap)</td></tr>
+<tr id="t0821A" class="h r"><td><a href="#t0821A">08:21</a></td><td class="nd">TEttinger</td><td>anything that uses NQP to make a compiler outputs a &quot;QAST&quot;, which is effectively the same as a clojure ast in my case after it's been fully macroexpanded (no compile time logic)</td></tr>
+<tr id="t0821A" class="h r"><td><a href="#t0821A">08:21</a></td><td class="nd">TEttinger</td><td>JVM and Moar backends take a QAST and compile it to a native jar or exe, respectively, I think</td></tr>
+<tr id="t0821A" class="h"><td><a href="#t0821A">08:21</a></td><td class="n7">crocket</td><td>Is there any clojure implementation suitable for command line programs?</td></tr>
+<tr id="t0821A" class="h r"><td><a href="#t0821A">08:21</a></td><td class="n7">crocket</td><td>or any lisp</td></tr>
+<tr id="t0822A" class="h"><td><a href="#t0822A">08:22</a></td><td class="nd">TEttinger</td><td>I'd say pixie is about as close to clojure and command line as you'd get</td></tr>
+<tr id="t0822A" class="h"><td><a href="#t0822A">08:22</a></td><td class="n7">crocket</td><td>pixie dust</td></tr>
+<tr id="t0822A" class="h"><td><a href="#t0822A">08:22</a></td><td class="nd">TEttinger</td><td>other things get more scheme-like or common lisp like</td></tr>
+<tr id="t0823A" class="h r"><td><a href="#t0823A">08:23</a></td><td class="nd">TEttinger</td><td>SBCL has worse compile times than clojure, from what I hear, but produces very good optimizations</td></tr>
+<tr id="t0823A" class="h r"><td><a href="#t0823A">08:23</a></td><td class="nd">TEttinger</td><td>(not sure about repl in there)</td></tr>
+<tr id="t0823A" class="h"><td><a href="#t0823A">08:23</a></td><td class="n7">crocket</td><td>&quot;Pixie implements its own virtual machine. It does not run on the JVM, CLR or Python VM.&quot;</td></tr>
+<tr id="t0823A" class="h"><td><a href="#t0823A">08:23</a></td><td class="nd">TEttinger</td><td>yep</td></tr>
+<tr id="t0823A" class="h"><td><a href="#t0823A">08:23</a></td><td class="n7">crocket</td><td>And, it's written in python.</td></tr>
+<tr id="t0823A" class="h"><td><a href="#t0823A">08:23</a></td><td class="nd">TEttinger</td><td>PyPy's RPython is a toolchain for making VMs</td></tr>
+<tr id="t0824A" class="h r"><td><a href="#t0824A">08:24</a></td><td class="nd">TEttinger</td><td>well, the bootstrapper is in RPython and even that isn't all of Python</td></tr>
+<tr id="t0824A" class="h"><td><a href="#t0824A">08:24</a></td><td class="n7">crocket</td><td>Is scheme decent for command line programs?</td></tr>
+<tr id="t0824A" class="h"><td><a href="#t0824A">08:24</a></td><td class="n0">wasamasa</td><td>yes</td></tr>
+<tr id="t0824A" class="h"><td><a href="#t0824A">08:24</a></td><td class="n7">crocket</td><td>What about common lisp?</td></tr>
+<tr id="t0824A" class="h"><td><a href="#t0824A">08:24</a></td><td class="nd">TEttinger</td><td>there are many schemes though</td></tr>
+<tr id="t0824A" class="h"><td><a href="#t0824A">08:24</a></td><td class="n0">wasamasa</td><td>common lisp sucks for that purpose</td></tr>
+<tr id="t0824A" class="h r"><td><a href="#t0824A">08:24</a></td><td class="n0">wasamasa</td><td>not a single open-source implementation has tree shaking</td></tr>
+<tr id="t0825A" class="h"><td><a href="#t0825A">08:25</a></td><td class="nd">TEttinger</td><td>racket is a good bridge between Clojure features and Scheme-ness</td></tr>
+<tr id="t0825A" class="h"><td><a href="#t0825A">08:25</a></td><td class="n0">wasamasa</td><td>and therefore cannot produce binaries comparable with what you'll otherwise find there</td></tr>
+<tr id="t0825A" class="h"><td><a href="#t0825A">08:25</a></td><td class="n7">crocket</td><td>???</td></tr>
+<tr id="t0825A" class="h"><td><a href="#t0825A">08:25</a></td><td class="nx">lazybot</td><td>crocket: Yes, 100% for sure.</td></tr>
+<tr id="t0825A" class="h"><td><a href="#t0825A">08:25</a></td><td class="nd">TEttinger</td><td>there's actually a racket lib that adds clojure data structures, immutable and all, to racket</td></tr>
+<tr id="t0825A" class="h"><td><a href="#t0825A">08:25</a></td><td class="n7">crocket</td><td>I don't know tree shaking.</td></tr>
+<tr id="t0825A" class="h"><td><a href="#t0825A">08:25</a></td><td class="nd">TEttinger</td><td>Racket is a scheme</td></tr>
+<tr id="t0825A" class="h"><td><a href="#t0825A">08:25</a></td><td class="n7">crocket</td><td>Is Racket a functional programming language?</td></tr>
+<tr id="t0825A" class="h"><td><a href="#t0825A">08:25</a></td><td class="n0">wasamasa</td><td>nope</td></tr>
+<tr id="t0825A" class="h"><td><a href="#t0825A">08:25</a></td><td class="nd">TEttinger</td><td>?</td></tr>
+<tr id="t0826A" class="h"><td><a href="#t0826A">08:26</a></td><td class="n7">crocket</td><td>Is there a functional lisp dialect suitable for command line?</td></tr>
+<tr id="t0826A" class="h"><td><a href="#t0826A">08:26</a></td><td class="nd">TEttinger</td><td>racket has immutable and mutable data structures like clojure</td></tr>
+<tr id="t0826A" class="h"><td><a href="#t0826A">08:26</a></td><td class="n0">wasamasa</td><td>it's a good deal closer than CL though</td></tr>
+<tr id="t0826A" class="h r"><td><a href="#t0826A">08:26</a></td><td class="n0">wasamasa</td><td>crocket: stop treating &quot;functional&quot; as a binary value</td></tr>
+<tr id="t0827A" class="h r"><td><a href="#t0827A">08:27</a></td><td class="n0">wasamasa</td><td>crocket: makes about as much sense as doing the same for OO</td></tr>
+<tr id="t0828A" class="h"><td><a href="#t0828A">08:28</a></td><td class="n7">crocket</td><td>javascript sucks.</td></tr>
+<tr id="t0828A" class="h"><td><a href="#t0828A">08:28</a></td><td class="nd">TEttinger</td><td>racket doesn't support the same type of concurrency stuff as clojure.  I don't think any other lisps do as well as clojure in that arena</td></tr>
+<tr id="t0828A" class="h"><td><a href="#t0828A">08:28</a></td><td class="n7">crocket</td><td>pixie is close?</td></tr>
+<tr id="t0828A" class="h r"><td><a href="#t0828A">08:28</a></td><td class="n7">crocket</td><td>pixie has STM and CSP.</td></tr>
+<tr id="t0828A" class="h"><td><a href="#t0828A">08:28</a></td><td class="nd">TEttinger</td><td>do you mean CPS?</td></tr>
+<tr id="t0829A" class="h"><td><a href="#t0829A">08:29</a></td><td class="n0">wasamasa</td><td>crocket: I also suggest you to just start writing code instead of spending all day asking #clojure about theoretical things</td></tr>
+<tr id="t0829A" class="h"><td><a href="#t0829A">08:29</a></td><td class="nd">TEttinger</td><td>I like talking though!</td></tr>
+<tr id="t0829A" class="h r"><td><a href="#t0829A">08:29</a></td><td class="nd">TEttinger</td><td>it means my brain hurts less from perl stuff!</td></tr>
+<tr id="t0829A" class="h"><td><a href="#t0829A">08:29</a></td><td class="n3">expez</td><td>I deployed a version that I don't want to promote to a proper release to clojars, when I try to deploy agai I get ReasonPhrase: Forbidden.  What gives?</td></tr>
+<tr id="t0830A"><td><a href="#t0830A">08:30</a></td><td class="n0">wasamasa</td><td>crocket: you may learn valuable things along the way such as that there is no perfect programming language</td></tr>
+<tr id="t0830A" class="h r"><td><a href="#t0830A">08:30</a></td><td class="n0">wasamasa</td><td>crocket: or that one programming language is better suited for a certain task than another</td></tr>
+<tr id="t0830A" class="h"><td><a href="#t0830A">08:30</a></td><td class="nd">TEttinger</td><td>clojure is very very good for server apps</td></tr>
+<tr id="t0830A" class="h"><td><a href="#t0830A">08:30</a></td><td class="n0">wasamasa</td><td>crocket: or that people writing code usually learn other languages as well</td></tr>
+<tr id="t0831A" class="h"><td><a href="#t0831A">08:31</a></td><td class="n7">crocket</td><td>ClojureScript on node.js could be made decent on command line.</td></tr>
+<tr id="t0835A" class="h r"><td><a href="#t0835A">08:35</a></td><td class="n7">crocket</td><td>TEttinger, Do you have other recommendations for command line than pixie?</td></tr>
+<tr id="t0835A" class="h r"><td><a href="#t0835A">08:35</a></td><td class="n7">crocket</td><td>pixie doesn't even have a tutorial yet.</td></tr>
+<tr id="t0837A" class="h"><td><a href="#t0837A">08:37</a></td><td class="nd">TEttinger</td><td>try lots of lisps.  racket has a heavy focus on being useful for whatever people want to adapt it for, since it's primary unique feature is the ability to make new language modes that are still valid racket (one has algol syntax)</td></tr>
+<tr id="t0837A" class="h r"><td><a href="#t0837A">08:37</a></td><td class="nd">TEttinger</td><td>racket also has a better documentation generator than, uh, everything</td></tr>
+<tr id="t0838A" class="h r"><td><a href="#t0838A">08:38</a></td><td class="nd">TEttinger</td><td>(it's a tool called Scribble and it really produces very good docs)</td></tr>
+<tr id="t0838A" class="h"><td><a href="#t0838A">08:38</a></td><td class="n7">crocket</td><td>Whut</td></tr>
+<tr id="t0839A" class="h r"><td><a href="#t0839A">08:39</a></td><td class="n7">crocket</td><td>Does clojure target python vm?</td></tr>
+<tr id="t0839A" class="h"><td><a href="#t0839A">08:39</a></td><td class="nd">TEttinger</td><td>not that I know of, it potentially could</td></tr>
+<tr id="t0839A" class="h r"><td><a href="#t0839A">08:39</a></td><td class="nd">TEttinger</td><td>better would be LLVM, like many other languages are starting to try</td></tr>
+<tr id="t0841A"><td><a href="#t0841A">08:41</a></td><td class="n7">crocket</td><td><a href="https://github.com/halgari/clojure-py/">https://github.com/halgari/clojure-py/</a> not useable</td></tr>
+<tr id="t0841A" class="h r"><td><a href="#t0841A">08:41</a></td><td class="n7">crocket</td><td>only 7 commits</td></tr>
+<tr id="t0841A" class="h"><td><a href="#t0841A">08:41</a></td><td class="nd">TEttinger</td><td>as far as I can tell, LLVM has a number of advantages that explain why Apple is investing so heavily in it, and one is the quality of debugging and compilation speed that they get with Clang, the C/C++ compiler targeting LLVM, relative to GCC</td></tr>
+<tr id="t0841A" class="h"><td><a href="#t0841A">08:41</a></td><td class="n7">crocket</td><td>LLVM sounds complex.</td></tr>
+<tr id="t0841A" class="h"><td><a href="#t0841A">08:41</a></td><td class="nd">TEttinger</td><td>it is.  it does have a lot of stuff under its banner</td></tr>
+<tr id="t0842A" class="h"><td><a href="#t0842A">08:42</a></td><td class="n0">wasamasa</td><td>crocket: will you promise me to go quiet if I hand you a lispy language with a tutorial that's capable of producing executables and starting up quickly?</td></tr>
+<tr id="t0842A" class="h"><td><a href="#t0842A">08:42</a></td><td class="nd">TEttinger</td><td>hehe</td></tr>
+<tr id="t0843A" class="h"><td><a href="#t0843A">08:43</a></td><td class="n0">wasamasa</td><td>not to mention an alive community and sufficient amount of libraries</td></tr>
+<tr id="t0844A" class="h"><td><a href="#t0844A">08:44</a></td><td class="n7">crocket</td><td>That sounds magical</td></tr>
+<tr id="t0844A" class="h"><td><a href="#t0844A">08:44</a></td><td class="n0">wasamasa</td><td>it's not if you relax your criteria a bit</td></tr>
+<tr id="t0844A" class="h r"><td><a href="#t0844A">08:44</a></td><td class="n0">wasamasa</td><td><a href="http://call-cc.org/">http://call-cc.org/</a></td></tr>
+<tr id="t0844A" class="h"><td><a href="#t0844A">08:44</a></td><td class="n7">crocket</td><td>Actually, I was overwhelmed by lisp dialects....</td></tr>
+<tr id="t0844A" class="h r"><td><a href="#t0844A">08:44</a></td><td class="n7">crocket</td><td>Racket, chicken scheme, et al...</td></tr>
+<tr id="t0844A" class="h"><td><a href="#t0844A">08:44</a></td><td class="n0">wasamasa</td><td>I'm using it for writing my CLI utilities and some simplistic web applications</td></tr>
+<tr id="t0845A" class="h"><td><a href="#t0845A">08:45</a></td><td class="n7">crocket</td><td>I surmise chicken scheme is a decent language.</td></tr>
+<tr id="t0845A" class="h"><td><a href="#t0845A">08:45</a></td><td class="n0">wasamasa</td><td>it's no clojure, but eh, I'm fine with scheme</td></tr>
+<tr id="t0847A" class="h"><td><a href="#t0847A">08:47</a></td><td class="n7">crocket</td><td>I'd be happier if there is a clojure implementation that starts up fast because that means one less language to learn.</td></tr>
+<tr id="t0847A" class="h"><td><a href="#t0847A">08:47</a></td><td class="n0">wasamasa</td><td>lol</td></tr>
+<tr id="t0848A" class="h"><td><a href="#t0848A">08:48</a></td><td class="n7">crocket</td><td>I could probably try ClojureScript on node.js</td></tr>
+<tr id="t0848A" class="h"><td><a href="#t0848A">08:48</a></td><td class="n0">wasamasa</td><td>just give up on it, as a good developer learning languages is a necessity</td></tr>
+<tr id="t0848A" class="h r"><td><a href="#t0848A">08:48</a></td><td class="n0">wasamasa</td><td>well, clojurescript's tooling sucks</td></tr>
+<tr id="t0848A" class="h"><td><a href="#t0848A">08:48</a></td><td class="n7">crocket</td><td>Does it have leiningen?</td></tr>
+<tr id="t0848A" class="h"><td><a href="#t0848A">08:48</a></td><td class="n0">wasamasa</td><td>you'll have to start with a clojure project first, then add clojurescript as dependency</td></tr>
+<tr id="t0848A" class="h r"><td><a href="#t0848A">08:48</a></td><td class="n0">wasamasa</td><td>then write some lines to make leiningen compile javascript</td></tr>
+<tr id="t0849A" class="h"><td><a href="#t0849A">08:49</a></td><td class="n7">crocket</td><td>wasamasa, It seems chicken scheme implements R5RS. Does R6RS improve on R5RS in any aspect?</td></tr>
+<tr id="t0849A" class="h"><td><a href="#t0849A">08:49</a></td><td class="n0">wasamasa</td><td>crocket: R6RS is very different from R5RS</td></tr>
+<tr id="t0850A" class="r"><td><a href="#t0850A">08:50</a></td><td class="n0">wasamasa</td><td>crocket: R7RS is an attempt to actually improve R5RS and splitting the language into a small and large version</td></tr>
+<tr id="t0850A" class="h r"><td><a href="#t0850A">08:50</a></td><td class="n0">wasamasa</td><td>crocket: and chicken supports a good amount of the small version of R7RS</td></tr>
+<tr id="t0852A" class="h"><td><a href="#t0852A">08:52</a></td><td class="n7">crocket</td><td>It seems committee has dominated scheme.</td></tr>
+<tr id="t0853A" class="h r"><td><a href="#t0853A">08:53</a></td><td class="n7">crocket</td><td>I have a selection disorder.</td></tr>
+<tr id="t0857A" class="h r"><td><a href="#t0857A">08:57</a></td><td class="n7">crocket</td><td>wasamasa, Does chicken scheme compile to native binaries directly?</td></tr>
+<tr id="t0857A" class="h"><td><a href="#t0857A">08:57</a></td><td class="np">kwladyka</td><td>wasamasa, did you use lein-sub?</td></tr>
+<tr id="t0857A" class="h"><td><a href="#t0857A">08:57</a></td><td class="n0">wasamasa</td><td>kwladyka: nope</td></tr>
+<tr id="t0857A" class="h"><td><a href="#t0857A">08:57</a></td><td class="nm">Bahman</td><td>wasamasa: Count me in :-D</td></tr>
+<tr id="t0858A" class="h"><td><a href="#t0858A">08:58</a></td><td class="n0">wasamasa</td><td>Bahman: and I thought I was just seeing things</td></tr>
+<tr id="t0858A" class="h"><td><a href="#t0858A">08:58</a></td><td class="np">kwladyka</td><td>wasamasa, ok. I am just looking somebody who can explain me <a href="https://github.com/ring-clojure/ring">https://github.com/ring-clojure/ring</a> architecture :)</td></tr>
+<tr id="t0859A" class="h"><td><a href="#t0859A">08:59</a></td><td class="n0">wasamasa</td><td>kwladyka: not sure how a leiningen plugin comes into play there</td></tr>
+<tr id="t0859A" class="h"><td><a href="#t0859A">08:59</a></td><td class="nm">Bahman</td><td>crocket: One of the strengths of Chicken (and Racket) are native binaries.</td></tr>
+<tr id="t0859A" class="h"><td><a href="#t0859A">08:59</a></td><td class="n0">wasamasa</td><td>Bahman: didn't racket switch to having a VM?</td></tr>
+<tr id="t0859A" class="h"><td><a href="#t0859A">08:59</a></td><td class="nm">Bahman</td><td>wasamasa: Yes...but the binary contains the slimmed down VM for easy redistribution.</td></tr>
+<tr id="t0859A" class="h r"><td><a href="#t0859A">08:59</a></td><td class="nm">Bahman</td><td>Pretty neat.</td></tr>
+<tr id="t0900A"><td><a href="#t0900A">09:00</a></td><td class="np">kwladyka</td><td>wasamasa, do you have any idea why author of code choose to have all this projects inside one repository then separate them?</td></tr>
+<tr id="t0900A" class="h"><td><a href="#t0900A">09:00</a></td><td class="n0">wasamasa</td><td>well, ok</td></tr>
+<tr id="t0900A" class="h r"><td><a href="#t0900A">09:00</a></td><td class="n0">wasamasa</td><td>kwladyka: I suggest asking them</td></tr>
+<tr id="t0900A" class="h"><td><a href="#t0900A">09:00</a></td><td class="np">kwladyka</td><td>;)</td></tr>
+<tr id="t0901A" class="h r"><td><a href="#t0901A">09:01</a></td><td class="np">kwladyka</td><td>it can be a solution :)</td></tr>
+<tr id="t0901A" class="h r"><td><a href="#t0901A">09:01</a></td><td class="np">kwladyka</td><td>and maybe the esiest in this case</td></tr>
+<tr id="t1002A"><td><a href="#t1002A">10:02</a></td><td class="n7">crocket</td><td>Is it ok to write a GUI program in clojure with a JavaFX binding?</td></tr>
+<tr id="t1119A"><td><a href="#t1119A">11:19</a></td><td class="n2">whodidthis</td><td><a href="https://www.refheap.com/104291">https://www.refheap.com/104291</a> any way i could make core.match work in tests? 😿</td></tr>
+<tr id="t1125A"><td><a href="#t1125A">11:25</a></td><td class="n7">crocket</td><td>Will clojure be fixed with regard to nil?</td></tr>
+<tr id="t1126A" class="h"><td><a href="#t1126A">11:26</a></td><td class="nt">mmeix</td><td>What should be fixed?</td></tr>
+<tr id="t1126A" class="h"><td><a href="#t1126A">11:26</a></td><td class="n7">crocket</td><td>nil</td></tr>
+<tr id="t1126A" class="h r"><td><a href="#t1126A">11:26</a></td><td class="n7">crocket</td><td>Nil causes errors</td></tr>
+<tr id="t1127A" class="h"><td><a href="#t1127A">11:27</a></td><td class="nt">mmeix</td><td>example?</td></tr>
+<tr id="t1127A" class="h r"><td><a href="#t1127A">11:27</a></td><td class="nt">mmeix</td><td>,(doc fnil)</td></tr>
+<tr id="t1127A" class="h"><td><a href="#t1127A">11:27</a></td><td class="n7">crocket</td><td>(if ({:a nil :b 1} :a) &quot;ok&quot; &quot;no&quot;)</td></tr>
+<tr id="t1127A" class="h"><td><a href="#t1127A">11:27</a></td><td class="nl">clojurebot</td><td>&quot;([f x] [f x y] [f x y z]); Takes a function f, and returns a function that calls f, replacing a nil first argument to f with the supplied value x. Higher arity versions can replace arguments in the second and third positions (y, z). Note that the function f can take any number of arguments, not just the one(s) being nil-patched.&quot;</td></tr>
+<tr id="t1127A" class="h"><td><a href="#t1127A">11:27</a></td><td class="n7">crocket</td><td>,(if ({:a nil :b 1} :a) &quot;ok&quot; &quot;no&quot;)</td></tr>
+<tr id="t1127A" class="h"><td><a href="#t1127A">11:27</a></td><td class="nl">clojurebot</td><td>&quot;no&quot;</td></tr>
+<tr id="t1128A" class="h"><td><a href="#t1128A">11:28</a></td><td class="n7">crocket</td><td>It leads to logical bugs.</td></tr>
+<tr id="t1128A" class="h r"><td><a href="#t1128A">11:28</a></td><td class="n7">crocket</td><td>,(if (contains? {:a nil :b 1} :a) &quot;ok&quot; &quot;no&quot;)</td></tr>
+<tr id="t1128A" class="h"><td><a href="#t1128A">11:28</a></td><td class="nl">clojurebot</td><td>&quot;ok&quot;</td></tr>
+<tr id="t1129A" class="h"><td><a href="#t1129A">11:29</a></td><td class="n7">crocket</td><td>Since nil is everywhere, it is difficult to find the origin of nil.</td></tr>
+<tr id="t1129A" class="h"><td><a href="#t1129A">11:29</a></td><td class="n2">whodidthis</td><td>maybe core.typed will help you out</td></tr>
+<tr id="t1130A"><td><a href="#t1130A">11:30</a></td><td class="n7">crocket</td><td>nil should have been an interop feature.</td></tr>
+<tr id="t1131A" class="h"><td><a href="#t1131A">11:31</a></td><td class="nt">mmeix</td><td>	,(if ({:a nil :b 1} :a) &quot;ok&quot; &quot;no&quot;)</td></tr>
+<tr id="t1131A" class="h"><td><a href="#t1131A">11:31</a></td><td class="nl">clojurebot</td><td>&quot;no&quot;</td></tr>
+<tr id="t1131A" class="h"><td><a href="#t1131A">11:31</a></td><td class="nt">mmeix</td><td>is perfectly ok, because nil is falsey</td></tr>
+<tr id="t1132A" class="h r"><td><a href="#t1132A">11:32</a></td><td class="nt">mmeix</td><td>&quot;Both nil and false are treated as &quot;false&quot; and everything else is treated as true.&quot;</td></tr>
+<tr id="t1132A" class="h r"><td><a href="#t1132A">11:32</a></td><td class="nt">mmeix</td><td><a href="http://blog.jayfields.com/2011/02/clojure-truthy-and-falsey.html">http://blog.jayfields.com/2011/02/clojure-truthy-and-falsey.html</a></td></tr>
+<tr id="t1132A" class="h"><td><a href="#t1132A">11:32</a></td><td class="n7">crocket</td><td>Somehow, it leads to bugs.</td></tr>
+<tr id="t1132A" class="h r"><td><a href="#t1132A">11:32</a></td><td class="n7">crocket</td><td>nil leaks into collections.</td></tr>
+<tr id="t1132A" class="h r"><td><a href="#t1132A">11:32</a></td><td class="n7">crocket</td><td>conditionals return false because nil leaked into collections somehow in a large codebase.</td></tr>
+<tr id="t1133A" class="h"><td><a href="#t1133A">11:33</a></td><td class="nt">mmeix</td><td>I guess, nil will not declared truey ...</td></tr>
+<tr id="t1134A" class="h"><td><a href="#t1134A">11:34</a></td><td class="nc">Bronsa</td><td>crocket: no, it will never be &quot;fixed&quot;. it's not considered a bug or misfeature</td></tr>
+<tr id="t1134A" class="h"><td><a href="#t1134A">11:34</a></td><td class="nt">mmeix</td><td>maybe this helps:</td></tr>
+<tr id="t1134A" class="h r"><td><a href="#t1134A">11:34</a></td><td class="nt">mmeix</td><td><a href="http://blog.jayfields.com/2011/01/clojure-fnil.html">http://blog.jayfields.com/2011/01/clojure-fnil.html</a></td></tr>
+<tr id="t1134A" class="h"><td><a href="#t1134A">11:34</a></td><td class="n7">crocket</td><td>nil shouldn't have been part of the core in the first place.</td></tr>
+<tr id="t1134A" class="h"><td><a href="#t1134A">11:34</a></td><td class="nc">Bronsa</td><td>that's your opinion</td></tr>
+<tr id="t1134A" class="h"><td><a href="#t1134A">11:34</a></td><td class="n7">crocket</td><td>Rich Hickey was forced to use nil due to JVM.</td></tr>
+<tr id="t1135A" class="h"><td><a href="#t1135A">11:35</a></td><td class="nc">Bronsa</td><td>do you have any evidence to back that claim or is it just you assuming things?</td></tr>
+<tr id="t1135A" class="h"><td><a href="#t1135A">11:35</a></td><td class="n7">crocket</td><td>Nil is a mistake in programming languages.</td></tr>
+<tr id="t1135A" class="h r"><td><a href="#t1135A">11:35</a></td><td class="n7">crocket</td><td>Nil, Null, ...</td></tr>
+<tr id="t1135A" class="h"><td><a href="#t1135A">11:35</a></td><td class="nc">Bronsa</td><td>cool. you seem to have made up your mind. have fun trying to convince the core team I guess</td></tr>
+<tr id="t1136A" class="h"><td><a href="#t1136A">11:36</a></td><td class="n7">crocket</td><td>mmeix, I think fnil is a band aid at best.</td></tr>
+<tr id="t1137A" class="h"><td><a href="#t1137A">11:37</a></td><td class="nt">mmeix</td><td>hm ...</td></tr>
+<tr id="t1138A" class="h r"><td><a href="#t1138A">11:38</a></td><td class="nt">mmeix</td><td>I'm a beginner, but the concept of only nil and false being falsey seemed very plausible to me</td></tr>
+<tr id="t1138A" class="h r"><td><a href="#t1138A">11:38</a></td><td class="nt">mmeix</td><td>instead of say 0 being false, for example</td></tr>
+<tr id="t1138A" class="h r"><td><a href="#t1138A">11:38</a></td><td class="nt">mmeix</td><td>etc.</td></tr>
+<tr id="t1138A" class="h"><td><a href="#t1138A">11:38</a></td><td class="n7">crocket</td><td>mmeix, My point is that I feel much better without nil in the core.</td></tr>
+<tr id="t1139A" class="h r"><td><a href="#t1139A">11:39</a></td><td class="n7">crocket</td><td>Nil is better served as a java interop feature.</td></tr>
+<tr id="t1139A" class="h"><td><a href="#t1139A">11:39</a></td><td class="nt">mmeix</td><td>this is not going to happen, it would break nearly everything</td></tr>
+<tr id="t1139A" class="h"><td><a href="#t1139A">11:39</a></td><td class="n7">crocket</td><td>I know</td></tr>
+<tr id="t1139A" class="h"><td><a href="#t1139A">11:39</a></td><td class="nt">mmeix</td><td>AFAIK</td></tr>
+<tr id="t1140A" class="r"><td><a href="#t1140A">11:40</a></td><td class="nt">mmeix</td><td>what is wrong with your example (if ({:a nil :b 1} :a) &quot;ok&quot; &quot;no&quot;)?</td></tr>
+<tr id="t1140A" class="h r"><td><a href="#t1140A">11:40</a></td><td class="nt">mmeix</td><td>don't see the point</td></tr>
+<tr id="t1140A" class="h"><td><a href="#t1140A">11:40</a></td><td class="n7">crocket</td><td>If a programmer assumes a map doesn't have nil, it is a problem.</td></tr>
+<tr id="t1142A" class="h"><td><a href="#t1142A">11:42</a></td><td class="nt">mmeix</td><td>Something other: trying &quot;boot&quot; for he first time, and doing some silly error somewhere - could someone have a quick look at: <a href="https://www.refheap.com/104324">https://www.refheap.com/104324</a></td></tr>
+<tr id="t1144A" class="h r"><td><a href="#t1144A">11:44</a></td><td class="nt">mmeix</td><td>,(contains? {:a nil :b 1} :a)</td></tr>
+<tr id="t1144A" class="h"><td><a href="#t1144A">11:44</a></td><td class="nl">clojurebot</td><td>true</td></tr>
+<tr id="t1144A" class="h"><td><a href="#t1144A">11:44</a></td><td class="nt">mmeix</td><td>if that matters</td></tr>
+<tr id="t1147A" class="h r"><td><a href="#t1147A">11:47</a></td><td class="nt">mmeix</td><td>what should (first {}) return? false?</td></tr>
+<tr id="t1147A" class="h r"><td><a href="#t1147A">11:47</a></td><td class="nt">mmeix</td><td>,(first {})</td></tr>
+<tr id="t1147A" class="h"><td><a href="#t1147A">11:47</a></td><td class="nl">clojurebot</td><td>nil</td></tr>
+<tr id="t1159A"><td><a href="#t1159A">11:59</a></td><td class="n7">crocket</td><td>Why does clojure not have an option type?</td></tr>
+<tr id="t1223A"><td><a href="#t1223A">12:23</a></td><td class="nc">hellofunk</td><td>is the idea behind an option type to simply differentiate between &quot;no value is there&quot; vs &quot;a value is there, but the value is nothing&quot; ?</td></tr>
+<tr id="t1230A"><td><a href="#t1230A">12:30</a></td><td class="ni">noidi</td><td>crocket, <a href="http://clojure.github.io/core.typed/#clojure.core.typed/Option">http://clojure.github.io/core.typed/#clojure.core.typed/Option</a></td></tr>
+<tr id="t1232A" class="h"><td><a href="#t1232A">12:32</a></td><td class="n7">crocket</td><td>Thanks</td></tr>
+<tr id="t1232A" class="h"><td><a href="#t1232A">12:32</a></td><td class="nt">mmeix</td><td>ad hoc: is core.typed preferable to prismatic/schema ?</td></tr>
+<tr id="t1232A" class="h"><td><a href="#t1232A">12:32</a></td><td class="n7">crocket</td><td>I have my eyes on pixie which is similar to clojure and loads fast.</td></tr>
+<tr id="t1233A" class="h r"><td><a href="#t1233A">12:33</a></td><td class="n7">crocket</td><td>pixie would be great for embedded devices and command line programs.</td></tr>
+<tr id="t1234A" class="h"><td><a href="#t1234A">12:34</a></td><td class="n2">whodidthis</td><td>maybe you can start a core.typed for pixie</td></tr>
+<tr id="t1234A" class="h"><td><a href="#t1234A">12:34</a></td><td class="nd">justin_smith</td><td>mmeix: schema is about runtime assertions, typed is about proving things at compile time</td></tr>
+<tr id="t1235A" class="h"><td><a href="#t1235A">12:35</a></td><td class="nt">mmeix</td><td>ah, ok ... thanks</td></tr>
+<tr id="t1239A" class="h"><td><a href="#t1239A">12:39</a></td><td class="n0">clojer</td><td>I'm finding the more I work with Clojure the more I don't want to work with anything else. Can't decide whether that's a good or a bad thing :)</td></tr>
+<tr id="t1242A" class="r"><td><a href="#t1242A">12:42</a></td><td class="n0">clojer</td><td>S-expressions just make it so easy to extract parts of a function and test in the repl by throwing some values at them.</td></tr>
+<tr id="t1248A" class="h"><td><a href="#t1248A">12:48</a></td><td class="nc">hellofunk</td><td>clojer: welcome to lisp!</td></tr>
+<tr id="t1249A" class="h"><td><a href="#t1249A">12:49</a></td><td class="n0">wasamasa</td><td>they want to know from me what I've learned at work</td></tr>
+<tr id="t1249A" class="h r"><td><a href="#t1249A">12:49</a></td><td class="n0">wasamasa</td><td>and it's been mostly clojure and clojurescript</td></tr>
+<tr id="t1250A"><td><a href="#t1250A">12:50</a></td><td class="nb">Jickelsen</td><td>Asked this before but it was probably at a bad time of day :) I've included react-with-addons (from CDN) but (aget js/React &quot;addons&quot;) returns nil. Any ideas?</td></tr>
+<tr id="t1312A"><td><a href="#t1312A">13:12</a></td><td class="np">kwladyka</td><td>What are you using to database migrations?</td></tr>
+<tr id="t1315A" class="h"><td><a href="#t1315A">13:15</a></td><td class="nc">sdegutis</td><td>Are there any decent OCR libraries for Clojure?</td></tr>
+<tr id="t1325A"><td><a href="#t1325A">13:25</a></td><td class="n0">clojer</td><td>Why does seq destructuring of a map change the original? For example:</td></tr>
+<tr id="t1325A" class="h r"><td><a href="#t1325A">13:25</a></td><td class="n0">clojer</td><td>(let [m { 365 [{:a 1 :b 2} {:a 4 :b 6}] 366 [{:a 11 :b 22} {:a 44 :b 66}]}] (for [[id [mps] :as orig] m] orig))</td></tr>
+<tr id="t1325A" class="h r"><td><a href="#t1325A">13:25</a></td><td class="n0">clojer</td><td>Produces: ([365 [{:b 2, :a 1} {:b 6, :a 4}]] [366 [{:b 2, :a 1} {:b 6, :a 4}]])</td></tr>
+<tr id="t1326A" class="h r"><td><a href="#t1326A">13:26</a></td><td class="n0">clojer</td><td>The original map has not been retained as a map.</td></tr>
+<tr id="t1326A" class="h"><td><a href="#t1326A">13:26</a></td><td class="nd">justin_smith</td><td>clojer: a hash-map is made of entry objects</td></tr>
+<tr id="t1326A" class="h"><td><a href="#t1326A">13:26</a></td><td class="nd">TEttinger</td><td>because for isn't changing the original?</td></tr>
+<tr id="t1326A" class="h r"><td><a href="#t1326A">13:26</a></td><td class="nd">TEttinger</td><td>for returns a new seq</td></tr>
+<tr id="t1326A" class="h"><td><a href="#t1326A">13:26</a></td><td class="nd">justin_smith</td><td>for cannot return a hash-map</td></tr>
+<tr id="t1327A" class="h r"><td><a href="#t1327A">13:27</a></td><td class="nd">justin_smith</td><td>you can make a hash-map out of the entries there though</td></tr>
+<tr id="t1327A" class="h"><td><a href="#t1327A">13:27</a></td><td class="nd">TEttinger</td><td>,(let [m { 365 [{:a 1 :b 2} {:a 4 :b 6}] 366 [{:a 11 :b 22} {:a 44 :b 66}]}] (into {} (for [[id [mps] :as orig] m] orig)))</td></tr>
+<tr id="t1327A" class="h"><td><a href="#t1327A">13:27</a></td><td class="nl">clojurebot</td><td>{365 [{:a 1, :b 2} {:a 4, :b 6}], 366 [{:a 11, :b 22} {:a 44, :b 66}]}</td></tr>
+<tr id="t1328A" class="h"><td><a href="#t1328A">13:28</a></td><td class="n0">clojer</td><td>I naively thought :as orig did exactly that, ie. saved the original, not transformed it.</td></tr>
+<tr id="t1329A" class="h"><td><a href="#t1329A">13:29</a></td><td class="n2">whodidthis</td><td>orig there is a single key value pair</td></tr>
+<tr id="t1330A"><td><a href="#t1330A">13:30</a></td><td class="nd">justin_smith</td><td>clojer: :as is a convenience for capturing bindings, but there is no binding in for that will capture the entirety of the original collection</td></tr>
+<tr id="t1511A"><td><a href="#t1511A">15:11</a></td><td class="n2">whodidthis</td><td>how do i make a string from a list of strings in emacs lisp</td></tr>
+<tr id="t1511A" class="h"><td><a href="#t1511A">15:11</a></td><td class="nc">Bronsa</td><td>whodidthis: what does this have to do with clojure?</td></tr>
+<tr id="t1513A" class="h"><td><a href="#t1513A">15:13</a></td><td class="n2">whodidthis</td><td>ok, whats kind of like (apply str '(&quot;abc&quot; &quot;def&quot;)) but in emacs lisp</td></tr>
+<tr id="t1514A" class="h"><td><a href="#t1514A">15:14</a></td><td class="n9">TimMc</td><td>haha</td></tr>
+<tr id="t1514A" class="h"><td><a href="#t1514A">15:14</a></td><td class="n2">whodidthis</td><td>most of us not originated from the great land of lisp :(</td></tr>
+<tr id="t1515A" class="h r"><td><a href="#t1515A">15:15</a></td><td class="n2">whodidthis</td><td>s/most/some</td></tr>
+<tr id="t1518A" class="h"><td><a href="#t1518A">15:18</a></td><td class="n0">wasamasa</td><td>(mapconcat #'identity '(&quot;foo&quot; &quot;bar&quot;) &quot;&quot;)</td></tr>
+<tr id="t1518A" class="h r"><td><a href="#t1518A">15:18</a></td><td class="n0">wasamasa</td><td>next time, ask on #emacs</td></tr>
+<tr id="t1520A" class="r"><td><a href="#t1520A">15:20</a></td><td class="n0">wasamasa</td><td>you can alternatively do it like you'd do in any other lisp, but I bet there's some stupid reason for not doing so, like it's version of apply and funcall being braindead</td></tr>
+<tr id="t1520A" class="h r"><td><a href="#t1520A">15:20</a></td><td class="n0">wasamasa</td><td>yup: &quot;If a subr takes more than 8 arguments without using MANY or UNEVALLED, we need to extend this function to support it.  Until this is done, there is no way to call the function.&quot;</td></tr>
+<tr id="t1527A" class="h"><td><a href="#t1527A">15:27</a></td><td class="n9">TimMc</td><td>...emacs lisp can't apply when the fn doesn't specifically support it?</td></tr>
+<tr id="t1531A"><td><a href="#t1531A">15:31</a></td><td class="n0">wasamasa</td><td>that's in the sources of funcall</td></tr>
+<tr id="t1531A" class="h r"><td><a href="#t1531A">15:31</a></td><td class="n0">wasamasa</td><td>so, I dunno how to interpret this, maybe it's a limitation at the C level</td></tr>
+<tr id="t1532A" class="h r"><td><a href="#t1532A">15:32</a></td><td class="n0">wasamasa</td><td>experimentation at elisp level doesn't suggest there's anything wrong</td></tr>
+<tr id="t1536A" class="h"><td><a href="#t1536A">15:36</a></td><td class="n2">whodidthis</td><td>apparently there was a new function called string-join, i was a bit dum for trying to find something apply-like in elisp</td></tr>
+<tr id="t1542A"><td><a href="#t1542A">15:42</a></td><td class="n0">wasamasa</td><td>it's using the same thing I suggested</td></tr>
+<tr id="t1542A" class="h r"><td><a href="#t1542A">15:42</a></td><td class="n0">wasamasa</td><td>and is relatively recent</td></tr>
+<tr id="t1634A"><td><a href="#t1634A">16:34</a></td><td class="np">kwladyka</td><td>Is any common rules for returning errors in Clojure from functions? For example validation error like &quot;email is to valid&quot;.</td></tr>
+<tr id="t1646A" class="r"><td><a href="#t1646A">16:46</a></td><td class="np">kwladyka</td><td>Why you will choose Pedestal instead of Ring?</td></tr>
+<tr id="t1648A" class="h"><td><a href="#t1648A">16:48</a></td><td class="ne">tcrayford____</td><td>kwladyka: for the former question: typically I'd use a value like a map or something in that case, exceptions in others</td></tr>
+<tr id="t1649A" class="h"><td><a href="#t1649A">16:49</a></td><td class="np">kwladyka</td><td>tcrayford____, yes.... i can't get used to i don't need some class for that...</td></tr>
+<tr id="t1650A" class="r"><td><a href="#t1650A">16:50</a></td><td class="np">kwladyka</td><td>Do you have any experience Validateur vs Bouncer?</td></tr>
+<tr id="t1650A" class="h"><td><a href="#t1650A">16:50</a></td><td class="ne">tcrayford____</td><td>nope. I use mississippi and it's worked fine for me</td></tr>
+<tr id="t1801A"><td><a href="#t1801A">18:01</a></td><td class="ny">zakwilson</td><td>I'm looking for an IMAP client library. All I've found so far is clojure-mail, a very gmail-specific wrapper around JavaMail. Is there something more general I should look at, or should I just use a Java library?</td></tr>
+<tr id="t1803A" class="h"><td><a href="#t1803A">18:03</a></td><td class="ny">bbloom</td><td>zakwilson: in general, you should prefer java libraries over clojure wrappers of java libraries.... unless the clojure wrapper is particularly good</td></tr>
+<tr id="t1803A" class="h r"><td><a href="#t1803A">18:03</a></td><td class="ny">bbloom</td><td>clojure is designed to make it easy to call jvm code w/o a wrapper. so the wrapper needs to provide some substantial benefit to justify itself</td></tr>
+<tr id="t1805A" class="h r"><td><a href="#t1805A">18:05</a></td><td class="ny">bbloom</td><td>and &quot;saves you from typing a dot character&quot; is not substantial benefit</td></tr>
+<tr id="t1807A" class="h"><td><a href="#t1807A">18:07</a></td><td class="ny">zakwilson</td><td>No, but converting from Java's representation of an email message to a Clojure map and dealing with what look to be a few thorny issues with JavaMail like clojure-mail does might be.</td></tr>
+<tr id="t1812A"><td><a href="#t1812A">18:12</a></td><td class="ny">bbloom</td><td>zakwilson: a quick look at the library suggests to me it's probably not worth wrapping</td></tr>
+<tr id="t1813A" class="h r"><td><a href="#t1813A">18:13</a></td><td class="ny">bbloom</td><td>or at least not worth wrapping in a general way: write the adaptor functions you need, reference clojure-mail if you need to for how to do some things</td></tr>
+<tr id="t1813A" class="h r"><td><a href="#t1813A">18:13</a></td><td class="ny">bbloom</td><td>cut out all the stuff you don't need/want</td></tr>
+<tr id="t1814A" class="h r"><td><a href="#t1814A">18:14</a></td><td class="ny">bbloom</td><td>or fork it and make the changes you need to be less gmail-specific</td></tr>
+<tr id="t1816A" class="h"><td><a href="#t1816A">18:16</a></td><td class="ny">zakwilson</td><td>bbloom: I was leaning toward forking it, as that doesn't look terribly hard. I was hoping for there to be a Right Thing I could use though, and it doesn't look like there is.</td></tr>
+<tr id="t1818A" class="h"><td><a href="#t1818A">18:18</a></td><td class="ny">bbloom</td><td>zakwilson: i was telling you what (many in) the community will tell you is &quot;the right thing&quot;: just call the jvm libs &amp; write functions to make it nicer as you need them</td></tr>
+<tr id="t1818A" class="h r"><td><a href="#t1818A">18:18</a></td><td class="ny">bbloom</td><td>the extra indirection only adds bulk and complexity</td></tr>
+<tr id="t1821A"><td><a href="#t1821A">18:21</a></td><td class="nd">jonathanj</td><td>is there a better way of expressing: (into {} (for [[k v]] (some-func {:x k} v))) ?</td></tr>
+<tr id="t1823A" class="h"><td><a href="#t1823A">18:23</a></td><td class="ny">bbloom</td><td>jonathanj: not sure what you're trying to express, since your `for is malformed</td></tr>
+<tr id="t1823A" class="h"><td><a href="#t1823A">18:23</a></td><td class="nd">jonathanj</td><td>it is?</td></tr>
+<tr id="t1824A" class="h"><td><a href="#t1824A">18:24</a></td><td class="ny">bbloom</td><td>,(for [[k v]] anything)</td></tr>
+<tr id="t1824A" class="h"><td><a href="#t1824A">18:24</a></td><td class="nl">clojurebot</td><td>#error {\n :cause &quot;for requires an even number of forms in binding vector in sandbox:&quot;\n :via\n [{:type clojure.lang.Compiler$CompilerException\n   :message &quot;java.lang.IllegalArgumentException: for requires an even number of forms in binding vector in sandbox:, compiling:(NO_SOURCE_FILE:0:0)&quot;\n   :at [clojure.lang.Compiler macroexpand1 &quot;Compiler.java&quot; 6644]}\n  {:type java.lang.IllegalArgumentExce...</td></tr>
+<tr id="t1825A" class="h"><td><a href="#t1825A">18:25</a></td><td class="nd">jonathanj</td><td>(for [[k v] some-map] ...) then</td></tr>
+<tr id="t1825A" class="h"><td><a href="#t1825A">18:25</a></td><td class="ny">bbloom</td><td>jonathanj: you need an expression for [k v] to iterate over</td></tr>
+<tr id="t1825A" class="h r"><td><a href="#t1825A">18:25</a></td><td class="ny">bbloom</td><td>so you're trying to apply a function to each key in a map and then get a new map with the same values?</td></tr>
+<tr id="t1826A" class="h"><td><a href="#t1826A">18:26</a></td><td class="nd">jonathanj</td><td>uh, i don't think that's what that code does</td></tr>
+<tr id="t1826A" class="h r"><td><a href="#t1826A">18:26</a></td><td class="nd">jonathanj</td><td>i want to apply a function to each value in a map, with access to the key, and have it result in a new map</td></tr>
+<tr id="t1827A" class="h"><td><a href="#t1827A">18:27</a></td><td class="ny">bbloom</td><td>(reduce (fn [m [k v]] (assoc m k (f k v))) {} m)</td></tr>
+<tr id="t1829A" class="h r"><td><a href="#t1829A">18:29</a></td><td class="ny">bbloom</td><td>or just (into {} (map f m))</td></tr>
+<tr id="t1834A"><td><a href="#t1834A">18:34</a></td><td class="nd">jonathanj</td><td>bbloom: yeah, i guess into map makes more sense than into for, thank you</td></tr>
+<tr id="t1836A" class="h"><td><a href="#t1836A">18:36</a></td><td class="nl">whomp</td><td>how can i get a list of all the values of a hashmap? like the keys fn, but for values instead</td></tr>
+<tr id="t1837A" class="h r"><td><a href="#t1837A">18:37</a></td><td class="nl">whomp</td><td>oh... vals... seems reasonable</td></tr>
+<tr id="t1917A"><td><a href="#t1917A">19:17</a></td><td class="nd">jonathanj</td><td>is there a less repetitive way of writing: (cond (map? value) ... (vector? value) ...)?</td></tr>
+<tr id="t1918A" class="h"><td><a href="#t1918A">19:18</a></td><td class="ny">bbloom</td><td>jonathanj: what repetition are you attempting to eliminate?</td></tr>
+<tr id="t1918A" class="h"><td><a href="#t1918A">19:18</a></td><td class="nd">justin_smith</td><td>jonathanj: for one thing, a multimethod can replace a cond over types</td></tr>
+<tr id="t1919A" class="h"><td><a href="#t1919A">19:19</a></td><td class="nd">jonathanj</td><td>bbloom: repeating `value`</td></tr>
+<tr id="t1920A" class="r"><td><a href="#t1920A">19:20</a></td><td class="nd">jonathanj</td><td>justin_smith: true, but it's quite a small task</td></tr>
+<tr id="t1922A" class="h"><td><a href="#t1922A">19:22</a></td><td class="ny">bbloom</td><td>jonathanj: you can 1) just deal w/ it, as it's not the problematic kind of repetition (spreading knowledge to multiple places) or 2) choose a smaller variable name or 3) probably can use condp</td></tr>
+<tr id="t1922A" class="h r"><td><a href="#t1922A">19:22</a></td><td class="ny">bbloom</td><td>(doc condp)</td></tr>
+<tr id="t1922A" class="h"><td><a href="#t1922A">19:22</a></td><td class="nl">clojurebot</td><td>&quot;([pred expr &amp; clauses]); Takes a binary predicate, an expression, and a set of clauses. Each clause can take the form of either: test-expr result-expr test-expr :&gt;&gt; result-fn Note :&gt;&gt; is an ordinary keyword. For each clause, (pred test-expr expr) is evaluated. If it returns logical true, the clause is a match. If a binary clause matches, the result-expr is returned, if a ternary clause matches, its result-fn, which must be a unary fu</td></tr>
+<tr id="t1923A" class="h"><td><a href="#t1923A">19:23</a></td><td class="no">bacon1989</td><td>bbloom: it was something I was going to suggest, but I think that would just lengthen his code</td></tr>
+<tr id="t1923A" class="h r"><td><a href="#t1923A">19:23</a></td><td class="no">bacon1989</td><td>IPersistentMap doesn't seem shorter to me ;)</td></tr>
+<tr id="t1926A" class="h"><td><a href="#t1926A">19:26</a></td><td class="ny">bbloom</td><td>,(let [value &quot;foo&quot;] (condp (fn [f _] (f value)) nil keyword? 1 symbol? 2 string? 3 number? 4))</td></tr>
+<tr id="t1926A" class="h"><td><a href="#t1926A">19:26</a></td><td class="nl">clojurebot</td><td>3</td></tr>
+<tr id="t1927A" class="h"><td><a href="#t1927A">19:27</a></td><td class="ny">bbloom</td><td>you can write a macro for that, or a custom macro built on cond</td></tr>
+<tr id="t1927A" class="h r"><td><a href="#t1927A">19:27</a></td><td class="ny">bbloom</td><td>or, really, just don't worry about that superficial repetition</td></tr>
+<tr id="t1929A" class="h r"><td><a href="#t1929A">19:29</a></td><td class="ny">bbloom</td><td>,(defmacro condv [v &amp; clauses] `(let [v# ~v] (condp (fn [f# _#] (f# v#)) nil ~@clauses)))</td></tr>
+<tr id="t1929A" class="h"><td><a href="#t1929A">19:29</a></td><td class="nl">clojurebot</td><td>#'sandbox/condv</td></tr>
+<tr id="t1929A" class="h"><td><a href="#t1929A">19:29</a></td><td class="ny">bbloom</td><td>,(condv &quot;foo&quot; keyword? 1 symbol? 2 string? 3 number? 4)</td></tr>
+<tr id="t1929A" class="h"><td><a href="#t1929A">19:29</a></td><td class="nl">clojurebot</td><td>3</td></tr>
+<tr id="t1929A" class="h"><td><a href="#t1929A">19:29</a></td><td class="ny">bbloom</td><td>,(condv 567 keyword? 1 symbol? 2 string? 3 number? 4)</td></tr>
+<tr id="t1929A" class="h"><td><a href="#t1929A">19:29</a></td><td class="nl">clojurebot</td><td>4</td></tr>
+<tr id="t1929A" class="h"><td><a href="#t1929A">19:29</a></td><td class="ny">bbloom</td><td>,(condv 'there-you-go keyword? 1 symbol? 2 string? 3 number? 4)</td></tr>
+<tr id="t1929A" class="h"><td><a href="#t1929A">19:29</a></td><td class="nl">clojurebot</td><td>2</td></tr>
+<tr id="t1930A"><td><a href="#t1930A">19:30</a></td><td class="nd">jonathanj</td><td>,(condp #(%1 %2) {} map? :map :else :unknown)</td></tr>
+<tr id="t1930A" class="h"><td><a href="#t1930A">19:30</a></td><td class="nl">clojurebot</td><td>:map</td></tr>
+<tr id="t1930A" class="h"><td><a href="#t1930A">19:30</a></td><td class="ny">bbloom</td><td>er duh, yeah, that works better than mine closing over value</td></tr>
+<tr id="t1930A" class="h r"><td><a href="#t1930A">19:30</a></td><td class="ny">bbloom</td><td>go with that</td></tr>
+<tr id="t1930A" class="h"><td><a href="#t1930A">19:30</a></td><td class="nd">jonathanj</td><td>is there another way of writing #(%1 %2)?</td></tr>
+<tr id="t1931A" class="h"><td><a href="#t1931A">19:31</a></td><td class="ny">bbloom</td><td>no</td></tr>
+<tr id="t1931A" class="h"><td><a href="#t1931A">19:31</a></td><td class="nm">amalloy</td><td>infinitely many ways, but none of them very good</td></tr>
+<tr id="t1931A" class="h"><td><a href="#t1931A">19:31</a></td><td class="ny">bbloom</td><td>yeah that</td></tr>
+<tr id="t1932A" class="h r"><td><a href="#t1932A">19:32</a></td><td class="ny">bbloom</td><td>,(defn call [f &amp; args] (apply f args))</td></tr>
+<tr id="t1932A" class="h"><td><a href="#t1932A">19:32</a></td><td class="nl">clojurebot</td><td>#'sandbox/call</td></tr>
+<tr id="t1932A" class="h"><td><a href="#t1932A">19:32</a></td><td class="ny">bbloom</td><td>,(condp call {} map? :map :else :unknown)</td></tr>
+<tr id="t1932A" class="h"><td><a href="#t1932A">19:32</a></td><td class="nl">clojurebot</td><td>:map</td></tr>
+<tr id="t1933A" class="h"><td><a href="#t1933A">19:33</a></td><td class="nd">jonathanj</td><td>(comp eval list) is what i came up with</td></tr>
+<tr id="t1933A" class="h r"><td><a href="#t1933A">19:33</a></td><td class="nd">jonathanj</td><td>but okay, i'll just use the macro</td></tr>
+<tr id="t1933A" class="h"><td><a href="#t1933A">19:33</a></td><td class="nd">justin_smith</td><td>eval for that is like using a chainsaw to do your nails</td></tr>
+<tr id="t1935A" class="h"><td><a href="#t1935A">19:35</a></td><td class="nm">amalloy</td><td>(inc justin_smith)</td></tr>
+<tr id="t1935A" class="h r"><td><a href="#t1935A">19:35</a></td><td class="nm">amalloy</td><td>lazybot pls</td></tr>
+<tr id="t1935A" class="h"><td><a href="#t1935A">19:35</a></td><td class="nl">clojurebot</td><td>Cool story bro.</td></tr>
+<tr id="t1935A" class="h"><td><a href="#t1935A">19:35</a></td><td class="nd">jonathanj</td><td>i generally assume that using anything like &quot;eval&quot; or &quot;exec&quot; in any language is like that :P</td></tr>
+<tr id="t2005A"><td><a href="#t2005A">20:05</a></td><td class="no">bacon1989</td><td>will there every come a day where clojure is written entirely in C, and has an FFI that works with C libraries fairly well</td></tr>
+<tr id="t2006A" class="h r"><td><a href="#t2006A">20:06</a></td><td class="no">bacon1989</td><td>not that i'm asking for it, I think it would be cool</td></tr>
+<tr id="t2006A" class="h r"><td><a href="#t2006A">20:06</a></td><td class="no">bacon1989</td><td>I would just love to see commandline tools written in clojure</td></tr>
+<tr id="t2007A" class="h r"><td><a href="#t2007A">20:07</a></td><td class="no">bacon1989</td><td>skummet definitely helps, but it's a crutch to the main problem</td></tr>
+<tr id="t2007A" class="h"><td><a href="#t2007A">20:07</a></td><td class="ny">bbloom</td><td>bacon1989: <a href="https://github.com/pixie-lang/pixie">https://github.com/pixie-lang/pixie</a></td></tr>
+<tr id="t2008A" class="h"><td><a href="#t2008A">20:08</a></td><td class="no">bacon1989</td><td>oh yeah, I think that's awesome</td></tr>
+<tr id="t2009A" class="h r"><td><a href="#t2009A">20:09</a></td><td class="no">bacon1989</td><td>but that's in 'pre-alpha'</td></tr>
+<tr id="t2009A" class="h r"><td><a href="#t2009A">20:09</a></td><td class="no">bacon1989</td><td>in time though</td></tr>
+<tr id="t2011A" class="r"><td><a href="#t2011A">20:11</a></td><td class="no">bacon1989</td><td>i'm liking the direction of pixie actually</td></tr>
+<tr id="t2011A" class="h r"><td><a href="#t2011A">20:11</a></td><td class="no">bacon1989</td><td>maybe I just need to be patient</td></tr>
+<tr id="t2012A" class="h r"><td><a href="#t2012A">20:12</a></td><td class="no">bacon1989</td><td>'clojure inspired lisp'</td></tr>
+<tr id="t2219A"><td><a href="#t2219A">22:19</a></td><td class="nr">jjttjj1</td><td>is there a way built into incanter to get a dataset from a sequence of maps keyed by the colnames?</td></tr>
+<tr id="t2221A" class="r"><td><a href="#t2221A">22:21</a></td><td class="nr">jjttjj1</td><td>found it, to-dataset works</td></tr>
+<tr id="t2318A"><td><a href="#t2318A">23:18</a></td><td class="nd">keramida</td><td>ma</td></tr>
+</tbody></table></main></body></html>

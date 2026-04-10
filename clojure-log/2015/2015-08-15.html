@@ -1,0 +1,254 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#clojure – 2015-08-15</title><link rel="stylesheet" href="../style.css"></head><body>
+<header class="sh"><a class="st" href="../index.html">#clojure logs</a><nav class="dn"><a href="2015-08-14.html">&larr;</a><span>2015-08-15</span><a href="2015-08-16.html">&rarr;</a></nav></header>
+<main><p class="dh">2015-08-15</p><table class="lg"><tbody>
+<tr id="t0041A"><td><a href="#t0041A">00:41</a></td><td class="np">mcktrtl</td><td>is it possible to give an async channel a custom string representation somehow? so like, if I do something like (let [ch (chan)] (println ch)) I'll see something I can identify and not &quot;clojure.core.async.impl.channels.ManyToManyChannel@25f32e46&quot;</td></tr>
+<tr id="t0051A"><td><a href="#t0051A">00:51</a></td><td class="nr">oddcully</td><td>mcktrtl: may with meta data?</td></tr>
+<tr id="t0051A" class="h r"><td><a href="#t0051A">00:51</a></td><td class="nr">oddcully</td><td>,(let [c (with-meta [] {:very :special})] (binding [*print-meta* true] (pr c)))</td></tr>
+<tr id="t0051A" class="h"><td><a href="#t0051A">00:51</a></td><td class="nl">clojurebot</td><td>^{:very :special} []</td></tr>
+<tr id="t0055A" class="h"><td><a href="#t0055A">00:55</a></td><td class="np">mcktrtl</td><td>(with-meta (chan) {:very :special}) -&gt; ClassCastException clojure.core.async.impl.channels.ManyToManyChannel cannot be cast to clojure.lang.IObj</td></tr>
+<tr id="t0055A" class="h r"><td><a href="#t0055A">00:55</a></td><td class="np">mcktrtl</td><td>am i doing that wrong?</td></tr>
+<tr id="t0112A"><td><a href="#t0112A">01:12</a></td><td class="nm">amalloy</td><td>channels don't support meta</td></tr>
+<tr id="t0112A" class="h r"><td><a href="#t0112A">01:12</a></td><td class="nm">amalloy</td><td>(is what that error message is saying)</td></tr>
+<tr id="t0118A" class="h"><td><a href="#t0118A">01:18</a></td><td class="np">mcktrtl</td><td>ahh ok :( thanks</td></tr>
+<tr id="t0119A" class="h"><td><a href="#t0119A">01:19</a></td><td class="n4">rhg135</td><td>I'd wrap it in a record/map</td></tr>
+<tr id="t0120A"><td><a href="#t0120A">01:20</a></td><td class="np">mcktrtl</td><td>like {:writer-ch (chan) :network-ch (chan)} ?</td></tr>
+<tr id="t0122A" class="h"><td><a href="#t0122A">01:22</a></td><td class="n4">rhg135</td><td>Yeah</td></tr>
+<tr id="t0123A" class="h r"><td><a href="#t0123A">01:23</a></td><td class="n4">rhg135</td><td>Or a record and define a print-method</td></tr>
+<tr id="t0123A" class="h"><td><a href="#t0123A">01:23</a></td><td class="np">mcktrtl</td><td>oh right, thanks. i guess i should have thought of that since i'm doing it already</td></tr>
+<tr id="t0124A" class="h"><td><a href="#t0124A">01:24</a></td><td class="n4">rhg135</td><td>Np</td></tr>
+<tr id="t0124A" class="h"><td><a href="#t0124A">01:24</a></td><td class="np">mcktrtl</td><td>i was just putting some logging in to a function that takes a channel as an argument and didn't think of the bigger picture</td></tr>
+<tr id="t0126A" class="h"><td><a href="#t0126A">01:26</a></td><td class="n4">rhg135</td><td>It's unfortunate there is no metadata on channels</td></tr>
+<tr id="t0157A"><td><a href="#t0157A">01:57</a></td><td class="nm">amalloy</td><td>rhg135: it's a little hard to imagine actually allowing it though, right? think of the consequences. (let [c (chan), c' (with-meta c {:blah true})] (go (&gt;! c 1)) (go (&lt;! c)) (go (&lt;! c'))). which of the two reads returns 1? either? both?</td></tr>
+<tr id="t0158A" class="h r"><td><a href="#t0158A">01:58</a></td><td class="nm">amalloy</td><td>with-meta is supposed to return a value that's indistinguishable from the input, but you can't really do that because channels are mutable objects, not values</td></tr>
+<tr id="t0158A" class="h r"><td><a href="#t0158A">01:58</a></td><td class="nm">amalloy</td><td>,(with-meta (atom 0) {:blah true})</td></tr>
+<tr id="t0158A" class="h"><td><a href="#t0158A">01:58</a></td><td class="nl">clojurebot</td><td>#error {\n :cause &quot;clojure.lang.Atom cannot be cast to clojure.lang.IObj&quot;\n :via\n [{:type java.lang.ClassCastException\n   :message &quot;clojure.lang.Atom cannot be cast to clojure.lang.IObj&quot;\n   :at [clojure.core$with_meta__4134 invokeStatic &quot;core.clj&quot; 217]}]\n :trace\n [[clojure.core$with_meta__4134 invokeStatic &quot;core.clj&quot; 217]\n  [clojure.core$with_meta__4134 invoke &quot;core.clj&quot; -1]\n  [sandbox$eval...</td></tr>
+<tr id="t0158A" class="h"><td><a href="#t0158A">01:58</a></td><td class="nm">amalloy</td><td>it doesn't work for atoms or refs either, for the same reason</td></tr>
+<tr id="t0159A" class="h r"><td><a href="#t0159A">01:59</a></td><td class="nm">amalloy</td><td>metadata on channels is such an obvious thing there's no way rich *forgot* to do it; there's got to be a reason why it's no good. i speculate that it's this reason, but maybe it's some other one</td></tr>
+<tr id="t0209A"><td><a href="#t0209A">02:09</a></td><td class="no">bacon1989</td><td>so who else is hoping that clojure takes over the COBOL market?</td></tr>
+<tr id="t0210A" class="r"><td><a href="#t0210A">02:10</a></td><td class="no">bacon1989</td><td>I was thinking of writing an FFI for it, since I think it could probably adopt a lot of interested fellows</td></tr>
+<tr id="t0217A" class="h"><td><a href="#t0217A">02:17</a></td><td class="nd">TEttinger</td><td>bacon1989: how would that work? I don't know if cobol usually runs on the JVM, but if it does then you probably wouldn't even need an FFI</td></tr>
+<tr id="t0226A"><td><a href="#t0226A">02:26</a></td><td class="nf">J_A_Work</td><td>TEttinger: there is a version of Visual COBOL that runs on the JVM apparently.</td></tr>
+<tr id="t0646A"><td><a href="#t0646A">06:46</a></td><td class="ng">devn</td><td>WickedShell: (set *warn-on-reflection* true). My emacs setup shows me by underlining in yellow the places I'm missing hints. Cursive does something similar IIRC.</td></tr>
+<tr id="t0655A"><td><a href="#t0655A">06:55</a></td><td class="n3">expez</td><td>devn: which package does that underlining?  squiggly-clojure?</td></tr>
+<tr id="t0852A"><td><a href="#t0852A">08:52</a></td><td class="n1">WickedShell</td><td>devn: right I'm familiar with that, however when I actually dump the heap very few of the instances caught by that are actually populating my 4 million instances of reflect (somewhere less then 1 percent). And I can't find enough in the object when looking at it in the heap dump to find it's origin</td></tr>
+<tr id="t1114A"><td><a href="#t1114A">11:14</a></td><td class="nn">joejag</td><td>Hello, I'm looking for help trying to figure out a simple way of solving a problem taking text from a collection until a condition is met: <a href="https://gist.github.com/joejag/5b19459f05a7cad977ff">https://gist.github.com/joejag/5b19459f05a7cad977ff</a></td></tr>
+<tr id="t1154A"><td><a href="#t1154A">11:54</a></td><td class="nd">justin_smith</td><td>,(reduce (fn [[s,n]e] (if (pos? n) [(str s (when (not-empty s) \,) e), (dec n)] (reduced s))) [&quot;&quot;,2] (clojure.string/split &quot;a,bb,ccc,dddd&quot; #&quot;,&quot;))</td></tr>
+<tr id="t1154A" class="h"><td><a href="#t1154A">11:54</a></td><td class="nl">clojurebot</td><td>&quot;a,bb&quot;</td></tr>
+<tr id="t1154A" class="h"><td><a href="#t1154A">11:54</a></td><td class="nd">justin_smith</td><td>that's a bit verbose, I guess</td></tr>
+<tr id="t1155A" class="h r"><td><a href="#t1155A">11:55</a></td><td class="nd">justin_smith</td><td>,(clojure.string/join \, (take 2 (clojure.string/split &quot;a,b,ccc,dddd&quot; #&quot;,&quot;)))</td></tr>
+<tr id="t1155A" class="h"><td><a href="#t1155A">11:55</a></td><td class="nl">clojurebot</td><td>&quot;a,b&quot;</td></tr>
+<tr id="t1202A"><td><a href="#t1202A">12:02</a></td><td class="n7">gfredericks</td><td>hello</td></tr>
+<tr id="t1202A" class="h"><td><a href="#t1202A">12:02</a></td><td class="np">kwladyka</td><td>why the same code as jar file has better performance then in REPL?</td></tr>
+<tr id="t1202A" class="h"><td><a href="#t1202A">12:02</a></td><td class="nd">justin_smith</td><td>because lein is slow</td></tr>
+<tr id="t1202A" class="h r"><td><a href="#t1202A">12:02</a></td><td class="nd">justin_smith</td><td>and so is nrepl</td></tr>
+<tr id="t1202A" class="h"><td><a href="#t1202A">12:02</a></td><td class="n7">gfredericks</td><td>kwladyka: presumably &quot;better performance&quot; is just startup time?</td></tr>
+<tr id="t1202A" class="h"><td><a href="#t1202A">12:02</a></td><td class="nd">justin_smith</td><td>the biggest difference you will see is startup time</td></tr>
+<tr id="t1203A" class="h r"><td><a href="#t1203A">12:03</a></td><td class="nd">justin_smith</td><td>yeah</td></tr>
+<tr id="t1203A" class="h"><td><a href="#t1203A">12:03</a></td><td class="np">kwladyka</td><td>justin_smith, but i am counting time as (time ...) so startup time doesn't matter? does it?</td></tr>
+<tr id="t1204A" class="h"><td><a href="#t1204A">12:04</a></td><td class="nd">justin_smith</td><td>the other difference is that lein uses a jvm arg that turns off hotspot</td></tr>
+<tr id="t1204A" class="h"><td><a href="#t1204A">12:04</a></td><td class="np">kwladyka</td><td>even more REPL started, load libraries and after then i run some command</td></tr>
+<tr id="t1204A" class="h"><td><a href="#t1204A">12:04</a></td><td class="nd">justin_smith</td><td>and usually with an uberjar you won't be turning that off, and for some code bases that can make a big difference</td></tr>
+<tr id="t1206A" class="h"><td><a href="#t1206A">12:06</a></td><td class="np">kwladyka</td><td>justin_smith, if i run java with -Xint can i check if it is that?</td></tr>
+<tr id="t1208A" class="h"><td><a href="#t1208A">12:08</a></td><td class="nd">justin_smith</td><td>kwladyka: yeah, that should test it</td></tr>
+<tr id="t1210A"><td><a href="#t1210A">12:10</a></td><td class="np">kwladyka</td><td>anyway i am writing article about how to improve algorithm performance. If you can share with me any interesting article which i can read to make something better will be great :)</td></tr>
+<tr id="t1214A" class="h r"><td><a href="#t1214A">12:14</a></td><td class="np">kwladyka</td><td>justin_smith, hmm i don't think it is because hotspot</td></tr>
+<tr id="t1214A" class="h r"><td><a href="#t1214A">12:14</a></td><td class="np">kwladyka</td><td>without hotspot it takes agaes, much much worst then REPL</td></tr>
+<tr id="t1215A" class="h"><td><a href="#t1215A">12:15</a></td><td class="nd">justin_smith</td><td>kwladyka: lein turns off hotspot</td></tr>
+<tr id="t1215A" class="h r"><td><a href="#t1215A">12:15</a></td><td class="nd">justin_smith</td><td>this is a documented fact</td></tr>
+<tr id="t1215A" class="h"><td><a href="#t1215A">12:15</a></td><td class="np">kwladyka</td><td>justin_smith, i understand but when i runed jar without hotspot it takes ages.... i couldn't even wait to finish counting</td></tr>
+<tr id="t1215A" class="h r"><td><a href="#t1215A">12:15</a></td><td class="np">kwladyka</td><td>hmm</td></tr>
+<tr id="t1215A" class="h r"><td><a href="#t1215A">12:15</a></td><td class="np">kwladyka</td><td>very strange</td></tr>
+<tr id="t1216A" class="h r"><td><a href="#t1216A">12:16</a></td><td class="np">kwladyka</td><td>based on that fact extremely strange :)</td></tr>
+<tr id="t1217A" class="h"><td><a href="#t1217A">12:17</a></td><td class="nd">justin_smith</td><td>kwladyka: you can use :jvm-opts ^:replace [&quot;-server&quot;] to see how lein repl performs with hotspot on</td></tr>
+<tr id="t1217A" class="h r"><td><a href="#t1217A">12:17</a></td><td class="nd">justin_smith</td><td>(that's a config you add to project.clj of course)</td></tr>
+<tr id="t1218A" class="h"><td><a href="#t1218A">12:18</a></td><td class="np">kwladyka</td><td>justin_smith, is it equal :jvm-opts [&quot;-Xms4g&quot; &quot;-Xmx4g&quot; &quot;-server&quot;]) ?</td></tr>
+<tr id="t1218A" class="h"><td><a href="#t1218A">12:18</a></td><td class="nd">justin_smith</td><td>no, your &quot;-server&quot; arg does nothing because you are not using the ^:replace metadata</td></tr>
+<tr id="t1218A" class="h"><td><a href="#t1218A">12:18</a></td><td class="np">kwladyka</td><td>ok</td></tr>
+<tr id="t1219A" class="h"><td><a href="#t1219A">12:19</a></td><td class="nd">justin_smith</td><td>so keep those opts, and throw in ^:replace as a metadta</td></tr>
+<tr id="t1219A" class="h r"><td><a href="#t1219A">12:19</a></td><td class="nd">justin_smith</td><td>kwladyka: the reason is that jvm opts are merged with the lein defaults, and those override the -server options, but ^:replace prevents that</td></tr>
+<tr id="t1221A"><td><a href="#t1221A">12:21</a></td><td class="np">kwladyka</td><td>you know so much about Clojure, are you close to develop clojure.core?</td></tr>
+<tr id="t1221A" class="h"><td><a href="#t1221A">12:21</a></td><td class="nd">justin_smith</td><td>kwladyka: I haven't really tried</td></tr>
+<tr id="t1221A" class="h r"><td><a href="#t1221A">12:21</a></td><td class="nd">justin_smith</td><td>I'm too lazy</td></tr>
+<tr id="t1222A" class="h"><td><a href="#t1222A">12:22</a></td><td class="np">kwladyka</td><td>but you looks like a guy with huge experience about Clojure :)</td></tr>
+<tr id="t1222A" class="h"><td><a href="#t1222A">12:22</a></td><td class="nd">justin_smith</td><td>yeah, I'm barely (and not really) meeting my deadlines at work though, and clojure.core doesn't even pay money</td></tr>
+<tr id="t1224A" class="h"><td><a href="#t1224A">12:24</a></td><td class="np">kwladyka</td><td>justin_smith, running with :jvm-opts ^:replace [&quot;-server&quot; &quot;-Xms4g&quot; &quot;-Xmx4g&quot;] didn't change the time</td></tr>
+<tr id="t1224A" class="h r"><td><a href="#t1224A">12:24</a></td><td class="np">kwladyka</td><td>maybe it has even few seconds more</td></tr>
+<tr id="t1225A" class="h r"><td><a href="#t1225A">12:25</a></td><td class="np">kwladyka</td><td>justin_smith, can i ask you what kind of software are you creating?</td></tr>
+<tr id="t1225A" class="h r"><td><a href="#t1225A">12:25</a></td><td class="np">kwladyka</td><td>justin_smith, yes with -server it is running even longer about few seconds</td></tr>
+<tr id="t1225A" class="h"><td><a href="#t1225A">12:25</a></td><td class="nd">justin_smith</td><td>kwladyka: a paid app for social media discovery</td></tr>
+<tr id="t1225A" class="h"><td><a href="#t1225A">12:25</a></td><td class="nd">timothyw</td><td>Quick question</td></tr>
+<tr id="t1226A" class="h r"><td><a href="#t1226A">12:26</a></td><td class="nd">timothyw</td><td>I want to print out a long list - but Clojure ellides some of it</td></tr>
+<tr id="t1226A" class="h r"><td><a href="#t1226A">12:26</a></td><td class="nd">timothyw</td><td>how can I print an entire list to string / edn</td></tr>
+<tr id="t1226A" class="h r"><td><a href="#t1226A">12:26</a></td><td class="nd">timothyw</td><td>… already tried pr , pr-str , etc</td></tr>
+<tr id="t1227A" class="h"><td><a href="#t1227A">12:27</a></td><td class="nd">justin_smith</td><td>,*print-length*</td></tr>
+<tr id="t1227A" class="h"><td><a href="#t1227A">12:27</a></td><td class="nl">clojurebot</td><td>5</td></tr>
+<tr id="t1227A" class="h"><td><a href="#t1227A">12:27</a></td><td class="nd">justin_smith</td><td>that value effects all of those printing methods</td></tr>
+<tr id="t1227A" class="h r"><td><a href="#t1227A">12:27</a></td><td class="nd">justin_smith</td><td>if it's set to nil, there will be no limit</td></tr>
+<tr id="t1227A" class="h"><td><a href="#t1227A">12:27</a></td><td class="np">kwladyka</td><td>timothyw, and i suggest use pprint &lt;- it is much more readable</td></tr>
+<tr id="t1227A" class="h"><td><a href="#t1227A">12:27</a></td><td class="nd">timothyw</td><td>a ha</td></tr>
+<tr id="t1227A" class="h"><td><a href="#t1227A">12:27</a></td><td class="nd">justin_smith</td><td>,(doc clojure.core/*print-length*)</td></tr>
+<tr id="t1227A" class="h"><td><a href="#t1227A">12:27</a></td><td class="nl">clojurebot</td><td>&quot;; *print-length* controls how many items of each collection the printer will print. If it is bound to logical false, there is no limit. Otherwise, it must be bound to an integer indicating the maximum number of items of each collection to print. If a collection contains more items, the printer will print items up to the limit followed by '...' to represent the remaining items. The root binding is...</td></tr>
+<tr id="t1228A" class="h"><td><a href="#t1228A">12:28</a></td><td class="nd">timothyw</td><td>kwladyka: yeah I definitely tried that</td></tr>
+<tr id="t1228A" class="h"><td><a href="#t1228A">12:28</a></td><td class="nd">justin_smith</td><td>timothyw: you can change the value with set! <a href="https://clojuredocs.org/clojure.core/*print-length*">https://clojuredocs.org/clojure.core/*print-length*</a></td></tr>
+<tr id="t1229A" class="h"><td><a href="#t1229A">12:29</a></td><td class="np">kwladyka</td><td>justin_smith, are you coding only in Clojure or you are polyglot?</td></tr>
+<tr id="t1229A" class="h"><td><a href="#t1229A">12:29</a></td><td class="nd">justin_smith</td><td>kwladyka: the app is 100% clojure unless you count like sql</td></tr>
+<tr id="t1230A"><td><a href="#t1230A">12:30</a></td><td class="np">kwladyka</td><td>justin_smith, nice</td></tr>
+<tr id="t1230A" class="h"><td><a href="#t1230A">12:30</a></td><td class="nd">timothyw</td><td>whew - awesome that does the trick</td></tr>
+<tr id="t1230A" class="h r"><td><a href="#t1230A">12:30</a></td><td class="nd">timothyw</td><td>cheers</td></tr>
+<tr id="t1231A" class="h"><td><a href="#t1231A">12:31</a></td><td class="np">kwladyka</td><td>justin_smith, BTW: do you have any idea why REPL is slower then jar? my tests didn't prove it is because hotspot. Even more when i runed jar with -Xint it takes much much longer then REPL.</td></tr>
+<tr id="t1232A" class="h"><td><a href="#t1232A">12:32</a></td><td class="nd">justin_smith</td><td>no, I don't know what the other difference would be</td></tr>
+<tr id="t1232A" class="h"><td><a href="#t1232A">12:32</a></td><td class="np">kwladyka</td><td>ok</td></tr>
+<tr id="t1232A" class="h r"><td><a href="#t1232A">12:32</a></td><td class="np">kwladyka</td><td>anyway it is strange REPL works faster then jar without hotspot...</td></tr>
+<tr id="t1233A" class="h r"><td><a href="#t1233A">12:33</a></td><td class="np">kwladyka</td><td>can i check if hotspot is runed in REPL?</td></tr>
+<tr id="t1233A" class="h"><td><a href="#t1233A">12:33</a></td><td class="nd">justin_smith</td><td>kwladyka: one difference, maybe is that lein does not turn on Xint, it uses the TieredCompilation=0 or something like that</td></tr>
+<tr id="t1233A" class="h r"><td><a href="#t1233A">12:33</a></td><td class="nd">justin_smith</td><td>kwladyka: iirc there is a vm flag that will make any runtime optimization decisions verbose...</td></tr>
+<tr id="t1234A" class="h"><td><a href="#t1234A">12:34</a></td><td class="np">kwladyka</td><td>justin_smith, but nothing really appear on screen, but maybe it can affect the time</td></tr>
+<tr id="t1235A" class="h"><td><a href="#t1235A">12:35</a></td><td class="nd">justin_smith</td><td>-XX:-PrintCompilation maybe</td></tr>
+<tr id="t1236A" class="h r"><td><a href="#t1236A">12:36</a></td><td class="nd">justin_smith</td><td><a href="http://www.oracle.com/technetwork/java/javase/tech/vmoptions-jsp-140102.html">http://www.oracle.com/technetwork/java/javase/tech/vmoptions-jsp-140102.html</a></td></tr>
+<tr id="t1239A" class="h"><td><a href="#t1239A">12:39</a></td><td class="np">kwladyka</td><td>justin_smith, i runed with this flag jar file and it doesn't change anything</td></tr>
+<tr id="t1510A"><td><a href="#t1510A">15:10</a></td><td class="nc">sdegutis</td><td>(remove nil?) is usually what you actually want as opposed to (keep)</td></tr>
+<tr id="t1512A" class="h"><td><a href="#t1512A">15:12</a></td><td class="nd">justin_smith</td><td>sdegutis: unless the alternative is (remove nil? (map ...)) because you should just use keep in that case</td></tr>
+<tr id="t1514A" class="h"><td><a href="#t1514A">15:14</a></td><td class="nc">sdegutis</td><td>justin_smith: false goes away in that case too</td></tr>
+<tr id="t1514A" class="h r"><td><a href="#t1514A">15:14</a></td><td class="nc">sdegutis</td><td>sometimes you want to keep true/false but remove nil</td></tr>
+<tr id="t1515A" class="h r"><td><a href="#t1515A">15:15</a></td><td class="nc">sdegutis</td><td>Like how booleans have three choices (true, false, file not found).</td></tr>
+<tr id="t1515A" class="h"><td><a href="#t1515A">15:15</a></td><td class="nd">justin_smith</td><td>,(keep identity [false true nil 1])</td></tr>
+<tr id="t1515A" class="h"><td><a href="#t1515A">15:15</a></td><td class="nl">clojurebot</td><td>(false true 1)</td></tr>
+<tr id="t1518A" class="h"><td><a href="#t1518A">15:18</a></td><td class="nc">sdegutis</td><td>Oh right, I misremembered (doc keep). It only does nil.</td></tr>
+<tr id="t1518A" class="h r"><td><a href="#t1518A">15:18</a></td><td class="nc">sdegutis</td><td>(keep identity) == (remove nil?)</td></tr>
+<tr id="t1519A" class="h r"><td><a href="#t1519A">15:19</a></td><td class="nc">sdegutis</td><td>But (remove nil?) expresses intent much more clearly though.</td></tr>
+<tr id="t1519A" class="h"><td><a href="#t1519A">15:19</a></td><td class="nd">justin_smith</td><td>sdegutis: what else would keep mean other than &quot;I don't want the nil results from this mapping&quot;</td></tr>
+<tr id="t1520A"><td><a href="#t1520A">15:20</a></td><td class="nc">sdegutis</td><td>&quot;keep&quot; isn't the problem, &quot;identity&quot; is.</td></tr>
+<tr id="t1520A" class="h r"><td><a href="#t1520A">15:20</a></td><td class="nc">sdegutis</td><td>remove nil? is much more English, keep identity is much more C++</td></tr>
+<tr id="t1520A" class="h"><td><a href="#t1520A">15:20</a></td><td class="nd">justin_smith</td><td>I mean I don't use (map identity ...) either</td></tr>
+<tr id="t1521A" class="h"><td><a href="#t1521A">15:21</a></td><td class="nc">sdegutis</td><td>keep identity makes use of more implications, remove nil? is completely straight forward</td></tr>
+<tr id="t1538A"><td><a href="#t1538A">15:38</a></td><td class="n7">gfredericks</td><td>,(doc keep)</td></tr>
+<tr id="t1538A" class="h"><td><a href="#t1538A">15:38</a></td><td class="nl">clojurebot</td><td>&quot;([f] [f coll]); Returns a lazy sequence of the non-nil results of (f item). Note, this means false return values will be included. f must be free of side-effects. Returns a transducer when no collection is provided.&quot;</td></tr>
+<tr id="t1538A" class="h"><td><a href="#t1538A">15:38</a></td><td class="n7">gfredericks</td><td>haha transducer</td></tr>
+<tr id="t1539A" class="h"><td><a href="#t1539A">15:39</a></td><td class="nd">justin_smith</td><td>gfredericks: combines map with (partial remove nil?), very useful</td></tr>
+<tr id="t1540A"><td><a href="#t1540A">15:40</a></td><td class="n7">gfredericks</td><td>yeah I've used it before; was just curious if it got transducified</td></tr>
+<tr id="t1540A" class="h"><td><a href="#t1540A">15:40</a></td><td class="nc">sdegutis</td><td>Question: are transducers effectively the same as partial'ing semantically (aside from their better performance)?</td></tr>
+<tr id="t1541A" class="h r"><td><a href="#t1541A">15:41</a></td><td class="nc">sdegutis</td><td>So is (partial remove even?) the same as (remove even?)?</td></tr>
+<tr id="t1542A" class="h"><td><a href="#t1542A">15:42</a></td><td class="n7">gfredericks</td><td>nope</td></tr>
+<tr id="t1542A" class="h r"><td><a href="#t1542A">15:42</a></td><td class="n7">gfredericks</td><td>they're a moderate haskellian headache</td></tr>
+<tr id="t1542A" class="h"><td><a href="#t1542A">15:42</a></td><td class="nc">sdegutis</td><td>How are they different? It seems like you could use them the same way.</td></tr>
+<tr id="t1542A" class="h r"><td><a href="#t1542A">15:42</a></td><td class="nc">sdegutis</td><td>Oh?</td></tr>
+<tr id="t1543A" class="h"><td><a href="#t1543A">15:43</a></td><td class="n7">gfredericks</td><td>(map foo) is a transducer, and a transducer is a function that transforms reducing functions</td></tr>
+<tr id="t1544A" class="h"><td><a href="#t1544A">15:44</a></td><td class="nc">sdegutis</td><td>Would you use them similarly to how you would with -&gt;&gt; just without the -&gt;&gt; ?</td></tr>
+<tr id="t1545A" class="h"><td><a href="#t1545A">15:45</a></td><td class="n7">gfredericks</td><td>you can combine them with comp</td></tr>
+<tr id="t1545A" class="h"><td><a href="#t1545A">15:45</a></td><td class="nc">sdegutis</td><td>I really don't understand transducers, I read the docs and I just don't fully get it.</td></tr>
+<tr id="t1545A" class="h"><td><a href="#t1545A">15:45</a></td><td class="n7">gfredericks</td><td>,(-&gt;&gt; (range) (map inc) (filter even?) (take 5))</td></tr>
+<tr id="t1545A" class="h"><td><a href="#t1545A">15:45</a></td><td class="nl">clojurebot</td><td>(2 4 6 8 10)</td></tr>
+<tr id="t1545A" class="h"><td><a href="#t1545A">15:45</a></td><td class="nc">Bronsa</td><td>sdegutis: transducers have nothing to do with currying</td></tr>
+<tr id="t1545A" class="h"><td><a href="#t1545A">15:45</a></td><td class="nc">sdegutis</td><td>So instead of (-&gt;&gt; (range) (remove even?) (take 3)) you would use ((comp (remove even?) (take 3)) (range))</td></tr>
+<tr id="t1545A" class="h"><td><a href="#t1545A">15:45</a></td><td class="n7">gfredericks</td><td>(reduce ((comp (map inc) (filter even?) (take 5)) conj) [] (range))</td></tr>
+<tr id="t1545A" class="h r"><td><a href="#t1545A">15:45</a></td><td class="n7">gfredericks</td><td>,(reduce ((comp (map inc) (filter even?) (take 5)) conj) [] (range))</td></tr>
+<tr id="t1545A" class="h"><td><a href="#t1545A">15:45</a></td><td class="nl">clojurebot</td><td>[2 4 6 8 10]</td></tr>
+<tr id="t1546A" class="h"><td><a href="#t1546A">15:46</a></td><td class="nc">sdegutis</td><td>##(-&gt;&gt; (range) (remove even?) (take 3))</td></tr>
+<tr id="t1546A" class="h"><td><a href="#t1546A">15:46</a></td><td class="nx">lazybot</td><td>⇒ (1 3 5)</td></tr>
+<tr id="t1546A" class="h"><td><a href="#t1546A">15:46</a></td><td class="n7">gfredericks</td><td>^ I had no idea if that would work or not</td></tr>
+<tr id="t1546A" class="h"><td><a href="#t1546A">15:46</a></td><td class="nc">sdegutis</td><td>##((comp (remove even?) (take 3)) (range))</td></tr>
+<tr id="t1546A" class="h"><td><a href="#t1546A">15:46</a></td><td class="nx">lazybot</td><td>⇒ #&lt;core$filter$fn__4361$fn__4362 clojure.core$filter$fn__4361$fn__4362@3e7b8ad4&gt;</td></tr>
+<tr id="t1546A" class="h"><td><a href="#t1546A">15:46</a></td><td class="nc">sdegutis</td><td>Ah.</td></tr>
+<tr id="t1546A" class="h"><td><a href="#t1546A">15:46</a></td><td class="n7">gfredericks</td><td>note how I made the transducer and then called it with conj as its arg</td></tr>
+<tr id="t1546A" class="h"><td><a href="#t1546A">15:46</a></td><td class="nc">sdegutis</td><td>Ahh.</td></tr>
+<tr id="t1547A" class="h"><td><a href="#t1547A">15:47</a></td><td class="n7">gfredericks</td><td>conj being the reducing function</td></tr>
+<tr id="t1547A" class="h"><td><a href="#t1547A">15:47</a></td><td class="nc">Bronsa</td><td>OTOH you shoulnd't use them that way</td></tr>
+<tr id="t1547A" class="h"><td><a href="#t1547A">15:47</a></td><td class="n7">gfredericks</td><td>:)</td></tr>
+<tr id="t1547A" class="h"><td><a href="#t1547A">15:47</a></td><td class="nc">Bronsa</td><td>transduce makes it easier</td></tr>
+<tr id="t1547A" class="h"><td><a href="#t1547A">15:47</a></td><td class="nc">sdegutis</td><td>How?</td></tr>
+<tr id="t1547A" class="h"><td><a href="#t1547A">15:47</a></td><td class="n7">gfredericks</td><td>yeah there's like three new functions for executing that stuff?</td></tr>
+<tr id="t1547A" class="h"><td><a href="#t1547A">15:47</a></td><td class="nd">justin_smith</td><td>the major difference with transducers is that you don't make a shitload of lazy-seqs that aren't actually useful</td></tr>
+<tr id="t1547A" class="h"><td><a href="#t1547A">15:47</a></td><td class="n7">gfredericks</td><td>~the major difference with transducers is that you don't make a shitload of lazy-seqs that aren't actually useful</td></tr>
+<tr id="t1547A" class="h"><td><a href="#t1547A">15:47</a></td><td class="nl">clojurebot</td><td>Roger.</td></tr>
+<tr id="t1548A" class="h"><td><a href="#t1548A">15:48</a></td><td class="nd">justin_smith</td><td>,(sequence (comp (map inc) (filter even?) (take 5)) (range))</td></tr>
+<tr id="t1548A" class="h"><td><a href="#t1548A">15:48</a></td><td class="nl">clojurebot</td><td>(2 4 6 8 10)</td></tr>
+<tr id="t1548A" class="h"><td><a href="#t1548A">15:48</a></td><td class="nc">Bronsa</td><td>(reduce ((comp (map inc) (filter even?) (take 5)) conj) [] (range)) is (transduce (comp (map inc) (filter even?) (take 5)) conj [] (range))</td></tr>
+<tr id="t1548A" class="h"><td><a href="#t1548A">15:48</a></td><td class="nc">sdegutis</td><td>justin_smith: so it's simply/merely/only a performance boost?</td></tr>
+<tr id="t1548A" class="h r"><td><a href="#t1548A">15:48</a></td><td class="nc">sdegutis</td><td>and serves no other purpos?</td></tr>
+<tr id="t1548A" class="h"><td><a href="#t1548A">15:48</a></td><td class="nc">Bronsa</td><td>no</td></tr>
+<tr id="t1548A" class="h"><td><a href="#t1548A">15:48</a></td><td class="nd">justin_smith</td><td>sdegutis: that's not the only purpose no</td></tr>
+<tr id="t1548A" class="h"><td><a href="#t1548A">15:48</a></td><td class="nc">Bronsa</td><td>sdegutis: read the transducers page in clojure.org</td></tr>
+<tr id="t1549A" class="h"><td><a href="#t1549A">15:49</a></td><td class="nd">justin_smith</td><td>it also makes it easier to implement the core functions like map, filter, etc. for new data sources (eg. channels in core.async)</td></tr>
+<tr id="t1549A" class="h r"><td><a href="#t1549A">15:49</a></td><td class="nd">justin_smith</td><td>(inc Bronsa)</td></tr>
+<tr id="t1549A" class="h"><td><a href="#t1549A">15:49</a></td><td class="nx">lazybot</td><td>⇒ 118</td></tr>
+<tr id="t1549A" class="h"><td><a href="#t1549A">15:49</a></td><td class="nd">justin_smith</td><td>yeah, that's the right answer</td></tr>
+<tr id="t1549A" class="h r"><td><a href="#t1549A">15:49</a></td><td class="nd">justin_smith</td><td><a href="http://clojure.org/transducers">http://clojure.org/transducers</a></td></tr>
+<tr id="t1550A"><td><a href="#t1550A">15:50</a></td><td class="nc">sdegutis</td><td>Bronsa: I'll read it again but last time I read that it seemed like useless marketing rhetoric</td></tr>
+<tr id="t1551A" class="h"><td><a href="#t1551A">15:51</a></td><td class="nc">Bronsa</td><td>sdegutis: you must have read a different page than the one I've read then</td></tr>
+<tr id="t1551A" class="h"><td><a href="#t1551A">15:51</a></td><td class="nd">justin_smith</td><td>sdegutis: can you point out which part of clojure.org/transducers is marketing?</td></tr>
+<tr id="t1551A" class="h"><td><a href="#t1551A">15:51</a></td><td class="nc">sdegutis</td><td>justin_smith: must be mixing it up with another page</td></tr>
+<tr id="t1604A"><td><a href="#t1604A">16:04</a></td><td class="nd">justin_smith</td><td>,(into [] (comp (map inc) (filter even?) (take 5)) (range)) ; equivalent to Bronsa's transduce</td></tr>
+<tr id="t1604A" class="h"><td><a href="#t1604A">16:04</a></td><td class="nl">clojurebot</td><td>[2 4 6 8 10]</td></tr>
+<tr id="t1634A"><td><a href="#t1634A">16:34</a></td><td class="n3">expez</td><td>If some user does (def foo 1) at the repl.  Is there some way to reset this, without knowing the names of the created vars?</td></tr>
+<tr id="t1635A" class="h r"><td><a href="#t1635A">16:35</a></td><td class="n3">expez</td><td><a href="https://github.com/clojure-emacs/cider/issues/1240">https://github.com/clojure-emacs/cider/issues/1240</a> I think this user has a pretty weird workflow, but if there's an easy fix to recommend that would be nice.</td></tr>
+<tr id="t1635A" class="h"><td><a href="#t1635A">16:35</a></td><td class="nd">justin_smith</td><td>expez: you could delete the user namespace. You could use ns-publics or ns-interns to see what all is defined.</td></tr>
+<tr id="t1636A" class="h r"><td><a href="#t1636A">16:36</a></td><td class="nd">justin_smith</td><td>expez: and yeah, like mentioned in that thread, tools.namespace is designed to do that kind of full ns reset</td></tr>
+<tr id="t1636A" class="h"><td><a href="#t1636A">16:36</a></td><td class="n3">expez</td><td>justin_smith: delete and recreate the namespace?  That seems like the simplest thing that could possibly work.</td></tr>
+<tr id="t1636A" class="h"><td><a href="#t1636A">16:36</a></td><td class="nm">amalloy</td><td>remove-ns is the easy answer, but then you lose the ns mappings to vars in other namespaces</td></tr>
+<tr id="t1637A" class="h r"><td><a href="#t1637A">16:37</a></td><td class="nm">amalloy</td><td>,(doc ns-interns)</td></tr>
+<tr id="t1637A" class="h"><td><a href="#t1637A">16:37</a></td><td class="nl">clojurebot</td><td>&quot;([ns]); Returns a map of the intern mappings for the namespace.&quot;</td></tr>
+<tr id="t1637A" class="h"><td><a href="#t1637A">16:37</a></td><td class="n3">expez</td><td>justin_smith: tools.namespace is limited to undef vars existing in the project, though, right?  Anything created at the repl won't be affected?</td></tr>
+<tr id="t1637A" class="h"><td><a href="#t1637A">16:37</a></td><td class="nm">amalloy</td><td>,(ns-interns *ns*)</td></tr>
+<tr id="t1637A" class="h"><td><a href="#t1637A">16:37</a></td><td class="nd">justin_smith</td><td>expez: it restarts namespaces from scratch, removing definitions that are not reflected in the source</td></tr>
+<tr id="t1637A" class="h"><td><a href="#t1637A">16:37</a></td><td class="nl">clojurebot</td><td>{}</td></tr>
+<tr id="t1637A" class="h"><td><a href="#t1637A">16:37</a></td><td class="nm">amalloy</td><td>,(def foo 1)</td></tr>
+<tr id="t1637A" class="h"><td><a href="#t1637A">16:37</a></td><td class="nl">clojurebot</td><td>#'sandbox/foo</td></tr>
+<tr id="t1637A" class="h"><td><a href="#t1637A">16:37</a></td><td class="nm">amalloy</td><td>,(ns-interns *ns*)</td></tr>
+<tr id="t1637A" class="h"><td><a href="#t1637A">16:37</a></td><td class="nl">clojurebot</td><td>{foo #'sandbox/foo}</td></tr>
+<tr id="t1637A" class="h"><td><a href="#t1637A">16:37</a></td><td class="n3">expez</td><td>The user reports trying cider-refresh, which calls out to tools.namespace :/</td></tr>
+<tr id="t1638A" class="h"><td><a href="#t1638A">16:38</a></td><td class="nd">justin_smith</td><td>oh, OK. So yeah, either using ns-interns and selectively ns-unmap to delete bindings, or destroy and recreate the ns</td></tr>
+<tr id="t1639A" class="h"><td><a href="#t1639A">16:39</a></td><td class="n3">expez</td><td>Can you think of any reason to prefer one over the other?  Seems like an easy feature to implement, though I'm not sure it'll get widely used heh</td></tr>
+<tr id="t1640A"><td><a href="#t1640A">16:40</a></td><td class="nd">justin_smith</td><td>expez: seems like it wouldn't be hard to implement a function that would take out all definitions and bindings from a namespace, and then use refer-clojure to get the defaults back</td></tr>
+<tr id="t1641A" class="h"><td><a href="#t1641A">16:41</a></td><td class="n3">expez</td><td>indeed, thanks guys!</td></tr>
+<tr id="t1641A" class="h r"><td><a href="#t1641A">16:41</a></td><td class="n3">expez</td><td>(do (inc amalloy) (inc justin_smith))</td></tr>
+<tr id="t1642A" class="h r"><td><a href="#t1642A">16:42</a></td><td class="n3">expez</td><td>suppose that was too much to ask for, clojurebot :)</td></tr>
+<tr id="t1642A" class="h"><td><a href="#t1642A">16:42</a></td><td class="nm">amalloy</td><td>justin_smith: if you use ns-interns you won't lose the defaults</td></tr>
+<tr id="t1642A" class="h"><td><a href="#t1642A">16:42</a></td><td class="nd">justin_smith</td><td>amalloy: but then you also wouldn't unmap required namespaces right?</td></tr>
+<tr id="t1643A" class="h r"><td><a href="#t1643A">16:43</a></td><td class="nd">justin_smith</td><td>expez: lazybot is not nearly so clever, inc is a pseudo-syntax</td></tr>
+<tr id="t1643A" class="h"><td><a href="#t1643A">16:43</a></td><td class="nm">amalloy</td><td>was that a requirement?</td></tr>
+<tr id="t1643A" class="h"><td><a href="#t1643A">16:43</a></td><td class="nd">justin_smith</td><td>perhaps only in my imagination :)</td></tr>
+<tr id="t1643A" class="h"><td><a href="#t1643A">16:43</a></td><td class="nm">amalloy</td><td>in mine it was a requirement to leave them alone</td></tr>
+<tr id="t1644A" class="h"><td><a href="#t1644A">16:44</a></td><td class="nd">justin_smith</td><td>a full tools.namespace refresh would get rid of any require that wasn't reflected in the ns definition on disk iirc</td></tr>
+<tr id="t1712A"><td><a href="#t1712A">17:12</a></td><td class="nw">biellls</td><td>Hi, I've been following the clojurescript tutorial on OS X and I can't get this section (<a href="https://github.com/clojure/clojurescript/wiki/Quick-Start#less-boilerplate)">https://github.com/clojure/clojurescript/wiki/Quick-Start#less-boilerplate)</a> to work properly</td></tr>
+<tr id="t1713A" class="h r"><td><a href="#t1713A">17:13</a></td><td class="nw">biellls</td><td>I have changed build.clj and index.html as indicated, but i get Uncaught ReferenceError: goog is not defined(anonymous function) @ main.js:1</td></tr>
+<tr id="t1744A"><td><a href="#t1744A">17:44</a></td><td class="nn">arkh</td><td>biellis: would you be able to upload what you have so far somewhere?</td></tr>
+<tr id="t1746A" class="h"><td><a href="#t1746A">17:46</a></td><td class="nw">biellls</td><td>Sure, I will post it on github in a sec</td></tr>
+<tr id="t1753A" class="r"><td><a href="#t1753A">17:53</a></td><td class="nw">biellls</td><td>arkh: Nevermind, I just realized that it was because i had initially added build.clj in src, and my emacs buffer was still saving my edits there even though I had moved the file. Thanks for your help anyways</td></tr>
+<tr id="t1754A" class="h"><td><a href="#t1754A">17:54</a></td><td class="nn">arkh</td><td>biellls: cool</td></tr>
+<tr id="t1838A"><td><a href="#t1838A">18:38</a></td><td class="n5">dfcarpenterak</td><td>Hi everyone, I’m an intermediate javascript developer who made my way to Clojure (also been playing with Elixir as well) through looking into solutions for concurrency/scalability problems with nodejs. Also, I’ve also been using React js + immutable js on the front end and been really enjoying that as well. Anyways, as I slowly become more familiar with Clojure I was wondering if anyone could point me to what are</td></tr>
+<tr id="t1838A" class="h r"><td><a href="#t1838A">18:38</a></td><td class="n5">dfcarpenterak</td><td> considered well designed web-focused open source clojure apps. I’m looking for apps + any reading materials through which I can glean good general architectural recommendations for scalable concurrent clojure apps.</td></tr>
+<tr id="t1854A"><td><a href="#t1854A">18:54</a></td><td class="nd">TEttinger</td><td>dfcarpenterak: hm, good question.  I don't write web apps, but I think the closest you'll find to an open source _complete_ web app is libraries that have been open sourced from a closed-source commercial venture. I suspect there's not enough motivation to open source a large app and allow a competitor access to your app's internals... there's likely some good architecture advice on dev blogs though.</td></tr>
+<tr id="t1855A" class="h r"><td><a href="#t1855A">18:55</a></td><td class="nd">TEttinger</td><td>Om is likely something you want to look into, it's ReactJS-based</td></tr>
+<tr id="t1855A" class="h r"><td><a href="#t1855A">18:55</a></td><td class="nd">TEttinger</td><td>or was it Rx</td></tr>
+<tr id="t1856A" class="h"><td><a href="#t1856A">18:56</a></td><td class="n5">dfcarpenterak</td><td>Yeah, I have been playing around with Reagent + reframe also</td></tr>
+<tr id="t1856A" class="h"><td><a href="#t1856A">18:56</a></td><td class="nd">TEttinger</td><td>I can't keep track of all this stuff I don't use :)</td></tr>
+<tr id="t1856A" class="h"><td><a href="#t1856A">18:56</a></td><td class="n5">dfcarpenterak</td><td><a href="https://github.com/Day8/re-frame">https://github.com/Day8/re-frame</a></td></tr>
+<tr id="t1935A"><td><a href="#t1935A">19:35</a></td><td class="nz">domokato</td><td>why is there no dissoc-in?</td></tr>
+<tr id="t2004A"><td><a href="#t2004A">20:04</a></td><td class="n7">gfredericks</td><td>I think because there aren't obvious semantics for such a function</td></tr>
+<tr id="t2005A" class="h r"><td><a href="#t2005A">20:05</a></td><td class="n7">gfredericks</td><td>but I might be confusing it with something else</td></tr>
+<tr id="t2006A" class="h"><td><a href="#t2006A">20:06</a></td><td class="nd">justin_smith</td><td>what should (dissoc-in {} [:a :b] :c) return?</td></tr>
+<tr id="t2009A" class="h"><td><a href="#t2009A">20:09</a></td><td class="n7">gfredericks</td><td>I imagine the call would just be (dissoc-in {} [:a :b])</td></tr>
+<tr id="t2010A"><td><a href="#t2010A">20:10</a></td><td class="nd">justin_smith</td><td>oh, right, of course</td></tr>
+<tr id="t2010A" class="h r"><td><a href="#t2010A">20:10</a></td><td class="nd">justin_smith</td><td>I still don't know what it would return</td></tr>
+<tr id="t2019A" class="h"><td><a href="#t2019A">20:19</a></td><td class="n7">gfredericks</td><td>either {} or nil</td></tr>
+<tr id="t2019A" class="h r"><td><a href="#t2019A">20:19</a></td><td class="n7">gfredericks</td><td>apparently there is such a function in core.incubator wherever that is, so we could go look at it</td></tr>
+<tr id="t2021A"><td><a href="#t2021A">20:21</a></td><td class="nd">justin_smith</td><td><a href="https://github.com/clojure/core.incubator/blob/master/src/main/clojure/clojure/core/incubator.clj#L62">https://github.com/clojure/core.incubator/blob/master/src/main/clojure/clojure/core/incubator.clj#L62</a></td></tr>
+<tr id="t2025A" class="h r"><td><a href="#t2025A">20:25</a></td><td class="nd">justin_smith</td><td><a href="https://www.refheap.com/108261">https://www.refheap.com/108261</a></td></tr>
+<tr id="t2026A" class="h"><td><a href="#t2026A">20:26</a></td><td class="nn">AWizzArd</td><td>Maybe something like (update-in m [k1 k2 k3] dissoc :key)</td></tr>
+<tr id="t2026A" class="h"><td><a href="#t2026A">20:26</a></td><td class="nd">justin_smith</td><td>AWizzArd: on my refheap paste you can see what the version from incubator does</td></tr>
+<tr id="t2042A"><td><a href="#t2042A">20:42</a></td><td class="nd">hiredman</td><td>I have this kademlia implementation I am playing with, and it stores some information as a vectors, but that information could just be stored as ByteBuffers, but when I make that change it causes a stackflow where all the frames are at clojure.lang.PersistentHashMap$BitmapIndexedNode.assoc(PersistentHashMap.java:693)</td></tr>
+<tr id="t2043A" class="h r"><td><a href="#t2043A">20:43</a></td><td class="nd">hiredman</td><td>:/</td></tr>
+<tr id="t2053A"><td><a href="#t2053A">20:53</a></td><td class="nc">Bronsa</td><td>hiredman: how does PHM come into play?</td></tr>
+<tr id="t2107A"><td><a href="#t2107A">21:07</a></td><td class="nd">hiredman</td><td>the vectors/bytebuffers are stored in a set in a map</td></tr>
+<tr id="t2108A" class="h r"><td><a href="#t2108A">21:08</a></td><td class="nd">hiredman</td><td>which is stored in a record, in a map, in a atom</td></tr>
+<tr id="t2108A" class="h r"><td><a href="#t2108A">21:08</a></td><td class="nd">hiredman</td><td>so I am not even sure which map level is the one that starts stacking</td></tr>
+<tr id="t2117A" class="r"><td><a href="#t2117A">21:17</a></td><td class="nd">hiredman</td><td>ah, it must be related to bytebuffer's crazy .hashCode calculation, it changes depending on how many bytes are remaining</td></tr>
+<tr id="t2119A" class="h"><td><a href="#t2119A">21:19</a></td><td class="nm">amalloy</td><td>sounds right to me. using anything mutable as a map key goes wrong pretty fast</td></tr>
+<tr id="t2120A"><td><a href="#t2120A">21:20</a></td><td class="nd">hiredman</td><td>yeah, but I often have something is just a chunk of bytes, which is a perfectly fine value, the jvm just doesn't have a great type for it</td></tr>
+<tr id="t2121A" class="h r"><td><a href="#t2121A">21:21</a></td><td class="nd">hiredman</td><td>bytebuffers are almost not terrible, they have value equality and hashing, but the value is dependent on all the mark and position stuff</td></tr>
+<tr id="t2121A" class="h r"><td><a href="#t2121A">21:21</a></td><td class="nd">hiredman</td><td>Strings are immutable, but double the storage space and cause lots of copying</td></tr>
+<tr id="t2200A"><td><a href="#t2200A">22:00</a></td><td class="n7">gfredericks</td><td>double the storage space?</td></tr>
+<tr id="t2200A" class="h"><td><a href="#t2200A">22:00</a></td><td class="nd">justin_smith</td><td>gfredericks: bytes stored as utf16 is my guess</td></tr>
+<tr id="t2200A" class="h r"><td><a href="#t2200A">22:00</a></td><td class="nd">justin_smith</td><td>just a guess though</td></tr>
+<tr id="t2201A" class="h"><td><a href="#t2201A">22:01</a></td><td class="n7">gfredericks</td><td>just to make charAt fast?</td></tr>
+</tbody></table></main></body></html>

@@ -1,0 +1,638 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#clojure – 2014-12-21</title><link rel="stylesheet" href="../style.css"></head><body>
+<header class="sh"><a class="st" href="../index.html">#clojure logs</a><nav class="dn"><a href="2014-12-20.html">&larr;</a><span>2014-12-21</span><a href="2014-12-22.html">&rarr;</a></nav></header>
+<main><p class="dh">2014-12-21</p><table class="lg"><tbody>
+<tr id="t0153A"><td><a href="#t0153A">01:53</a></td><td class="nz">kenrestivo</td><td>hmm, buffering in async channels is kind of ruining my day now too. seems it takes 3 or 4 repetitions of a message before it actually gets handled by any of the listening threads</td></tr>
+<tr id="t0154A" class="h"><td><a href="#t0154A">01:54</a></td><td class="n6">raspasov</td><td>kenrestivo: what's the problem?</td></tr>
+<tr id="t0155A" class="h"><td><a href="#t0155A">01:55</a></td><td class="nz">kenrestivo</td><td>i've got a message bus with pub/sub. several listeners. i send a message... takes 3 or 4 repetitions before any of the listeners seem to get it. and then there's like a 1-second delay after that last message before it goes through</td></tr>
+<tr id="t0156A" class="h"><td><a href="#t0156A">01:56</a></td><td class="n6">raspasov</td><td>networked pub/sub or in-process only?</td></tr>
+<tr id="t0156A" class="h r"><td><a href="#t0156A">01:56</a></td><td class="n6">raspasov</td><td>i.e. pub/sub over core.async only (local, in process) or via some external queue ?</td></tr>
+<tr id="t0158A" class="h"><td><a href="#t0158A">01:58</a></td><td class="nz">kenrestivo</td><td>in-process</td></tr>
+<tr id="t0159A" class="h r"><td><a href="#t0159A">01:59</a></td><td class="nz">kenrestivo</td><td>just core.async, no other queues. the message bus has a buffer though</td></tr>
+<tr id="t0159A" class="h r"><td><a href="#t0159A">01:59</a></td><td class="nz">kenrestivo</td><td>i'm wondering what the typical/expected latency would be for such a thing?</td></tr>
+<tr id="t0200A"><td><a href="#t0200A">02:00</a></td><td class="n6">raspasov</td><td>not 100% sure but should be pretty fast - what do you mean by 3-4 repetitions ?</td></tr>
+<tr id="t0200A" class="h r"><td><a href="#t0200A">02:00</a></td><td class="n6">raspasov</td><td>3-4 repetitions of what?</td></tr>
+<tr id="t0200A" class="h"><td><a href="#t0200A">02:00</a></td><td class="nz">kenrestivo</td><td>i have to send the same message, repetitively, before it gets received</td></tr>
+<tr id="t0201A" class="h"><td><a href="#t0201A">02:01</a></td><td class="n6">raspasov</td><td>that's definitely weird, it's either a bug, or you're using something wrong, how are you trying to take from the channel?</td></tr>
+<tr id="t0201A" class="h"><td><a href="#t0201A">02:01</a></td><td class="nz">kenrestivo</td><td>and, interestingly, it only gets received fewer times than it was sent. it's as if the other sends are lost</td></tr>
+<tr id="t0201A" class="h r"><td><a href="#t0201A">02:01</a></td><td class="nz">kenrestivo</td><td>takes are in a loop in a future</td></tr>
+<tr id="t0201A" class="h"><td><a href="#t0201A">02:01</a></td><td class="n6">raspasov</td><td>do you have gist?</td></tr>
+<tr id="t0202A" class="h"><td><a href="#t0202A">02:02</a></td><td class="nz">kenrestivo</td><td>i could try to distill one down</td></tr>
+<tr id="t0203A" class="h"><td><a href="#t0203A">02:03</a></td><td class="n6">raspasov</td><td>your take should look something like (go (loop [] (println &quot;got val on a chan::&quot; (&lt;! my-chan)) (recur)))</td></tr>
+<tr id="t0203A" class="h r"><td><a href="#t0203A">02:03</a></td><td class="n6">raspasov</td><td>yea that would be helpful, hard to talk without code :)</td></tr>
+<tr id="t0204A" class="h"><td><a href="#t0204A">02:04</a></td><td class="nz">kenrestivo</td><td>well there are a lot of moving parts.</td></tr>
+<tr id="t0204A" class="h r"><td><a href="#t0204A">02:04</a></td><td class="nz">kenrestivo</td><td>there are two pubs, off of one message bus, in several namespaces, etc</td></tr>
+<tr id="t0204A" class="h r"><td><a href="#t0204A">02:04</a></td><td class="nz">kenrestivo</td><td>but yeah, let me paste something</td></tr>
+<tr id="t0205A" class="h"><td><a href="#t0205A">02:05</a></td><td class="n6">raspasov</td><td>are you using the core.async pub/sub stuff or building your own? last I remember the core.async pub/sub was experimental</td></tr>
+<tr id="t0206A" class="h"><td><a href="#t0206A">02:06</a></td><td class="nz">kenrestivo</td><td>the core of it is just this <a href="https://www.refheap.com/95237">https://www.refheap.com/95237</a></td></tr>
+<tr id="t0206A" class="h r"><td><a href="#t0206A">02:06</a></td><td class="nz">kenrestivo</td><td>hmm, i didn't realize i was gonna get cut that badly, but i'm not surprised.</td></tr>
+<tr id="t0206A" class="h"><td><a href="#t0206A">02:06</a></td><td class="n6">raspasov</td><td>first of all, use (thread) instead of (future)</td></tr>
+<tr id="t0207A" class="h r"><td><a href="#t0207A">02:07</a></td><td class="n6">raspasov</td><td>not sure what's the difference, but that's the recommended way to do it I beliee</td></tr>
+<tr id="t0207A" class="h r"><td><a href="#t0207A">02:07</a></td><td class="n6">raspasov</td><td>I think there is some</td></tr>
+<tr id="t0208A" class="h"><td><a href="#t0208A">02:08</a></td><td class="nz">kenrestivo</td><td>the difference is that a channel is returned from thread. i don't care about the result, so i was usnig a future instead (also can future-cancel)</td></tr>
+<tr id="t0208A" class="h r"><td><a href="#t0208A">02:08</a></td><td class="nz">kenrestivo</td><td>i don't see any notes about pub/sub being experimental, but all of async is alpha, so i'm not too surprised</td></tr>
+<tr id="t0209A" class="h"><td><a href="#t0209A">02:09</a></td><td class="n6">raspasov</td><td>yea I don't see it either</td></tr>
+<tr id="t0209A" class="h r"><td><a href="#t0209A">02:09</a></td><td class="n6">raspasov</td><td>in general it has been pretty solid for me, but I haven't used to pub/sub part of it</td></tr>
+<tr id="t0210A" class="r"><td><a href="#t0210A">02:10</a></td><td class="n6">raspasov</td><td>is that drop happening under load or just when you put values one by one?</td></tr>
+<tr id="t0210A" class="h r"><td><a href="#t0210A">02:10</a></td><td class="n6">raspasov</td><td>I also see &quot;Items received when there are no matching subs get dropped.&quot;</td></tr>
+<tr id="t0210A" class="h r"><td><a href="#t0210A">02:10</a></td><td class="n6">raspasov</td><td><a href="http://clojure.github.io/core.async/#clojure.core.async/pub">http://clojure.github.io/core.async/#clojure.core.async/pub</a></td></tr>
+<tr id="t0211A" class="h r"><td><a href="#t0211A">02:11</a></td><td class="n6">raspasov</td><td>are your subs active when the first messages gets put on the pub channel?</td></tr>
+<tr id="t0213A" class="h"><td><a href="#t0213A">02:13</a></td><td class="nz">kenrestivo</td><td>no load, just testing.</td></tr>
+<tr id="t0213A" class="h r"><td><a href="#t0213A">02:13</a></td><td class="nz">kenrestivo</td><td>the subs are active, yes.</td></tr>
+<tr id="t0214A" class="h r"><td><a href="#t0214A">02:14</a></td><td class="nz">kenrestivo</td><td>i'm starting to think i might be rearchitecting the whole app without async soon.</td></tr>
+<tr id="t0215A" class="h"><td><a href="#t0215A">02:15</a></td><td class="n6">raspasov</td><td>I bet there's something weird with what you're doing, I highly doubt there's a glaring bug that no-one has noticed that's so elementary, but yes - async is a tool for special cases and you should make sure you need it before you use it, esp this pub/sub</td></tr>
+<tr id="t0215A" class="h r"><td><a href="#t0215A">02:15</a></td><td class="n6">raspasov</td><td>I've been using channels for a while and never felt the need to use pub/sub</td></tr>
+<tr id="t0216A" class="h"><td><a href="#t0216A">02:16</a></td><td class="nz">kenrestivo</td><td>that'd be a less drastic step: i could blow off this message bus idea and just pass channels around instead</td></tr>
+<tr id="t0218A" class="h r"><td><a href="#t0218A">02:18</a></td><td class="nz">kenrestivo</td><td>the idea of decoupling everything was very attractive. but now i'm wondering if it just is making things more complex than necessary.</td></tr>
+<tr id="t0222A"><td><a href="#t0222A">02:22</a></td><td class="ny">crispin</td><td>hey peeps! How do i eval an expression with a macro in it?</td></tr>
+<tr id="t0222A" class="h r"><td><a href="#t0222A">02:22</a></td><td class="ny">crispin</td><td>I can do this</td></tr>
+<tr id="t0222A" class="h r"><td><a href="#t0222A">02:22</a></td><td class="ny">crispin</td><td>,(eval '(map inc [1 2 3]))</td></tr>
+<tr id="t0222A" class="h"><td><a href="#t0222A">02:22</a></td><td class="nl">clojurebot</td><td>(2 3 4)</td></tr>
+<tr id="t0223A" class="h"><td><a href="#t0223A">02:23</a></td><td class="ny">crispin</td><td>but I cant do this</td></tr>
+<tr id="t0223A" class="h r"><td><a href="#t0223A">02:23</a></td><td class="ny">crispin</td><td>,(eval '(doseq [i [1 2 3]] (inc i)))</td></tr>
+<tr id="t0223A" class="h"><td><a href="#t0223A">02:23</a></td><td class="nl">clojurebot</td><td>nil</td></tr>
+<tr id="t0223A" class="h"><td><a href="#t0223A">02:23</a></td><td class="ny">crispin</td><td>doseq is a macro. Putting in macroexpand doesnt fix it</td></tr>
+<tr id="t0224A" class="h"><td><a href="#t0224A">02:24</a></td><td class="nz">kenrestivo</td><td>doseq returns nil, it's side-effecting</td></tr>
+<tr id="t0224A" class="h"><td><a href="#t0224A">02:24</a></td><td class="ny">crispin</td><td>ahahhhhhahah</td></tr>
+<tr id="t0224A" class="h r"><td><a href="#t0224A">02:24</a></td><td class="ny">crispin</td><td>ffs</td></tr>
+<tr id="t0224A" class="h"><td><a href="#t0224A">02:24</a></td><td class="nz">kenrestivo</td><td>you meant &quot;for&quot; not &quot;doseq&quot;?</td></tr>
+<tr id="t0224A" class="h"><td><a href="#t0224A">02:24</a></td><td class="ny">crispin</td><td>,(eval '(doall (for [i [1 2 3]] (inc i))))</td></tr>
+<tr id="t0224A" class="h"><td><a href="#t0224A">02:24</a></td><td class="nl">clojurebot</td><td>(2 3 4)</td></tr>
+<tr id="t0224A" class="h"><td><a href="#t0224A">02:24</a></td><td class="ny">crispin</td><td>haha yeah</td></tr>
+<tr id="t0225A" class="h r"><td><a href="#t0225A">02:25</a></td><td class="ny">crispin</td><td>thanks kenrestivo</td></tr>
+<tr id="t0225A" class="h"><td><a href="#t0225A">02:25</a></td><td class="nz">kenrestivo</td><td>np</td></tr>
+<tr id="t0225A" class="h"><td><a href="#t0225A">02:25</a></td><td class="ny">crispin</td><td>so eval lazyseq will expand the seq, not just return the lazyseq?</td></tr>
+<tr id="t0225A" class="h r"><td><a href="#t0225A">02:25</a></td><td class="ny">crispin</td><td>,(eval '(for [i [1 2 3]] (inc i)))</td></tr>
+<tr id="t0225A" class="h"><td><a href="#t0225A">02:25</a></td><td class="nl">clojurebot</td><td>(2 3 4)</td></tr>
+<tr id="t0225A" class="h"><td><a href="#t0225A">02:25</a></td><td class="ny">crispin</td><td>right</td></tr>
+<tr id="t0227A" class="h"><td><a href="#t0227A">02:27</a></td><td class="n6">raspasov</td><td>kenrestivo: check this out <a href="https://gist.github.com/raspasov/81c678961b6292eebe04">https://gist.github.com/raspasov/81c678961b6292eebe04</a></td></tr>
+<tr id="t0227A" class="h r"><td><a href="#t0227A">02:27</a></td><td class="n6">raspasov</td><td>seemed to work for me</td></tr>
+<tr id="t0228A" class="h r"><td><a href="#t0228A">02:28</a></td><td class="n6">raspasov</td><td>I get the published message on both subscribers</td></tr>
+<tr id="t0232A"><td><a href="#t0232A">02:32</a></td><td class="nz">kenrestivo</td><td>yeah, my test code works too, and did, before i weaved it into the app</td></tr>
+<tr id="t0233A" class="h r"><td><a href="#t0233A">02:33</a></td><td class="nz">kenrestivo</td><td>everything worked fine, which is why i felt safe goign with this approach. of course, now that it's into the app which is all built out, it's not working :-/</td></tr>
+<tr id="t0234A" class="h r"><td><a href="#t0234A">02:34</a></td><td class="nz">kenrestivo</td><td>not too surprising.</td></tr>
+<tr id="t0234A" class="h"><td><a href="#t0234A">02:34</a></td><td class="n6">raspasov</td><td>yea not sure then, it seems unlikely that the guarantees of core.async's pub/sub will change though - how big is your app in terms of lines of code? as you said, really think if you really need that pub/sub mechanism in there</td></tr>
+<tr id="t0235A" class="h"><td><a href="#t0235A">02:35</a></td><td class="nz">kenrestivo</td><td>it's not that big. i was hoping to not have to pass a bunch of channels around, a single message bus seemed so much cleaner</td></tr>
+<tr id="t0235A" class="h r"><td><a href="#t0235A">02:35</a></td><td class="nz">kenrestivo</td><td>but if latency issues are cropping up, i've got to back out of that idea</td></tr>
+<tr id="t0235A" class="h r"><td><a href="#t0235A">02:35</a></td><td class="nz">kenrestivo</td><td>one of the great things about clojure is how easy it is to make rather large sweeping changes without too much work</td></tr>
+<tr id="t0236A" class="h"><td><a href="#t0236A">02:36</a></td><td class="n6">raspasov</td><td>yes, that's true</td></tr>
+<tr id="t0236A" class="h r"><td><a href="#t0236A">02:36</a></td><td class="n6">raspasov</td><td>Lisp is just like a lego</td></tr>
+<tr id="t0236A" class="h"><td><a href="#t0236A">02:36</a></td><td class="nz">kenrestivo</td><td>if i had to do a major rethink about stuff lke this in any other language, i think i'd be well and truly screwed</td></tr>
+<tr id="t0236A" class="h"><td><a href="#t0236A">02:36</a></td><td class="n6">raspasov</td><td>how long have you been doing Clojure?</td></tr>
+<tr id="t0236A" class="h"><td><a href="#t0236A">02:36</a></td><td class="nz">kenrestivo</td><td>almost 3 years, off and on</td></tr>
+<tr id="t0237A" class="h"><td><a href="#t0237A">02:37</a></td><td class="n6">raspasov</td><td>cool</td></tr>
+<tr id="t0237A" class="h"><td><a href="#t0237A">02:37</a></td><td class="nz">kenrestivo</td><td>and i keep cutting my fingers on new things (like async) so i never really feel that experienced</td></tr>
+<tr id="t0238A" class="h r"><td><a href="#t0238A">02:38</a></td><td class="nz">kenrestivo</td><td>you seem to be fairly comfortable with core.async. thanks for your help and perspective.</td></tr>
+<tr id="t0239A" class="h"><td><a href="#t0239A">02:39</a></td><td class="n6">raspasov</td><td>no problem, hope I could help more, feels like something small is off somewhere, if you can share some more code, esp where the stuff is being put on the channel? but if you're going to re-architect out of pub/sub prob not worth it</td></tr>
+<tr id="t0241A"><td><a href="#t0241A">02:41</a></td><td class="nz">kenrestivo</td><td>i'm going to try to simplify. the fewer moving parts the better.</td></tr>
+<tr id="t0243A" class="h"><td><a href="#t0243A">02:43</a></td><td class="n6">raspasov</td><td>yea, agree</td></tr>
+<tr id="t0428A"><td><a href="#t0428A">04:28</a></td><td class="ng">rivrkeepr</td><td>lookz2boring</td></tr>
+<tr id="t0428A" class="h r"><td><a href="#t0428A">04:28</a></td><td class="ng">rivrkeepr</td><td>4actualInterchange</td></tr>
+<tr id="t0432A"><td><a href="#t0432A">04:32</a></td><td class="nu">_steven_</td><td>if i do (let [x &lt;expression&gt;]), is it true that everytime i use x, the code inside the expression will be run again?</td></tr>
+<tr id="t0435A" class="h"><td><a href="#t0435A">04:35</a></td><td class="n3">expez</td><td>How can I find out if some macro is in use?  To find out if a function is in use I've been expecting the AST, but macros are expanded prior to building said AST.</td></tr>
+<tr id="t0435A" class="h r"><td><a href="#t0435A">04:35</a></td><td class="n3">expez</td><td>s/expecting/inspecting/</td></tr>
+<tr id="t0435A" class="h"><td><a href="#t0435A">04:35</a></td><td class="nb">dysfun</td><td>you can read the file and not macroexpand it</td></tr>
+<tr id="t0435A" class="h"><td><a href="#t0435A">04:35</a></td><td class="nj">adu</td><td>what's the difference between doto and -&gt;</td></tr>
+<tr id="t0436A" class="h"><td><a href="#t0436A">04:36</a></td><td class="n3">expez</td><td>dysfun: then what? string match the macro name?</td></tr>
+<tr id="t0436A" class="h"><td><a href="#t0436A">04:36</a></td><td class="nb">dysfun</td><td>doto is for mutable things</td></tr>
+<tr id="t0436A" class="h r"><td><a href="#t0436A">04:36</a></td><td class="nb">dysfun</td><td>expez: yup</td></tr>
+<tr id="t0436A" class="h"><td><a href="#t0436A">04:36</a></td><td class="n3">expez</td><td>this was my 'simplest thing that could possibly work' plan, but I was hoping for other options :p</td></tr>
+<tr id="t0437A" class="h"><td><a href="#t0437A">04:37</a></td><td class="nb">dysfun</td><td>that would require knowledge of what you're trying to achieve</td></tr>
+<tr id="t0437A" class="h"><td><a href="#t0437A">04:37</a></td><td class="nj">adu</td><td>dysfun: so x.f() x.g() instead of y = x.f(), y.g()?</td></tr>
+<tr id="t0437A" class="h"><td><a href="#t0437A">04:37</a></td><td class="n3">expez</td><td>dysfun: I'm writing tooling to clean up the ns form.  Part of that job is getting rid if stuff that is no longer in use.</td></tr>
+<tr id="t0438A" class="h"><td><a href="#t0438A">04:38</a></td><td class="nb">dysfun</td><td>adu: if you replace that comma with a semicolon, yes</td></tr>
+<tr id="t0438A" class="h r"><td><a href="#t0438A">04:38</a></td><td class="nb">dysfun</td><td>expez: you're reimplementing slamhound?</td></tr>
+<tr id="t0438A" class="h"><td><a href="#t0438A">04:38</a></td><td class="nj">adu</td><td>how do you pronounce -&gt; and -&gt;&gt;?</td></tr>
+<tr id="t0438A" class="h"><td><a href="#t0438A">04:38</a></td><td class="nb">dysfun</td><td>'thread' and 'thrush' or 'thread-last'</td></tr>
+<tr id="t0438A" class="h"><td><a href="#t0438A">04:38</a></td><td class="n3">expez</td><td>dysfun: yes</td></tr>
+<tr id="t0439A" class="h"><td><a href="#t0439A">04:39</a></td><td class="nb">dysfun</td><td>is there a reason you're not just using slamhound?</td></tr>
+<tr id="t0439A" class="h"><td><a href="#t0439A">04:39</a></td><td class="n3">expez</td><td>yes, it doesn't work :p</td></tr>
+<tr id="t0439A" class="h"><td><a href="#t0439A">04:39</a></td><td class="nb">dysfun</td><td>perhaps we can help you with that rather than reinventing the wheel? :)</td></tr>
+<tr id="t0440A" class="r"><td><a href="#t0440A">04:40</a></td><td class="nb">dysfun</td><td>(or perhaps you may be tempted to patch it?)</td></tr>
+<tr id="t0441A" class="h"><td><a href="#t0441A">04:41</a></td><td class="n3">expez</td><td>dysfun: <a href="https://github.com/clojure-emacs/refactor-nrepl/pull/9">https://github.com/clojure-emacs/refactor-nrepl/pull/9</a> I think this op does a bit more than slamhound and it should work better</td></tr>
+<tr id="t0442A" class="h"><td><a href="#t0442A">04:42</a></td><td class="nb">dysfun</td><td>oh that's pretty cool</td></tr>
+<tr id="t0443A" class="h r"><td><a href="#t0443A">04:43</a></td><td class="nb">dysfun</td><td>so doing this 'properly' is going to require stepping through macroexpansion and it'll get very tedious</td></tr>
+<tr id="t0443A" class="h r"><td><a href="#t0443A">04:43</a></td><td class="nb">dysfun</td><td>but 99% of cases will be caught by the 'simple' method</td></tr>
+<tr id="t0444A" class="h r"><td><a href="#t0444A">04:44</a></td><td class="nb">dysfun</td><td>thanks largely to syntax-quote</td></tr>
+<tr id="t0444A" class="h"><td><a href="#t0444A">04:44</a></td><td class="n3">expez</td><td>so if I search for &quot;(some-macro &quot; what's going to get missed?</td></tr>
+<tr id="t0445A" class="h r"><td><a href="#t0445A">04:45</a></td><td class="n3">expez</td><td>maybe I should search for &quot;some-macro&quot;, then and just leave an extra symbol in the ns every now and then</td></tr>
+<tr id="t0445A" class="h"><td><a href="#t0445A">04:45</a></td><td class="nb">dysfun</td><td>i suspect there's scope for missing things when generating macros in macros</td></tr>
+<tr id="t0445A" class="h"><td><a href="#t0445A">04:45</a></td><td class="nd">justin_smith</td><td>&quot;( some-macro&quot; is valid, though pathological</td></tr>
+<tr id="t0445A" class="h r"><td><a href="#t0445A">04:45</a></td><td class="nd">justin_smith</td><td>,(     +     1       1     )</td></tr>
+<tr id="t0445A" class="h"><td><a href="#t0445A">04:45</a></td><td class="nb">dysfun</td><td>and you would actually step through an edn tree, rather than string match</td></tr>
+<tr id="t0445A" class="h"><td><a href="#t0445A">04:45</a></td><td class="nl">clojurebot</td><td>2</td></tr>
+<tr id="t0447A" class="h"><td><a href="#t0447A">04:47</a></td><td class="nb">dysfun</td><td>justin_smith: this explains a lot about your code :)</td></tr>
+<tr id="t0547A"><td><a href="#t0547A">05:47</a></td><td class="n3">expez</td><td>dysfun: I did find a use for, parts of slamhound, <a href="https://github.com/clojure-emacs/clj-refactor.el/pull/88">https://github.com/clojure-emacs/clj-refactor.el/pull/88</a></td></tr>
+<tr id="t0608A"><td><a href="#t0608A">06:08</a></td><td class="nb">dysfun</td><td>:)</td></tr>
+<tr id="t0611A" class="r"><td><a href="#t0611A">06:11</a></td><td class="nb">dysfun</td><td>anyone using reloaded workflow with something that tries to invert control? in this case jmonkeyengine</td></tr>
+<tr id="t0612A" class="h r"><td><a href="#t0612A">06:12</a></td><td class="nb">dysfun</td><td>i'm pondering starting it on another thread and wanted to know things i'll have to watch out for since it's rather not in the spirit</td></tr>
+<tr id="t0614A" class="h r"><td><a href="#t0614A">06:14</a></td><td class="nb">dysfun</td><td>i'm also very much hoping i won't have to keep it on the main thread (as is the case with javafx), because my first thoughts on that are that it'll be messy as hell</td></tr>
+<tr id="t0744A"><td><a href="#t0744A">07:44</a></td><td class="n4">triss</td><td>so chaps. what's the simplest way to extract values for two keys in a map in to a tuple?</td></tr>
+<tr id="t0746A" class="h"><td><a href="#t0746A">07:46</a></td><td class="nn">andyf</td><td>triss: juxt, probably.</td></tr>
+<tr id="t0746A" class="h r"><td><a href="#t0746A">07:46</a></td><td class="nn">andyf</td><td>,((juxt :c :d) {:a 1 :c 2 :d 7 :e -2})</td></tr>
+<tr id="t0746A" class="h"><td><a href="#t0746A">07:46</a></td><td class="nl">clojurebot</td><td>[2 7]</td></tr>
+<tr id="t0746A" class="h"><td><a href="#t0746A">07:46</a></td><td class="nn">andyf</td><td>if by 'tuple' you mean vector.</td></tr>
+<tr id="t0747A" class="h"><td><a href="#t0747A">07:47</a></td><td class="n4">triss</td><td>splendid thanks andyf!</td></tr>
+<tr id="t0748A" class="h"><td><a href="#t0748A">07:48</a></td><td class="nn">andyf</td><td>juxt is useful for other similar things, too, when you want a vector of results</td></tr>
+<tr id="t0808A"><td><a href="#t0808A">08:08</a></td><td class="na">lodin</td><td>Is there any way to write a macro that would insert two elements into e.g. (let [(mymacro)] ...), without modifying let?</td></tr>
+<tr id="t0808A" class="h"><td><a href="#t0808A">08:08</a></td><td class="nc">Bronsa</td><td>lodin: no that's not possible</td></tr>
+<tr id="t0808A" class="h"><td><a href="#t0808A">08:08</a></td><td class="na">lodin</td><td>That's what I figured. :-/</td></tr>
+<tr id="t0809A" class="h r"><td><a href="#t0809A">08:09</a></td><td class="na">lodin</td><td>The drawback of Clojure prefering flat structures and less brackets.</td></tr>
+<tr id="t0809A" class="h"><td><a href="#t0809A">08:09</a></td><td class="nb">dysfun</td><td>ooh, i hadn't seen 'juxt' used like that before, that's pretty neat</td></tr>
+<tr id="t0809A" class="h"><td><a href="#t0809A">08:09</a></td><td class="nc">Bronsa</td><td>lodin: that wouldn't be possible in cl either</td></tr>
+<tr id="t0810A"><td><a href="#t0810A">08:10</a></td><td class="na">lodin</td><td>Bronsa: Why not? (I don't know CL.)</td></tr>
+<tr id="t0810A" class="h"><td><a href="#t0810A">08:10</a></td><td class="nc">Bronsa</td><td>dysfun: (let ((mymacro 1))) would bind mymacro to 1 rather than invoke mymacro and bind whatever first symbol it returned</td></tr>
+<tr id="t0810A" class="h"><td><a href="#t0810A">08:10</a></td><td class="nb">dysfun</td><td>i think you mean 'lodin'</td></tr>
+<tr id="t0810A" class="h"><td><a href="#t0810A">08:10</a></td><td class="nc">Bronsa</td><td>dysfun: yeah sorry</td></tr>
+<tr id="t0810A" class="h r"><td><a href="#t0810A">08:10</a></td><td class="nc">Bronsa</td><td>lodin: ^ that was meant for you</td></tr>
+<tr id="t0811A" class="h"><td><a href="#t0811A">08:11</a></td><td class="na">lodin</td><td>Bronsa: True.</td></tr>
+<tr id="t0811A" class="h r"><td><a href="#t0811A">08:11</a></td><td class="na">lodin</td><td>So maybe let wasn't the best example. :-)</td></tr>
+<tr id="t0811A" class="h"><td><a href="#t0811A">08:11</a></td><td class="nc">Bronsa</td><td>amalloy_: picasso is the daily spammer</td></tr>
+<tr id="t0812A" class="h"><td><a href="#t0812A">08:12</a></td><td class="n4">triss</td><td>ok... laziness is confusing me re: writing performant code...</td></tr>
+<tr id="t0812A" class="h r"><td><a href="#t0812A">08:12</a></td><td class="n4">triss</td><td>anyone know of any good writings on the subject?</td></tr>
+<tr id="t0812A" class="h"><td><a href="#t0812A">08:12</a></td><td class="na">lodin</td><td>Bronsa: (let (((mymacro 1)))) then? Can't bind to (mymacro 1). ;-)</td></tr>
+<tr id="t0813A" class="h"><td><a href="#t0813A">08:13</a></td><td class="n4">triss</td><td>or will this sort of understanding take a while to sink in?</td></tr>
+<tr id="t0813A" class="h"><td><a href="#t0813A">08:13</a></td><td class="nc">Bronsa</td><td>lodin: I'll take that as a joke :)</td></tr>
+<tr id="t0813A" class="h"><td><a href="#t0813A">08:13</a></td><td class="nb">dysfun</td><td>triss: don't worry about performance yet. worry about performance when you have a performance problem</td></tr>
+<tr id="t0813A" class="h r"><td><a href="#t0813A">08:13</a></td><td class="nb">dysfun</td><td>focus on algorithm order of complexity</td></tr>
+<tr id="t0814A" class="h"><td><a href="#t0814A">08:14</a></td><td class="n4">triss</td><td>i got one.... I'm wondering wether clojurescript's a nicer language that js for writing low level web audio stuff.</td></tr>
+<tr id="t0814A" class="h"><td><a href="#t0814A">08:14</a></td><td class="nb">dysfun</td><td>plus as you say, you'll develop an intuition in time</td></tr>
+<tr id="t0814A" class="h r"><td><a href="#t0814A">08:14</a></td><td class="nb">dysfun</td><td>how do you mean? run it on client side?</td></tr>
+<tr id="t0815A" class="h"><td><a href="#t0815A">08:15</a></td><td class="n4">triss</td><td>&quot;algorithm order or complexity&quot;?</td></tr>
+<tr id="t0815A" class="h r"><td><a href="#t0815A">08:15</a></td><td class="n4">triss</td><td>yep. run on the client side....</td></tr>
+<tr id="t0815A" class="h"><td><a href="#t0815A">08:15</a></td><td class="nb">dysfun</td><td><a href="https://en.wikipedia.org/wiki/Big_O_notation">https://en.wikipedia.org/wiki/Big_O_notation</a></td></tr>
+<tr id="t0815A" class="h r"><td><a href="#t0815A">08:15</a></td><td class="nb">dysfun</td><td>well if you're running on the client side, i don't see you have much choice than clojurescript</td></tr>
+<tr id="t0815A" class="h"><td><a href="#t0815A">08:15</a></td><td class="n4">triss</td><td>cheers dysfun. I think I'm paying attention to all that stuff.</td></tr>
+<tr id="t0816A" class="h"><td><a href="#t0816A">08:16</a></td><td class="na">lodin</td><td>triss: Note that if if have ((juxt k1 k2) the-map)) you could run into problems.</td></tr>
+<tr id="t0816A" class="h r"><td><a href="#t0816A">08:16</a></td><td class="na">lodin</td><td>,(let [a 3 b 5 m {a :three b :five}] ((juxt a b) m))</td></tr>
+<tr id="t0816A" class="h"><td><a href="#t0816A">08:16</a></td><td class="nl">clojurebot</td><td>#&lt;ClassCastException java.lang.ClassCastException: java.lang.Long cannot be cast to clojure.lang.IFn&gt;</td></tr>
+<tr id="t0816A" class="h"><td><a href="#t0816A">08:16</a></td><td class="na">lodin</td><td>Not fun to debug.</td></tr>
+<tr id="t0816A" class="h"><td><a href="#t0816A">08:16</a></td><td class="nb">dysfun</td><td>in which case, i recommend not worrying about performance yet</td></tr>
+<tr id="t0816A" class="h"><td><a href="#t0816A">08:16</a></td><td class="n4">triss</td><td>cheers dysfun. we'll see how it goes.</td></tr>
+<tr id="t0817A" class="h"><td><a href="#t0817A">08:17</a></td><td class="nb">dysfun</td><td>i've yet to write any clojure which wasn't &quot;fast enough&quot; if that helps, and i've been doing it full time for a while now</td></tr>
+<tr id="t0817A" class="h"><td><a href="#t0817A">08:17</a></td><td class="n4">triss</td><td>excellent news. cheers dysfun</td></tr>
+<tr id="t0818A" class="h"><td><a href="#t0818A">08:18</a></td><td class="nb">dysfun</td><td>in general, most problems deal with a fairly small amount of data anyway and even order of complexity makes little difference</td></tr>
+<tr id="t0818A" class="h r"><td><a href="#t0818A">08:18</a></td><td class="nb">dysfun</td><td>not that i'd advocate not paying it attention</td></tr>
+<tr id="t0819A" class="h"><td><a href="#t0819A">08:19</a></td><td class="na">lodin</td><td>Bronsa: Yes, a joke. Partly. ;-) It's like of like when you do (-&gt; a (#(... % ...))) to move the &quot;insertion point&quot;. Really don't look good. (Yes, I know there are other macros too.)</td></tr>
+<tr id="t0820A"><td><a href="#t0820A">08:20</a></td><td class="n4">triss</td><td>what's worrying me is that the callbacks required to do web-audio stuff pass you in an input array and expect you to populate an output array</td></tr>
+<tr id="t0820A" class="h r"><td><a href="#t0820A">08:20</a></td><td class="n4">triss</td><td>it feels most unnatural in clojure to be writing a function like this.</td></tr>
+<tr id="t0821A" class="h r"><td><a href="#t0821A">08:21</a></td><td class="n4">triss</td><td>most example code (in JS) doesn't the imperative thing of updating a slot at a time of the output array in a for loop</td></tr>
+<tr id="t0822A" class="h"><td><a href="#t0822A">08:22</a></td><td class="nb">dysfun</td><td>you may even find that it's better to just write it in javascript for that bit</td></tr>
+<tr id="t0822A" class="h r"><td><a href="#t0822A">08:22</a></td><td class="nb">dysfun</td><td>one of the great things about clojurescript is that you get proper javascript interop</td></tr>
+<tr id="t0823A" class="h"><td><a href="#t0823A">08:23</a></td><td class="n4">triss</td><td>hmmmm... I'm gonna push on with cljs for the time being and see if its sluggish or not.</td></tr>
+<tr id="t0824A" class="h r"><td><a href="#t0824A">08:24</a></td><td class="n4">triss</td><td>fast enough is fast enough i suppose.</td></tr>
+<tr id="t0826A" class="h"><td><a href="#t0826A">08:26</a></td><td class="nb">dysfun</td><td>depends how much audio you're processing i guess</td></tr>
+<tr id="t0827A" class="h"><td><a href="#t0827A">08:27</a></td><td class="n4">triss</td><td>44100 samples of it per second. with only a smidgeon of latency</td></tr>
+<tr id="t0842A" class="r"><td><a href="#t0842A">08:42</a></td><td class="n4">triss</td><td>so what's a nice ay of copying a lazy sequence in to a Java/JS array?</td></tr>
+<tr id="t0842A" class="h r"><td><a href="#t0842A">08:42</a></td><td class="n4">triss</td><td>^nice way</td></tr>
+<tr id="t0843A" class="h r"><td><a href="#t0843A">08:43</a></td><td class="n4">triss</td><td>I guess doing this could be considered not nice at all.....</td></tr>
+<tr id="t0851A"><td><a href="#t0851A">08:51</a></td><td class="n8">brucehauman</td><td>triss: clj-&gt;js</td></tr>
+<tr id="t1015A"><td><a href="#t1015A">10:15</a></td><td class="n4">vmarcinko</td><td>hey everyone, i have a need to have huge number of processes within my app, each of them corresponding to single entity such as Order, so one can have few hundreds of thousands of orders... Each of this orders has its own, potentially complex, lifecycle, but although at first glance core.async would be good since it inverts the control, i cannot see that it is good fit for it, because I need individual go blocks for each entity, an</td></tr>
+<tr id="t1015A" class="h r"><td><a href="#t1015A">10:15</a></td><td class="n4">vmarcinko</td><td>d process can last even months/years..</td></tr>
+<tr id="t1016A" class="h r"><td><a href="#t1016A">10:16</a></td><td class="n4">vmarcinko</td><td>so i just wanted to have some kind of conrimation that core.async is not made for this kind of &quot;processes&quot;</td></tr>
+<tr id="t1018A" class="h r"><td><a href="#t1018A">10:18</a></td><td class="n4">vmarcinko</td><td>these kind of processes are usually handled in java land by some SOA/BPM platforms such as BPEL/BPMN, but it seems to me these are a bit different then core.async processes - they can last for years, they are not kept in memory, they stroe their current state thus if one reobots the app, it cpontinues where it left off etc..</td></tr>
+<tr id="t1033A"><td><a href="#t1033A">10:33</a></td><td class="n4">triss</td><td>ah thanks brucehauman.....</td></tr>
+<tr id="t1033A" class="h r"><td><a href="#t1033A">10:33</a></td><td class="n4">triss</td><td>but doesn't that create a new array? I want to populate an existing one.</td></tr>
+<tr id="t1107A"><td><a href="#t1107A">11:07</a></td><td class="nc">Bronsa</td><td>chouser: hi, mind banning picasso? the usual spam bot</td></tr>
+<tr id="t1128A"><td><a href="#t1128A">11:28</a></td><td class="nn">luxbock</td><td>I have a deftype backed up by a vector of doubles, and I'll be serializing a lot of these inside a tree structure to disk. would it make sense to re-implement Serializable to use a double-array for writing and reading from disk instead to save up some disk space, or is this a bad idea?</td></tr>
+<tr id="t1142A"><td><a href="#t1142A">11:42</a></td><td class="ng">mindbender1</td><td>How do I remove hidden directories from a file-seq?</td></tr>
+<tr id="t1215A"><td><a href="#t1215A">12:15</a></td><td class="nd">justin_smith</td><td>triss: for audio processing with low latency, everything should remain arrays, don't use vectors or lazy seqs for samples</td></tr>
+<tr id="t1216A" class="h"><td><a href="#t1216A">12:16</a></td><td class="n4">triss</td><td>ahhhhhhh..... thought so justin_smith thanks.....</td></tr>
+<tr id="t1217A" class="h r"><td><a href="#t1217A">12:17</a></td><td class="n4">triss</td><td>that won't the last few hours of attempting to write a bitcrusher in a functional style go away though</td></tr>
+<tr id="t1217A" class="h r"><td><a href="#t1217A">12:17</a></td><td class="n4">triss</td><td>clojure really is ugly for that sort of thing though....</td></tr>
+<tr id="t1218A" class="h"><td><a href="#t1218A">12:18</a></td><td class="nd">justin_smith</td><td>triss: check out kunstkusic/pink to see low latency audio processing in clojure  done decently</td></tr>
+<tr id="t1220A"><td><a href="#t1220A">12:20</a></td><td class="n4">triss</td><td>cheers justin.... not seen those. I'll take a peek</td></tr>
+<tr id="t1220A" class="h"><td><a href="#t1220A">12:20</a></td><td class="nd">justin_smith</td><td>*kunstmusic that is (irc from the phone)</td></tr>
+<tr id="t1221A" class="h r"><td><a href="#t1221A">12:21</a></td><td class="nd">justin_smith</td><td>it's just one project, kunstmusic is the org, pink the package</td></tr>
+<tr id="t1222A" class="h r"><td><a href="#t1222A">12:22</a></td><td class="nd">justin_smith</td><td>,</td></tr>
+<tr id="t1222A" class="h"><td><a href="#t1222A">12:22</a></td><td class="nl">clojurebot</td><td>#&lt;RuntimeException java.lang.RuntimeException: EOF while reading&gt;</td></tr>
+<tr id="t1223A" class="h"><td><a href="#t1223A">12:23</a></td><td class="n4">triss</td><td>thanks man. this stuff looks really cool</td></tr>
+<tr id="t1225A" class="h"><td><a href="#t1225A">12:25</a></td><td class="nd">jonathanj</td><td>i'm getting the following error from this &lt;<a href="https://pb.codehash.net/kitokegi.clj&amp;gt;">https://pb.codehash.net/kitokegi.clj&amp;gt;</a> yesql code and i have no idea what it's telling me: Exception in thread &quot;main&quot; clojure.lang.ArityException: Wrong number of args (1) passed to: generate/generate-query-fn/query-wrapper-fn--5115, compiling:(/private/var/folders/qj/lb3tbsp97gg74jpcxtcw30zm0000gn/T/form-init271047470154200468.clj:1:123)</td></tr>
+<tr id="t1228A" class="h r"><td><a href="#t1228A">12:28</a></td><td class="nd">jonathanj</td><td>oh... i guess there is no 1 arity version of the generated query functions, that's unfortunately rather cryptic</td></tr>
+<tr id="t1231A"><td><a href="#t1231A">12:31</a></td><td class="n4">triss</td><td>is there a way to swap the order or a functions arguments?</td></tr>
+<tr id="t1232A" class="h"><td><a href="#t1232A">12:32</a></td><td class="nd">TEttinger</td><td>justin_smith, kinda funny how the german word for art (kunst) is so un-beautiful</td></tr>
+<tr id="t1232A" class="h"><td><a href="#t1232A">12:32</a></td><td class="nd">justin_smith</td><td>triss: s/or/of?</td></tr>
+<tr id="t1232A" class="h r"><td><a href="#t1232A">12:32</a></td><td class="nd">justin_smith</td><td>TEttinger: heh, indeed</td></tr>
+<tr id="t1232A" class="h"><td><a href="#t1232A">12:32</a></td><td class="n4">triss</td><td>TEttinger. Art doesn't need to pretty chaps. (or that's the excuse I use for my work)</td></tr>
+<tr id="t1233A" class="h"><td><a href="#t1233A">12:33</a></td><td class="nc">hellofunk</td><td>TEttinger or the dutch word</td></tr>
+<tr id="t1233A" class="h"><td><a href="#t1233A">12:33</a></td><td class="nd">TEttinger</td><td>heh, indeed.</td></tr>
+<tr id="t1233A" class="h"><td><a href="#t1233A">12:33</a></td><td class="n5">picasso</td><td>Bronsa, it was picassoo who was spamming, not picasso</td></tr>
+<tr id="t1233A" class="h r"><td><a href="#t1233A">12:33</a></td><td class="n5">picasso</td><td>no affiliation</td></tr>
+<tr id="t1233A" class="h"><td><a href="#t1233A">12:33</a></td><td class="nd">TEttinger</td><td>lol</td></tr>
+<tr id="t1233A" class="h r"><td><a href="#t1233A">12:33</a></td><td class="nd">TEttinger</td><td>that's hilariously coincidental</td></tr>
+<tr id="t1234A" class="h r"><td><a href="#t1234A">12:34</a></td><td class="nd">TEttinger</td><td>maybe the spambots are starting to learn and pick modifications of names used in the channel to divert blame</td></tr>
+<tr id="t1234A" class="h"><td><a href="#t1234A">12:34</a></td><td class="n5">picasso</td><td>indeed</td></tr>
+<tr id="t1234A" class="h"><td><a href="#t1234A">12:34</a></td><td class="nd">TEttinger</td><td>TEttingerr is spamming now :P</td></tr>
+<tr id="t1234A" class="h"><td><a href="#t1234A">12:34</a></td><td class="n5">picasso</td><td>i wouldnt put it past them</td></tr>
+<tr id="t1234A" class="h r"><td><a href="#t1234A">12:34</a></td><td class="n5">picasso</td><td>kids with too much time</td></tr>
+<tr id="t1235A" class="h"><td><a href="#t1235A">12:35</a></td><td class="nd">TEttinger</td><td>there was an excellent thing I read about the spam pharmacy emails mostly distributing counterfeit drugs, and one woman in canada died after consuming too much uranium and lead from online-purchased meds</td></tr>
+<tr id="t1235A" class="h"><td><a href="#t1235A">12:35</a></td><td class="n4">triss</td><td>sorry justin_smith: of</td></tr>
+<tr id="t1236A" class="h"><td><a href="#t1236A">12:36</a></td><td class="nc">hellofunk</td><td>TEttinger wow that's awful</td></tr>
+<tr id="t1238A" class="h"><td><a href="#t1238A">12:38</a></td><td class="nd">TEttinger</td><td><a href="http://www.politico.com/magazine/story/2014/12/pharma-spam-113562.html">http://www.politico.com/magazine/story/2014/12/pharma-spam-113562.html</a></td></tr>
+<tr id="t1239A" class="h r"><td><a href="#t1239A">12:39</a></td><td class="nd">TEttinger</td><td>it makes you wonder, how hard can it possibly be to not but uranium in things?</td></tr>
+<tr id="t1239A" class="h r"><td><a href="#t1239A">12:39</a></td><td class="nd">TEttinger</td><td>*put</td></tr>
+<tr id="t1240A" class="r"><td><a href="#t1240A">12:40</a></td><td class="nd">TEttinger</td><td>triss: to swap fn order in a 2-arg fn?</td></tr>
+<tr id="t1241A" class="h r"><td><a href="#t1241A">12:41</a></td><td class="nd">TEttinger</td><td>,(#(map %2 %1) [1 2 3] inc)</td></tr>
+<tr id="t1241A" class="h"><td><a href="#t1241A">12:41</a></td><td class="nl">clojurebot</td><td>(2 3 4)</td></tr>
+<tr id="t1243A" class="h"><td><a href="#t1243A">12:43</a></td><td class="nd">TEttinger</td><td>for an arbitrary-number of-args order reversal,</td></tr>
+<tr id="t1243A" class="h r"><td><a href="#t1243A">12:43</a></td><td class="nd">TEttinger</td><td>,(#(apply map `[~@(reverse %&amp;)]) [10 20 30] [1 2 3] +)</td></tr>
+<tr id="t1243A" class="h"><td><a href="#t1243A">12:43</a></td><td class="nl">clojurebot</td><td>(11 22 33)</td></tr>
+<tr id="t1244A" class="h"><td><a href="#t1244A">12:44</a></td><td class="nd">TEttinger</td><td>,(#(apply map `[~@(rseq %&amp;)]) [10 20 30] [1 2 3] +) ; might work?</td></tr>
+<tr id="t1244A" class="h"><td><a href="#t1244A">12:44</a></td><td class="nl">clojurebot</td><td>#&lt;ClassCastException java.lang.ClassCastException: clojure.lang.ArraySeq cannot be cast to clojure.lang.Reversible&gt;</td></tr>
+<tr id="t1244A" class="h"><td><a href="#t1244A">12:44</a></td><td class="nd">TEttinger</td><td>assuming map is the fn you want</td></tr>
+<tr id="t1245A" class="h r"><td><a href="#t1245A">12:45</a></td><td class="nd">TEttinger</td><td>hm wait</td></tr>
+<tr id="t1245A" class="h r"><td><a href="#t1245A">12:45</a></td><td class="nd">TEttinger</td><td>that's unneeded</td></tr>
+<tr id="t1245A" class="h r"><td><a href="#t1245A">12:45</a></td><td class="nd">TEttinger</td><td>,(#(apply map (reverse %&amp;)) [10 20 30] [1 2 3] +) ; might work?</td></tr>
+<tr id="t1245A" class="h"><td><a href="#t1245A">12:45</a></td><td class="nl">clojurebot</td><td>(11 22 33)</td></tr>
+<tr id="t1245A" class="h"><td><a href="#t1245A">12:45</a></td><td class="nd">TEttinger</td><td>much easier :D</td></tr>
+<tr id="t1245A" class="h"><td><a href="#t1245A">12:45</a></td><td class="n4">triss</td><td>cheers TEttinger - mulling this over. it's just a two arg function.</td></tr>
+<tr id="t1246A" class="h"><td><a href="#t1246A">12:46</a></td><td class="nd">TEttinger</td><td>then %2 %1 may be easiest</td></tr>
+<tr id="t1246A" class="h r"><td><a href="#t1246A">12:46</a></td><td class="nd">TEttinger</td><td>there may be a built-in lib fn but I kinda doubt it</td></tr>
+<tr id="t1250A"><td><a href="#t1250A">12:50</a></td><td class="nd">justin_smith</td><td>there is a flip in flatland/useful</td></tr>
+<tr id="t1250A" class="h"><td><a href="#t1250A">12:50</a></td><td class="n4">triss</td><td>ah flip... that's what I'm looking for. cheers.</td></tr>
+<tr id="t1251A" class="h r"><td><a href="#t1251A">12:51</a></td><td class="n4">triss</td><td>what are the reasons for that useful stuff not makings it way in to .core</td></tr>
+<tr id="t1251A" class="h r"><td><a href="#t1251A">12:51</a></td><td class="n4">triss</td><td>?</td></tr>
+<tr id="t1252A" class="h r"><td><a href="#t1252A">12:52</a></td><td class="n4">triss</td><td>hey really are useful... should I be looking to avoid using stuff like applied and flip? the little haskell I've done got me kinda used to it</td></tr>
+<tr id="t1252A" class="h"><td><a href="#t1252A">12:52</a></td><td class="nd">justin_smith</td><td>core is pretty conservative about what it includes</td></tr>
+<tr id="t1258A" class="h"><td><a href="#t1258A">12:58</a></td><td class="ng">mindbender1</td><td>I need to get rid of hidden folders from a file-seq. What's an efficient way of doing that?</td></tr>
+<tr id="t1259A" class="h"><td><a href="#t1259A">12:59</a></td><td class="n5">tcrayford___</td><td>mindbender1: can't you just use `filter` and call whatever java api lets you get at hidden/not hidden on File?</td></tr>
+<tr id="t1302A"><td><a href="#t1302A">13:02</a></td><td class="nd">justin_smith</td><td>tcrayford___: what about filtering files inside hidden directories?</td></tr>
+<tr id="t1302A" class="h"><td><a href="#t1302A">13:02</a></td><td class="n5">tcrayford___</td><td>oh, touché :/</td></tr>
+<tr id="t1303A" class="h"><td><a href="#t1303A">13:03</a></td><td class="nd">justin_smith</td><td>at that point you are better off rewriting file-seq</td></tr>
+<tr id="t1303A" class="h"><td><a href="#t1303A">13:03</a></td><td class="nd">tomjack</td><td>reimplement file-seq?</td></tr>
+<tr id="t1306A" class="h"><td><a href="#t1306A">13:06</a></td><td class="n2">borkdude</td><td>Is it possible to add a message to a :post condition in a function when the assertino fails?</td></tr>
+<tr id="t1312A"><td><a href="#t1312A">13:12</a></td><td class="ny">bbloom</td><td>,((fn [x] {:post [(and (odd? %) &quot;a message&quot;)]} x) 6) ; borkdude: this work? :-)</td></tr>
+<tr id="t1312A" class="h"><td><a href="#t1312A">13:12</a></td><td class="nl">clojurebot</td><td>#&lt;AssertionError java.lang.AssertionError: Assert failed: (and (odd? %) &quot;a message&quot;)&gt;</td></tr>
+<tr id="t1313A" class="h"><td><a href="#t1313A">13:13</a></td><td class="n2">borkdude</td><td>it's a hack ;)</td></tr>
+<tr id="t1313A" class="h"><td><a href="#t1313A">13:13</a></td><td class="ny">bbloom</td><td>,((fn [x] {:post [(do &quot;must be odd&quot; (odd? %)))]} x) 6) ; this feels marginally less hacky</td></tr>
+<tr id="t1313A" class="h"><td><a href="#t1313A">13:13</a></td><td class="nl">clojurebot</td><td>#&lt;RuntimeException java.lang.RuntimeException: Unmatched delimiter: )&gt;</td></tr>
+<tr id="t1313A" class="h"><td><a href="#t1313A">13:13</a></td><td class="ny">bbloom</td><td>eh, you get the idea</td></tr>
+<tr id="t1324A"><td><a href="#t1324A">13:24</a></td><td class="nj">munderwo</td><td>Is there a way in a let block to have two statements assign to the same var? I basically have two ways of getting a value, if the first doesnt work I want to try the second. and then just deal with the same variable further down in the function. any ideas?</td></tr>
+<tr id="t1325A" class="h"><td><a href="#t1325A">13:25</a></td><td class="ny">bbloom</td><td>munderwo: define &quot;doesn't work&quot;</td></tr>
+<tr id="t1326A" class="h"><td><a href="#t1326A">13:26</a></td><td class="nj">munderwo</td><td>So in this case we are checking out a git repo. If it already exists on the filesystem then the first function will return a representation of it. If it doesnt find it then we need to check it out, and then the second function will do that and return the exact same representation of it.</td></tr>
+<tr id="t1327A" class="h"><td><a href="#t1327A">13:27</a></td><td class="ny">bbloom</td><td>munderwo: (let [repo (or (open-or-nil ...) (clone ...))] ....</td></tr>
+<tr id="t1327A" class="h r"><td><a href="#t1327A">13:27</a></td><td class="ny">bbloom</td><td>or in two statements:</td></tr>
+<tr id="t1327A" class="h"><td><a href="#t1327A">13:27</a></td><td class="nj">munderwo</td><td>in python I would just try the first, put some kind of if statement for None and the assign to the same variable, and then use the same variable further down.</td></tr>
+<tr id="t1327A" class="h"><td><a href="#t1327A">13:27</a></td><td class="ny">bbloom</td><td>(let [repo (open-or-nil ...) repo (or repo (clone ... ...</td></tr>
+<tr id="t1328A" class="h r"><td><a href="#t1328A">13:28</a></td><td class="ny">bbloom</td><td>(let [[status repo] (open ...), repo (if (= status :not-found) (clone ...) repo) ....</td></tr>
+<tr id="t1328A" class="h r"><td><a href="#t1328A">13:28</a></td><td class="ny">bbloom</td><td>munderwo: one of those many variations should work for you</td></tr>
+<tr id="t1329A" class="h"><td><a href="#t1329A">13:29</a></td><td class="nj">munderwo</td><td>ok thanks… i’ll give those a shot</td></tr>
+<tr id="t1330A"><td><a href="#t1330A">13:30</a></td><td class="ny">bbloom</td><td>munderwo: in short, the common pattern is to shadow the variable with a variable of the same name. you just can't specify a 1-armed if, you need to use something like the `or macro, or repeat the variable name in the other arm of the if</td></tr>
+<tr id="t1331A" class="h"><td><a href="#t1331A">13:31</a></td><td class="nj">munderwo</td><td>ok, I think that makes sense. Thanks for the help!</td></tr>
+<tr id="t1331A" class="h"><td><a href="#t1331A">13:31</a></td><td class="nn">andyf</td><td>Bronsa: I'm getting some exceptions thrown with latest t.a(.j) that I wasn't with the version from about 4 weeks ago.  Creating a brief ticket with repro steps -- I haven't figured out what is going on yet.</td></tr>
+<tr id="t1332A" class="h"><td><a href="#t1332A">13:32</a></td><td class="nc">Bronsa</td><td>andyf: ok, I'm busy doing stuff right now so I likely won't be able to look at it until tomorrw</td></tr>
+<tr id="t1332A" class="h"><td><a href="#t1332A">13:32</a></td><td class="nn">andyf</td><td>No problem.</td></tr>
+<tr id="t1357A"><td><a href="#t1357A">13:57</a></td><td class="nh">dnolen_</td><td><a href="http://swannodette.github.io/2014/12/21/browserless-clojurescript/">http://swannodette.github.io/2014/12/21/browserless-clojurescript/</a></td></tr>
+<tr id="t1425A"><td><a href="#t1425A">14:25</a></td><td class="n0">sveri</td><td>Hi, I became curious yesterday to try out boot and build my own build.boot file, now when I run boot dev I get this error: ←[1;31mclojure.lang.ExceptionInfo←[m: ←[31mNo implementation of method: :make-reader of protocol: #'clojure.java.io/IOFactory found for class: nil (whole stacktrace and the function in question can be found here: <a href="http://pastebin.com/fKn0QV8r)">http://pastebin.com/fKn0QV8r)</a> Any ideas what is wrong here?</td></tr>
+<tr id="t1432A"><td><a href="#t1432A">14:32</a></td><td class="n0">michaniskin</td><td>sveri: can you paste your build.boot file please?</td></tr>
+<tr id="t1435A" class="h"><td><a href="#t1435A">14:35</a></td><td class="n0">sveri</td><td>michaniskin: <a href="http://pastebin.com/0XRNzAb2">http://pastebin.com/0XRNzAb2</a> I thought I saw this error in a different kind of context once, but cannot remember the solution. However, the same code works with my leiningen project</td></tr>
+<tr id="t1439A" class="h"><td><a href="#t1439A">14:39</a></td><td class="n0">michaniskin</td><td>sveri: what's on line 8 of sveri.clojure.commons.files.edn source file?</td></tr>
+<tr id="t1439A" class="h r"><td><a href="#t1439A">14:39</a></td><td class="n0">michaniskin</td><td>sveri: oh i see</td></tr>
+<tr id="t1439A" class="h r"><td><a href="#t1439A">14:39</a></td><td class="n0">michaniskin</td><td>fname is nil i think</td></tr>
+<tr id="t1439A" class="h r"><td><a href="#t1439A">14:39</a></td><td class="n0">michaniskin</td><td>trying to make a reader from nil throws</td></tr>
+<tr id="t1440A" class="r"><td><a href="#t1440A">14:40</a></td><td class="n0">michaniskin</td><td>i mean there is no resource maybe</td></tr>
+<tr id="t1440A" class="h"><td><a href="#t1440A">14:40</a></td><td class="n0">sveri</td><td>michaniskin: ah, resource paths -.-</td></tr>
+<tr id="t1440A" class="h"><td><a href="#t1440A">14:40</a></td><td class="n0">michaniskin</td><td>sveri: debug print (io/resource fname)</td></tr>
+<tr id="t1440A" class="h r"><td><a href="#t1440A">14:40</a></td><td class="n0">michaniskin</td><td>it's probably nil</td></tr>
+<tr id="t1441A" class="h"><td><a href="#t1441A">14:41</a></td><td class="n0">sveri</td><td>the boot file I copied from has only this resource path set: src/clj, this is not enough for me, I try it</td></tr>
+<tr id="t1441A" class="h"><td><a href="#t1441A">14:41</a></td><td class="n0">michaniskin</td><td>sweet</td></tr>
+<tr id="t1443A" class="h"><td><a href="#t1443A">14:43</a></td><td class="n0">sveri</td><td>michaniskin: ok, that error is gone, hopping to the next one :D Btw. are there options for dev-resource paths? I have an extra resource path set for the tests in leiningen</td></tr>
+<tr id="t1444A" class="h"><td><a href="#t1444A">14:44</a></td><td class="n0">michaniskin</td><td>sveri: you can call set-env! anywhere</td></tr>
+<tr id="t1444A" class="h r"><td><a href="#t1444A">14:44</a></td><td class="n0">michaniskin</td><td>you can make a task that calls it</td></tr>
+<tr id="t1444A" class="h r"><td><a href="#t1444A">14:44</a></td><td class="n0">michaniskin</td><td>basically all the different things in lein can be done in boot with just deftask</td></tr>
+<tr id="t1445A" class="h"><td><a href="#t1445A">14:45</a></td><td class="nc">Bronsa</td><td>amalloy: I won't talk about what I just saw.</td></tr>
+<tr id="t1445A" class="h"><td><a href="#t1445A">14:45</a></td><td class="ns">@amalloy</td><td>Bronsa: i'm not sure what the deal is there. i didn't actually type that</td></tr>
+<tr id="t1445A" class="h"><td><a href="#t1445A">14:45</a></td><td class="n0">sveri</td><td>michaniskin: ok, I think I get it</td></tr>
+<tr id="t1445A" class="h"><td><a href="#t1445A">14:45</a></td><td class="nc">Bronsa</td><td>amalloy: &lt;insert joke about your irc client here&gt;</td></tr>
+<tr id="t1445A" class="h"><td><a href="#t1445A">14:45</a></td><td class="n0">michaniskin</td><td>(deftask dev [] (set-env! :dependencies #(conj % '[...])) identity)</td></tr>
+<tr id="t1445A" class="h r"><td><a href="#t1445A">14:45</a></td><td class="n0">michaniskin</td><td>sveri: then you can use it like a lein profile: `boot dev run-tests`</td></tr>
+<tr id="t1446A" class="h r"><td><a href="#t1446A">14:46</a></td><td class="n0">michaniskin</td><td>or something, there are lots of options cause you're programming there</td></tr>
+<tr id="t1446A" class="h"><td><a href="#t1446A">14:46</a></td><td class="ns">@amalloy</td><td>Bronsa: picasso's hostmask is different-looking from previous incarnations, and what i was doing to ban the others apparently results in a ban to *!*@*</td></tr>
+<tr id="t1446A" class="h r"><td><a href="#t1446A">14:46</a></td><td class="ns">@amalloy</td><td>i actually attempted to ban *!~mike@bb.pixor.net</td></tr>
+<tr id="t1447A" class="h"><td><a href="#t1447A">14:47</a></td><td class="nm">amalloy</td><td>so i am gonna leave this for more a competetent op</td></tr>
+<tr id="t1448A" class="h"><td><a href="#t1448A">14:48</a></td><td class="nc">Bronsa</td><td>amalloy: I'm pretty sure any client will do the right thing with /mode #clojure +b picasso</td></tr>
+<tr id="t1448A" class="h"><td><a href="#t1448A">14:48</a></td><td class="n0">michaniskin</td><td>sveri: clojure.core/identity is actually the noop middleware, like if you have a task that you want to just pass through to the next task and not actually do anything (like the &quot;profiles&quot; pattern above)</td></tr>
+<tr id="t1448A" class="h"><td><a href="#t1448A">14:48</a></td><td class="nm">amalloy</td><td>Bronsa: i don't think you want to ban nicks</td></tr>
+<tr id="t1448A" class="h"><td><a href="#t1448A">14:48</a></td><td class="nc">hellofunk</td><td>Bronsa: please forgive my ignorance, i beg you most kindly please note the difference in the /mode you mentioned and /ignore</td></tr>
+<tr id="t1449A" class="h"><td><a href="#t1449A">14:49</a></td><td class="n0">sveri</td><td>michaniskin: thanks, I just wrote this up</td></tr>
+<tr id="t1449A" class="h"><td><a href="#t1449A">14:49</a></td><td class="nc">Bronsa</td><td>amalloy: meh, he's identified though</td></tr>
+<tr id="t1449A" class="h r"><td><a href="#t1449A">14:49</a></td><td class="nc">Bronsa</td><td>hellofunk: I have already /ignored it but banning it from the channel is the only way to prevent it won't spam other users</td></tr>
+<tr id="t1450A"><td><a href="#t1450A">14:50</a></td><td class="nc">hellofunk</td><td>Bronsa: I care very much to provide to you this moment my thanks, given to you for your succinct reasoning that you have imminently shared</td></tr>
+<tr id="t1450A" class="h"><td><a href="#t1450A">14:50</a></td><td class="n0">sveri</td><td>michaniskin: I now got problems with cljx I guess, so if you got some time, this is the stacktrace: <a href="http://pastebin.com/svnfVYgD">http://pastebin.com/svnfVYgD</a> &quot;de/sveri/structconverter/routes/csv.clj&quot; is clj code and de/sveri/structconverter/csv_common is cljx code, looks like it cannot find the compiled cljx classes</td></tr>
+<tr id="t1451A" class="h"><td><a href="#t1451A">14:51</a></td><td class="nc">Bronsa</td><td>hellofunk: are you by any chance sdegutis?</td></tr>
+<tr id="t1451A" class="h"><td><a href="#t1451A">14:51</a></td><td class="nc">hellofunk</td><td>Bronsa: while my medical history is not something wish to share, i all the same admit that i am unfamiliar with the condition you just mentioned.</td></tr>
+<tr id="t1509A" class="r"><td><a href="#t1509A">15:09</a></td><td class="nc">hellofunk</td><td>Bronsa: lol just having a bit of fun, but no i am not that other user, if that's what you meant.</td></tr>
+<tr id="t1510A" class="r"><td><a href="#t1510A">15:10</a></td><td class="nc">hellofunk</td><td>btw happy holidays gentlemen and ladies, this has been a good year for me and clojure and you guys are a big part of why</td></tr>
+<tr id="t1515A" class="h"><td><a href="#t1515A">15:15</a></td><td class="nd">TEttinger</td><td>hellofunk, yep, clojure's a great language with a great community</td></tr>
+<tr id="t1520A"><td><a href="#t1520A">15:20</a></td><td class="nv">Deraen</td><td>sveri: Interesting. The boot doesn't print anything before the exception? Is your build.boot file still similar to what you linked previously?</td></tr>
+<tr id="t1521A" class="h"><td><a href="#t1521A">15:21</a></td><td class="n0">michaniskin</td><td>sveri: you can increase verbosity with the -v option, like `boot -vvvv dev`</td></tr>
+<tr id="t1522A" class="h"><td><a href="#t1522A">15:22</a></td><td class="n0">sveri</td><td>Deraen: yea, but I just saw, I have to add a special boot.clj file like in the example, I totall ymissed this</td></tr>
+<tr id="t1522A" class="h"><td><a href="#t1522A">15:22</a></td><td class="nv">Deraen</td><td>You were trying to require some code from build.boot which requires some ns which has to be compiled using cljx?</td></tr>
+<tr id="t1524A" class="h"><td><a href="#t1524A">15:24</a></td><td class="n4">Pistahh</td><td>hi</td></tr>
+<tr id="t1524A" class="h r"><td><a href="#t1524A">15:24</a></td><td class="n4">Pistahh</td><td>&lt;- relatively new to clojure</td></tr>
+<tr id="t1525A" class="h r"><td><a href="#t1525A">15:25</a></td><td class="n4">Pistahh</td><td>how to do ((mymap &quot;foo&quot;) &quot;bar&quot;) more clojure-ly?</td></tr>
+<tr id="t1526A" class="h"><td><a href="#t1526A">15:26</a></td><td class="n0">michaniskin</td><td>Pistahh: (get-in mymap [&quot;foo&quot; &quot;bar&quot;])</td></tr>
+<tr id="t1527A" class="h r"><td><a href="#t1527A">15:27</a></td><td class="n0">michaniskin</td><td>Pistahh: see also assoc-in, update-in</td></tr>
+<tr id="t1527A" class="h"><td><a href="#t1527A">15:27</a></td><td class="n4">Pistahh</td><td>thy</td></tr>
+<tr id="t1527A" class="h"><td><a href="#t1527A">15:27</a></td><td class="n0">michaniskin</td><td>np</td></tr>
+<tr id="t1528A" class="h"><td><a href="#t1528A">15:28</a></td><td class="n0">sveri</td><td>Deraen: but yea, I am requiring cljx code in clj code, I guess thats what the error says+</td></tr>
+<tr id="t1531A"><td><a href="#t1531A">15:31</a></td><td class="nv">emaczen`</td><td>How can I debug in clojurescript repl?</td></tr>
+<tr id="t1531A" class="h r"><td><a href="#t1531A">15:31</a></td><td class="nv">emaczen`</td><td>I want to find the values of some web-forms.</td></tr>
+<tr id="t1536A" class="h"><td><a href="#t1536A">15:36</a></td><td class="n0">michaniskin</td><td>sveri: you can make a task that is after cljx in the pipeline and that can require things</td></tr>
+<tr id="t1537A" class="h r"><td><a href="#t1537A">15:37</a></td><td class="n0">michaniskin</td><td>you would need to require/refer or require/eval in there, of course</td></tr>
+<tr id="t1539A" class="h"><td><a href="#t1539A">15:39</a></td><td class="n0">sveri</td><td>michaniskin: for debugging purposes?</td></tr>
+<tr id="t1539A" class="h"><td><a href="#t1539A">15:39</a></td><td class="n0">michaniskin</td><td>sveri: i mean if you're using things produced by cljx in your build.boot</td></tr>
+<tr id="t1539A" class="h r"><td><a href="#t1539A">15:39</a></td><td class="n0">michaniskin</td><td>you'd need to put that code in a task that comes after the cljx task</td></tr>
+<tr id="t1550A"><td><a href="#t1550A">15:50</a></td><td class="n0">sveri</td><td>michaniskin: hm, I think I misexpressed myself. I have cljx code in my existing project and clj code that requires it, this does work in the liningen project, but not with boot</td></tr>
+<tr id="t1605A"><td><a href="#t1605A">16:05</a></td><td class="n0">michaniskin</td><td>sveri: the clj code that requires the cljx should not itself be required until after the cljx task runs</td></tr>
+<tr id="t1605A" class="h r"><td><a href="#t1605A">16:05</a></td><td class="n0">michaniskin</td><td>you can do this from a task that runs after the cljx task</td></tr>
+<tr id="t1607A" class="h"><td><a href="#t1607A">16:07</a></td><td class="n0">sveri</td><td>ah I see, that makes sense</td></tr>
+<tr id="t1607A" class="h r"><td><a href="#t1607A">16:07</a></td><td class="n0">sveri</td><td>michaniskin: thank you, I guess I have to refactor a bit then</td></tr>
+<tr id="t1616A"><td><a href="#t1616A">16:16</a></td><td class="n4">Pistahh</td><td>I have a vector of some values, e.g. [1 2 3], and I want an assoc map with e.g. keys [:a :b :c] to have those values -&gt; { :a 1 :b 2 :c 3 } - how to do that? :)</td></tr>
+<tr id="t1618A" class="h"><td><a href="#t1618A">16:18</a></td><td class="nn">andyf</td><td>,(zipmap [:a :b :c] [1 2 3])</td></tr>
+<tr id="t1618A" class="h"><td><a href="#t1618A">16:18</a></td><td class="nl">clojurebot</td><td>{:c 3, :b 2, :a 1}</td></tr>
+<tr id="t1620A"><td><a href="#t1620A">16:20</a></td><td class="nb">havenwood</td><td>,(interleave [:a :b :c] [1 2 3])</td></tr>
+<tr id="t1620A" class="h"><td><a href="#t1620A">16:20</a></td><td class="nl">clojurebot</td><td>(:a 1 :b 2 :c ...)</td></tr>
+<tr id="t1620A" class="h"><td><a href="#t1620A">16:20</a></td><td class="nb">havenwood</td><td>ah right, assoc map</td></tr>
+<tr id="t1633A"><td><a href="#t1633A">16:33</a></td><td class="nd">SagiCZ1</td><td>top o' the mornin' to ya</td></tr>
+<tr id="t1635A" class="h"><td><a href="#t1635A">16:35</a></td><td class="nz">kenrestivo</td><td>howdy</td></tr>
+<tr id="t1636A" class="h r"><td><a href="#t1636A">16:36</a></td><td class="nz">kenrestivo</td><td>hmm, ok, replacing a message bus with individual channels for each component presents a problem: the components can't be shutdown and restarted individually because there'll be other components taking or putting onto dead channels</td></tr>
+<tr id="t1637A" class="h r"><td><a href="#t1637A">16:37</a></td><td class="nz">kenrestivo</td><td>could also ref/atom the channels but that starts to smell funny to me (async/&lt;!! @chan)</td></tr>
+<tr id="t1638A" class="h"><td><a href="#t1638A">16:38</a></td><td class="nd">SagiCZ1</td><td>maybe you could use poision pill approach</td></tr>
+<tr id="t1638A" class="h"><td><a href="#t1638A">16:38</a></td><td class="nz">kenrestivo</td><td>how so?</td></tr>
+<tr id="t1638A" class="h"><td><a href="#t1638A">16:38</a></td><td class="nd">SagiCZ1</td><td>feed the channel something that the consumer recognizes and shutdowns... &quot;-1&quot; or nil or something</td></tr>
+<tr id="t1639A" class="h r"><td><a href="#t1639A">16:39</a></td><td class="nd">SagiCZ1</td><td>this is what is commonly used in java when operating blocking queue</td></tr>
+<tr id="t1639A" class="h"><td><a href="#t1639A">16:39</a></td><td class="nz">kenrestivo</td><td>oh,  a kill message. but what if someone else shuts it down? the error handling becomes complex</td></tr>
+<tr id="t1640A"><td><a href="#t1640A">16:40</a></td><td class="nd">SagiCZ1</td><td>i guess.. it was just an idea, i dont understand your case well enough</td></tr>
+<tr id="t1640A" class="h"><td><a href="#t1640A">16:40</a></td><td class="nz">kenrestivo</td><td>neither do i, apparently :-/</td></tr>
+<tr id="t1642A" class="h"><td><a href="#t1642A">16:42</a></td><td class="nd">SagiCZ1</td><td>i read just one little tutorial on async.. seems nice but i need to learn how to apply it properly.. and also recognize a problem that benefits from it</td></tr>
+<tr id="t1643A" class="h"><td><a href="#t1643A">16:43</a></td><td class="nz">kenrestivo</td><td>i'm learning it. it has a lot of potential but i'm still trying to figure out how to use it properly.</td></tr>
+<tr id="t1644A" class="h r"><td><a href="#t1644A">16:44</a></td><td class="nz">kenrestivo</td><td>i found it very useful in cljs in the context of om, for example. now i'm trying to use it to get components to communicate with one another in a jvm app, and it's been challenging</td></tr>
+<tr id="t1646A" class="h"><td><a href="#t1646A">16:46</a></td><td class="nd">SagiCZ1</td><td>so you would need the channel to recognize that one of its ends is dead and close itself?</td></tr>
+<tr id="t1646A" class="h"><td><a href="#t1646A">16:46</a></td><td class="nz">kenrestivo</td><td>hmm, lemme see if i can refheap something up. might help me think about the problem better too</td></tr>
+<tr id="t1647A" class="h r"><td><a href="#t1647A">16:47</a></td><td class="nz">kenrestivo</td><td>see, in a lot of core.async examples, they just assume threads or go-loops just start and go on forever. trying to make things modular so that loops are treated as daemons, seems not as well documented</td></tr>
+<tr id="t1647A" class="h"><td><a href="#t1647A">16:47</a></td><td class="nd">SagiCZ1</td><td>yeah i see</td></tr>
+<tr id="t1647A" class="h"><td><a href="#t1647A">16:47</a></td><td class="nz">kenrestivo</td><td>it's real easy to just close a channel adn stop a loop that way, but then restarting... that's the thing</td></tr>
+<tr id="t1648A" class="h r"><td><a href="#t1648A">16:48</a></td><td class="nz">kenrestivo</td><td>(loop [] (when-let [v (async/&lt;!! chan)] (do-stuff v) (recur)))</td></tr>
+<tr id="t1732A"><td><a href="#t1732A">17:32</a></td><td class="nh">numberten</td><td>is aset O(1) ?</td></tr>
+<tr id="t1733A" class="h"><td><a href="#t1733A">17:33</a></td><td class="nd">SagiCZ1</td><td>numberten: what do you mean? set? what operation?</td></tr>
+<tr id="t1734A" class="h"><td><a href="#t1734A">17:34</a></td><td class="nh">numberten</td><td>,(doc aset)</td></tr>
+<tr id="t1734A" class="h"><td><a href="#t1734A">17:34</a></td><td class="nl">clojurebot</td><td>&quot;([array idx val] [array idx idx2 &amp; idxv]); Sets the value at the index/indices. Works on Java arrays of reference types. Returns val.&quot;</td></tr>
+<tr id="t1735A" class="h"><td><a href="#t1735A">17:35</a></td><td class="nd">SagiCZ1</td><td>numberten: oh sorry</td></tr>
+<tr id="t1736A" class="h r"><td><a href="#t1736A">17:36</a></td><td class="nd">SagiCZ1</td><td>i think it should be definitely O(1)</td></tr>
+<tr id="t1736A" class="h"><td><a href="#t1736A">17:36</a></td><td class="nz">kenrestivo</td><td>ok, just played around with it, i think it'll work the way i want it to. <a href="https://www.refheap.com/95273">https://www.refheap.com/95273</a></td></tr>
+<tr id="t1751A"><td><a href="#t1751A">17:51</a></td><td class="nn">andyf</td><td>kenrestivo: Definitely O(1).  However the constant differs dramatically and noticeably if it uses reflection.  If it is used many times during run time in your code, you'll want to enable reflection warnings and eliminate them if you can.</td></tr>
+<tr id="t1752A" class="h"><td><a href="#t1752A">17:52</a></td><td class="nz">kenrestivo</td><td>andyf: i think you meant SagiCZ1</td></tr>
+<tr id="t1752A" class="h r"><td><a href="#t1752A">17:52</a></td><td class="nz">kenrestivo</td><td>or maybe numberten</td></tr>
+<tr id="t1752A" class="h"><td><a href="#t1752A">17:52</a></td><td class="nn">andyf</td><td>sorry, yes.</td></tr>
+<tr id="t1752A" class="h r"><td><a href="#t1752A">17:52</a></td><td class="nn">andyf</td><td>numberten: ^^</td></tr>
+<tr id="t1753A" class="h"><td><a href="#t1753A">17:53</a></td><td class="nz">kenrestivo</td><td>(who is probably wonder why his computer is beeping so much now)</td></tr>
+<tr id="t1754A" class="h"><td><a href="#t1754A">17:54</a></td><td class="nh">numberten</td><td>this is an array of bigints</td></tr>
+<tr id="t1754A" class="h r"><td><a href="#t1754A">17:54</a></td><td class="nh">numberten</td><td>so reflection could probably be a big constant cost I imagine :/</td></tr>
+<tr id="t1755A" class="h"><td><a href="#t1755A">17:55</a></td><td class="nz">kenrestivo</td><td>type hints</td></tr>
+<tr id="t1755A" class="h r"><td><a href="#t1755A">17:55</a></td><td class="nz">kenrestivo</td><td>kills reflection dead</td></tr>
+<tr id="t1755A" class="h"><td><a href="#t1755A">17:55</a></td><td class="nh">numberten</td><td>cool</td></tr>
+<tr id="t1755A" class="h r"><td><a href="#t1755A">17:55</a></td><td class="nh">numberten</td><td>never actually used them before</td></tr>
+<tr id="t1756A" class="h"><td><a href="#t1756A">17:56</a></td><td class="nd">jonathanj</td><td>is there a better way of writing: (into {} (map (juxt :id :name) modes))</td></tr>
+<tr id="t1757A" class="h"><td><a href="#t1757A">17:57</a></td><td class="nc">Bronsa</td><td>select-keys</td></tr>
+<tr id="t1757A" class="h r"><td><a href="#t1757A">17:57</a></td><td class="nc">Bronsa</td><td>,(doc select-keys)</td></tr>
+<tr id="t1757A" class="h"><td><a href="#t1757A">17:57</a></td><td class="nl">clojurebot</td><td>&quot;([map keyseq]); Returns a map containing only those entries in map whose key is in keys&quot;</td></tr>
+<tr id="t1757A" class="h"><td><a href="#t1757A">17:57</a></td><td class="nz">kenrestivo</td><td>i like &quot;lein update-in : assoc :pedantic? :warn -- check&quot; to find all the reflection warnings, dependency mismatches, etc</td></tr>
+<tr id="t1757A" class="h"><td><a href="#t1757A">17:57</a></td><td class="nc">Bronsa</td><td>no, that doesn't do what you want</td></tr>
+<tr id="t1758A" class="h"><td><a href="#t1758A">17:58</a></td><td class="nd">jonathanj</td><td>that is turning [{:id &quot;a&quot; :name &quot;Aye&quot;} ...] into {&quot;a&quot; &quot;Aye&quot; ...}</td></tr>
+<tr id="t1800A"><td><a href="#t1800A">18:00</a></td><td class="nc">Bronsa</td><td>jonathanj: yeah I can't think of a better solution than the one you wrote</td></tr>
+<tr id="t1802A" class="h"><td><a href="#t1802A">18:02</a></td><td class="nh">numberten</td><td>kenrestivo: is it possible to type hint an array?</td></tr>
+<tr id="t1802A" class="h"><td><a href="#t1802A">18:02</a></td><td class="nd">SagiCZ1</td><td>yes</td></tr>
+<tr id="t1803A" class="h r"><td><a href="#t1803A">18:03</a></td><td class="nd">SagiCZ1</td><td>ints, longs, floats, doubles ..</td></tr>
+<tr id="t1804A" class="h"><td><a href="#t1804A">18:04</a></td><td class="n4">Pistahh</td><td>is there anything like &quot;map&quot; but without collecting the results?</td></tr>
+<tr id="t1804A" class="h"><td><a href="#t1804A">18:04</a></td><td class="nd">justin_smith</td><td>in fact, arrays aren't just hinted - they are typed</td></tr>
+<tr id="t1804A" class="h r"><td><a href="#t1804A">18:04</a></td><td class="nd">justin_smith</td><td>Pistahh: doseq</td></tr>
+<tr id="t1804A" class="h"><td><a href="#t1804A">18:04</a></td><td class="nh">numberten</td><td>bigints?</td></tr>
+<tr id="t1804A" class="h"><td><a href="#t1804A">18:04</a></td><td class="nd">justin_smith</td><td>or (dorun (map ...)) if you really want the map syntax</td></tr>
+<tr id="t1805A" class="h r"><td><a href="#t1805A">18:05</a></td><td class="nd">justin_smith</td><td>numberten: &quot;bigints&quot; would not make sense, because bigint is not a primitive type</td></tr>
+<tr id="t1805A" class="h r"><td><a href="#t1805A">18:05</a></td><td class="nd">justin_smith</td><td>,(into-array BigInt [])</td></tr>
+<tr id="t1805A" class="h"><td><a href="#t1805A">18:05</a></td><td class="nl">clojurebot</td><td>#&lt;CompilerException java.lang.RuntimeException: Unable to resolve symbol: BigInt in this context, compiling:(NO_SOURCE_PATH:0:0)&gt;</td></tr>
+<tr id="t1806A" class="h"><td><a href="#t1806A">18:06</a></td><td class="nd">justin_smith</td><td>,(into-array clojure.lang.BigInt [])</td></tr>
+<tr id="t1806A" class="h"><td><a href="#t1806A">18:06</a></td><td class="nl">clojurebot</td><td>#&lt;BigInt[] [Lclojure.lang.BigInt;@248d7e99&gt;</td></tr>
+<tr id="t1806A" class="h"><td><a href="#t1806A">18:06</a></td><td class="nh">numberten</td><td>,(into-array clojure.lang.BigInt [])</td></tr>
+<tr id="t1806A" class="h"><td><a href="#t1806A">18:06</a></td><td class="nl">clojurebot</td><td>#&lt;BigInt[] [Lclojure.lang.BigInt;@33ba11b3&gt;</td></tr>
+<tr id="t1806A" class="h"><td><a href="#t1806A">18:06</a></td><td class="nd">justin_smith</td><td>but that's not the same sort of thing as longs, doubles, bytes etc. - each element must be boxed</td></tr>
+<tr id="t1807A" class="h"><td><a href="#t1807A">18:07</a></td><td class="nh">numberten</td><td>i see</td></tr>
+<tr id="t1809A" class="h r"><td><a href="#t1809A">18:09</a></td><td class="nh">numberten</td><td>so then there's no way I could typehint away this warning: Reflection warning, solution.clj:35:54 - call to static method aget on clojure.lang.RT can't be resolved (argument types: unknown, int)</td></tr>
+<tr id="t1810A"><td><a href="#t1810A">18:10</a></td><td class="nd">justin_smith</td><td>^&quot;[Lclojure.lang.BigInt&quot; may work as an annotation there actually</td></tr>
+<tr id="t1810A" class="h r"><td><a href="#t1810A">18:10</a></td><td class="nd">justin_smith</td><td>iirc the string will be interpreted properly</td></tr>
+<tr id="t1810A" class="h"><td><a href="#t1810A">18:10</a></td><td class="nh">numberten</td><td>i didn't know you could wrap types in strings</td></tr>
+<tr id="t1810A" class="h"><td><a href="#t1810A">18:10</a></td><td class="nd">justin_smith</td><td>it's needed for [L...</td></tr>
+<tr id="t1811A" class="h r"><td><a href="#t1811A">18:11</a></td><td class="nd">justin_smith</td><td>Bronsa knows more about this stuff though</td></tr>
+<tr id="t1811A" class="h"><td><a href="#t1811A">18:11</a></td><td class="nz">kenrestivo</td><td>hahaha, the complexity in starting/stopping multiple threads/channels comes when i get into using alts!!...</td></tr>
+<tr id="t1811A" class="h r"><td><a href="#t1811A">18:11</a></td><td class="nz">kenrestivo</td><td>a simple when-let ain't gonna cut it</td></tr>
+<tr id="t1812A" class="h"><td><a href="#t1812A">18:12</a></td><td class="nh">numberten</td><td>it worked</td></tr>
+<tr id="t1812A" class="h r"><td><a href="#t1812A">18:12</a></td><td class="nh">numberten</td><td>but it needed the ;</td></tr>
+<tr id="t1812A" class="h r"><td><a href="#t1812A">18:12</a></td><td class="nh">numberten</td><td>^&quot;[Lclojure.lang.BigInt;&quot;</td></tr>
+<tr id="t1812A" class="h r"><td><a href="#t1812A">18:12</a></td><td class="nh">numberten</td><td>justin_smith: thanks</td></tr>
+<tr id="t1812A" class="h"><td><a href="#t1812A">18:12</a></td><td class="nd">justin_smith</td><td>np - forgot the ; was part of the class name, yeah</td></tr>
+<tr id="t1913A"><td><a href="#t1913A">19:13</a></td><td class="nc">dthurn</td><td>Can somebody help me understand why this doesn’t return 15: (let [[tween [:tween]] [15 [:tween]]] tween) ?</td></tr>
+<tr id="t1914A" class="h"><td><a href="#t1914A">19:14</a></td><td class="nc">Bronsa</td><td>dthurn: destructuring is not pattern matching</td></tr>
+<tr id="t1914A" class="h r"><td><a href="#t1914A">19:14</a></td><td class="nc">Bronsa</td><td>,(let [[tween [_]] [15 [:tween]]] tween)</td></tr>
+<tr id="t1914A" class="h"><td><a href="#t1914A">19:14</a></td><td class="nl">clojurebot</td><td>15</td></tr>
+<tr id="t1915A" class="h"><td><a href="#t1915A">19:15</a></td><td class="n4">seangrove</td><td>,(let [[tween [:tween]] [15 [:tween]]] tween)</td></tr>
+<tr id="t1915A" class="h"><td><a href="#t1915A">19:15</a></td><td class="nl">clojurebot</td><td>:tween</td></tr>
+<tr id="t1915A" class="h"><td><a href="#t1915A">19:15</a></td><td class="nc">Bronsa</td><td>,(let [[:a] [1]] a) ; :(</td></tr>
+<tr id="t1915A" class="h"><td><a href="#t1915A">19:15</a></td><td class="nl">clojurebot</td><td>1</td></tr>
+<tr id="t1915A" class="h"><td><a href="#t1915A">19:15</a></td><td class="nc">Bronsa</td><td>this works by accident since 1.6</td></tr>
+<tr id="t1916A" class="h"><td><a href="#t1916A">19:16</a></td><td class="n4">seangrove</td><td>Wow, didn't know that keywords would turn into bindings..</td></tr>
+<tr id="t1916A" class="h"><td><a href="#t1916A">19:16</a></td><td class="nc">dthurn</td><td>you can use keywords instead of symbols in bindings?</td></tr>
+<tr id="t1916A" class="h"><td><a href="#t1916A">19:16</a></td><td class="n4">seangrove</td><td>Ah, ok</td></tr>
+<tr id="t1916A" class="h"><td><a href="#t1916A">19:16</a></td><td class="nc">dthurn</td><td>didn’t know that</td></tr>
+<tr id="t1916A" class="h"><td><a href="#t1916A">19:16</a></td><td class="nc">Bronsa</td><td>seangrove: only in destructuring</td></tr>
+<tr id="t1916A" class="h r"><td><a href="#t1916A">19:16</a></td><td class="nc">Bronsa</td><td>dthurn: don't do that. it's an implementation detail</td></tr>
+<tr id="t1917A" class="h"><td><a href="#t1917A">19:17</a></td><td class="nc">dthurn</td><td>That’s too bad, I like the idea of using constants in binding expressions</td></tr>
+<tr id="t1917A" class="h"><td><a href="#t1917A">19:17</a></td><td class="nc">Bronsa</td><td>seangrove: if you're interested, this works as a side-effect of the patch for destructuring namespaced keywords</td></tr>
+<tr id="t1917A" class="h"><td><a href="#t1917A">19:17</a></td><td class="nc">dthurn</td><td>But it makes sense, I guess</td></tr>
+<tr id="t1918A" class="h"><td><a href="#t1918A">19:18</a></td><td class="n4">seangrove</td><td>Bronsa: Ah, interesting actually</td></tr>
+<tr id="t1959A"><td><a href="#t1959A">19:59</a></td><td class="nz">sova</td><td>:D Clojure!</td></tr>
+<tr id="t2000A"><td><a href="#t2000A">20:00</a></td><td class="nm">xnil</td><td>Finally, some Clojure.</td></tr>
+<tr id="t2001A" class="h r"><td><a href="#t2001A">20:01</a></td><td class="nm">xnil</td><td>Clojure for Windows [close your four windows]</td></tr>
+<tr id="t2008A" class="h r"><td><a href="#t2008A">20:08</a></td><td class="nm">xnil</td><td>Clojure Mind, Clojure Buddha</td></tr>
+<tr id="t2019A"><td><a href="#t2019A">20:19</a></td><td class="nz">sova</td><td>could someone kindly point me to an open source project which uses clojureScript?</td></tr>
+<tr id="t2020A"><td><a href="#t2020A">20:20</a></td><td class="nt">rads</td><td>ztellman: I watched your &quot;Always Be Composing&quot; talk and really enjoyed it. I'm trying to learn the tradeoffs between data-oriented code and function-oriented code, but I basically have to write it both ways to see which works best right now</td></tr>
+<tr id="t2020A" class="h"><td><a href="#t2020A">20:20</a></td><td class="n1">ztellman</td><td>rads: so do I, a lot of the time</td></tr>
+<tr id="t2020A" class="h"><td><a href="#t2020A">20:20</a></td><td class="nt">rads</td><td>one insight I liked was that data is more general than code because it has no predefined semantics</td></tr>
+<tr id="t2020A" class="h r"><td><a href="#t2020A">20:20</a></td><td class="nt">rads</td><td>which makes the program more general</td></tr>
+<tr id="t2020A" class="h"><td><a href="#t2020A">20:20</a></td><td class="n1">ztellman</td><td>in both the good and bad senses of the term</td></tr>
+<tr id="t2020A" class="h r"><td><a href="#t2020A">20:20</a></td><td class="n1">ztellman</td><td>anyway, glad you liked it</td></tr>
+<tr id="t2021A" class="h"><td><a href="#t2021A">20:21</a></td><td class="nt">rads</td><td>I'm interested in doing a talk that goes into more detail about those tradeoffs, but I need more experience and research to be able to do that</td></tr>
+<tr id="t2021A" class="h r"><td><a href="#t2021A">20:21</a></td><td class="nt">rads</td><td>I find this concept of data-orientation hard to explain to people who only know OO</td></tr>
+<tr id="t2022A" class="h"><td><a href="#t2022A">20:22</a></td><td class="n1">ztellman</td><td>I'd be interested in seeing that talk</td></tr>
+<tr id="t2022A" class="h"><td><a href="#t2022A">20:22</a></td><td class="nt">rads</td><td>it seems like there's not much literature on this idea right now, but maybe that's because it's a relatively new concept?</td></tr>
+<tr id="t2023A" class="h"><td><a href="#t2023A">20:23</a></td><td class="n1">ztellman</td><td>I'm sure there are multiple papers in the 70s that discuss it under a different name</td></tr>
+<tr id="t2023A" class="h"><td><a href="#t2023A">20:23</a></td><td class="nt">rads</td><td>I don't have a lot of experience with other FP languages besides clojure, but in haskell for example it appears there's a lot of emphasis on higher-order funtions</td></tr>
+<tr id="t2024A" class="h r"><td><a href="#t2024A">20:24</a></td><td class="nt">rads</td><td>I haven't heard much about &quot;data-first&quot; programming in haskell</td></tr>
+<tr id="t2024A" class="h r"><td><a href="#t2024A">20:24</a></td><td class="nt">rads</td><td>yeah, that's the tricky part :)</td></tr>
+<tr id="t2024A" class="h r"><td><a href="#t2024A">20:24</a></td><td class="nt">rads</td><td>figuring out the different name</td></tr>
+<tr id="t2025A" class="h"><td><a href="#t2025A">20:25</a></td><td class="nd">TEttinger</td><td>there's also this <a href="http://www.dataorienteddesign.com/dodmain/node3.html">http://www.dataorienteddesign.com/dodmain/node3.html</a></td></tr>
+<tr id="t2025A" class="h r"><td><a href="#t2025A">20:25</a></td><td class="nd">TEttinger</td><td>data oriented design is a crazy concept</td></tr>
+<tr id="t2026A" class="h r"><td><a href="#t2026A">20:26</a></td><td class="nd">TEttinger</td><td>but rather different from the high-level approach to data in clojure</td></tr>
+<tr id="t2026A" class="h"><td><a href="#t2026A">20:26</a></td><td class="nt">rads</td><td>cool, thanks for the link</td></tr>
+<tr id="t2027A" class="h r"><td><a href="#t2027A">20:27</a></td><td class="nt">rads</td><td>another way to put it is that we have this rule of thumb of &quot;data &gt; functions &gt; macros&quot; when designing a program. I'm wondering what are the principles that make that rule of thumb work</td></tr>
+<tr id="t2028A" class="h"><td><a href="#t2028A">20:28</a></td><td class="nd">TEttinger</td><td>more data than fns than macros sounds like a good approach</td></tr>
+<tr id="t2028A" class="h"><td><a href="#t2028A">20:28</a></td><td class="nt">rads</td><td>I've heard it around the community before, but I don't know where it originally came from</td></tr>
+<tr id="t2030A" class="r"><td><a href="#t2030A">20:30</a></td><td class="nt">rads</td><td>TEttinger: it looks like &quot;data-orientented design&quot; and &quot;data-driven design&quot; are two separate things</td></tr>
+<tr id="t2031A" class="h"><td><a href="#t2031A">20:31</a></td><td class="nd">TEttinger</td><td>rads, indeed!</td></tr>
+<tr id="t2031A" class="h r"><td><a href="#t2031A">20:31</a></td><td class="nd">TEttinger</td><td>$wiki data driven design</td></tr>
+<tr id="t2031A" class="h"><td><a href="#t2031A">20:31</a></td><td class="nx">lazybot</td><td>[Data-driven programming - Wikipedia, the free encyclopedia] <a href="http://en.wikipedia.org/wiki/Data-driven_programming">http://en.wikipedia.org/wiki/Data-driven_programming</a></td></tr>
+<tr id="t2031A" class="h"><td><a href="#t2031A">20:31</a></td><td class="nd">TEttinger</td><td>who fixed lazybot, Raynes, justin_smith, rhg135?</td></tr>
+<tr id="t2031A" class="h"><td><a href="#t2031A">20:31</a></td><td class="na">Raynes</td><td>?</td></tr>
+<tr id="t2032A" class="h"><td><a href="#t2032A">20:32</a></td><td class="nd">TEttinger</td><td>google didn't work for a while because the API died</td></tr>
+<tr id="t2032A" class="h r"><td><a href="#t2032A">20:32</a></td><td class="nd">TEttinger</td><td>$google google search api deprecated</td></tr>
+<tr id="t2032A" class="h"><td><a href="#t2032A">20:32</a></td><td class="nx">lazybot</td><td>[Google Web Search API (Deprecated) — Google Developers] <a href="https://developers.google.com/web-search/">https://developers.google.com/web-search/</a></td></tr>
+<tr id="t2033A" class="h"><td><a href="#t2033A">20:33</a></td><td class="na">Raynes</td><td>Well, nobody fixed it.</td></tr>
+<tr id="t2033A" class="h"><td><a href="#t2033A">20:33</a></td><td class="nt">rads</td><td>when I first heard about this idea of modeling a program as passing in a data structure to a domain-specific evaluator, I thought of grunt (the javascript build tool) and thought &quot;yuck&quot;</td></tr>
+<tr id="t2033A" class="h"><td><a href="#t2033A">20:33</a></td><td class="nd">TEttinger</td><td>hm</td></tr>
+<tr id="t2034A" class="h r"><td><a href="#t2034A">20:34</a></td><td class="nd">TEttinger</td><td>For CSE users, the API provides 100 search queries per day for free. If you need more, you may sign up for billing in the Developers Console. Additional requests cost $5 per 1000 queries, up to 10k queries per day.</td></tr>
+<tr id="t2034A" class="h"><td><a href="#t2034A">20:34</a></td><td class="nt">rads</td><td>after thinking about it some more, I think the problem with grunt I had is that I felt limited by what I could express in its data format</td></tr>
+<tr id="t2034A" class="h r"><td><a href="#t2034A">20:34</a></td><td class="nt">rads</td><td>perhaps it's not the weakness of the programming orientation, but the specific choices the grunt authors made</td></tr>
+<tr id="t2034A" class="h"><td><a href="#t2034A">20:34</a></td><td class="nx">tadni_</td><td>Is Luminus suggested for webdev?</td></tr>
+<tr id="t2035A" class="h"><td><a href="#t2035A">20:35</a></td><td class="nz">sova</td><td>luminus is sweet, depending on the complexity of your app</td></tr>
+<tr id="t2035A" class="h"><td><a href="#t2035A">20:35</a></td><td class="nd">TEttinger</td><td>I had an issue with my lazybot after restarting it, that any $google requests didn't print anything because there was no :body in the JSON, just a response like &quot;this has been deprecated, use our paid thing instead&quot;</td></tr>
+<tr id="t2036A" class="h"><td><a href="#t2036A">20:36</a></td><td class="nx">tadni_</td><td>sova: I mean, it'll mostly just be a document viewer -- but also have a system that will talk to my server and build a custom GNU+Linux distro on my end, probably though tome simplisiticish UI.</td></tr>
+<tr id="t2036A" class="h"><td><a href="#t2036A">20:36</a></td><td class="nd">TEttinger</td><td>I ended up adding my own google plugin, that scrapes DDG's redirect page for a request like <a href="http://duckduckgo.com/q=\panda%20site:wikipedia.org">http://duckduckgo.com/q=\panda%20site:wikipedia.org</a></td></tr>
+<tr id="t2037A" class="h"><td><a href="#t2037A">20:37</a></td><td class="nx">tadni_</td><td>I really want to do it in as much Lispyness as possible, but I keep having people suggesting Angular to me. I know very, very little about webdev. And JS about at that same level.</td></tr>
+<tr id="t2037A" class="h"><td><a href="#t2037A">20:37</a></td><td class="nd">TEttinger</td><td>make that <a href="https://duckduckgo.com/?q=\panda+site:wikipedia.org">https://duckduckgo.com/?q=\panda+site:wikipedia.org</a></td></tr>
+<tr id="t2038A" class="h"><td><a href="#t2038A">20:38</a></td><td class="nt">rads</td><td>tadni_: might want to look into something based on React.JS for a functional-approach to front-end development</td></tr>
+<tr id="t2038A" class="h"><td><a href="#t2038A">20:38</a></td><td class="nd">TEttinger</td><td>Om ?</td></tr>
+<tr id="t2039A" class="h"><td><a href="#t2039A">20:39</a></td><td class="nx">tadni_</td><td>rads: Thanks, I'll add it to my list of things to check. :^)</td></tr>
+<tr id="t2039A" class="h"><td><a href="#t2039A">20:39</a></td><td class="nt">rads</td><td>om is one option, there's also reagent which is a more direct clojure wrapper for react.js</td></tr>
+<tr id="t2040A"><td><a href="#t2040A">20:40</a></td><td class="nx">tadni_</td><td>I mean, to a large degree -- I want to just clone getfedora.org with having most everything on the page ... but also, having a distro genrator seems like a relatively cool/easy thing to implement.</td></tr>
+<tr id="t2042A" class="h"><td><a href="#t2042A">20:42</a></td><td class="nm">xnil</td><td>tadni_: clojurescript, m8</td></tr>
+<tr id="t2049A" class="h"><td><a href="#t2049A">20:49</a></td><td class="nx">tadni_</td><td>But yeah, of the selections I've seen -- Luminus seems decent.</td></tr>
+<tr id="t2054A"><td><a href="#t2054A">20:54</a></td><td class="na">Raynes</td><td><a href="http://www.tryclj.com/">http://www.tryclj.com/</a> has a new design</td></tr>
+<tr id="t2054A" class="h r"><td><a href="#t2054A">20:54</a></td><td class="na">Raynes</td><td>Sure wish folks would contribute more cool stuff like this to tryclj ;)</td></tr>
+<tr id="t2054A" class="h r"><td><a href="#t2054A">20:54</a></td><td class="na">Raynes</td><td>It hasn't seen love in a while.</td></tr>
+<tr id="t2054A" class="h r"><td><a href="#t2054A">20:54</a></td><td class="na">Raynes</td><td>Sure would be neat if someone updated it for new Clojures and stuff ;)</td></tr>
+<tr id="t2103A"><td><a href="#t2103A">21:03</a></td><td class="nm">xnil</td><td>Raynes: oh, that's nice.</td></tr>
+<tr id="t2103A" class="h"><td><a href="#t2103A">21:03</a></td><td class="n1">kl</td><td>Hi, a question. Clojure uses the JVM to enable interoperability with Java stuff. But Clojure promotes immutability &amp; referential transparency - why would anybody have an interest in linking up Clojure stuff to Java stuff to begin with?</td></tr>
+<tr id="t2103A" class="h"><td><a href="#t2103A">21:03</a></td><td class="nm">xnil</td><td>kl: because instead of reinventing the wheel, we decided to use preexisting tools</td></tr>
+<tr id="t2104A" class="h"><td><a href="#t2104A">21:04</a></td><td class="n1">kl</td><td>xnil: so the aim was to avoid creating a runtime, rather than Java interoperability?</td></tr>
+<tr id="t2104A" class="h"><td><a href="#t2104A">21:04</a></td><td class="nm">xnil</td><td>it was both</td></tr>
+<tr id="t2105A" class="h r"><td><a href="#t2105A">21:05</a></td><td class="nm">xnil</td><td>i believe hickey's got an official explanation</td></tr>
+<tr id="t2105A" class="h r"><td><a href="#t2105A">21:05</a></td><td class="nm">xnil</td><td>let me find it</td></tr>
+<tr id="t2105A" class="h"><td><a href="#t2105A">21:05</a></td><td class="n1">kl</td><td>xnil: that's pretty much my question: why would anybody want Clojure interop with a side-effectful &amp; mutable language</td></tr>
+<tr id="t2105A" class="h r"><td><a href="#t2105A">21:05</a></td><td class="n1">kl</td><td>oh ok, thanks</td></tr>
+<tr id="t2105A" class="h"><td><a href="#t2105A">21:05</a></td><td class="nm">xnil</td><td><a href="http://clojure.org/rationale">http://clojure.org/rationale</a></td></tr>
+<tr id="t2106A" class="h r"><td><a href="#t2106A">21:06</a></td><td class="nm">xnil</td><td>kl: ^^</td></tr>
+<tr id="t2107A" class="h r"><td><a href="#t2107A">21:07</a></td><td class="nm">xnil</td><td>so yeah, java interop is a huge incentive</td></tr>
+<tr id="t2108A" class="h r"><td><a href="#t2108A">21:08</a></td><td class="nm">xnil</td><td>if your question is the opposite, why would anyone want to use clojure where they can just use java instead, that page should explain the same thing</td></tr>
+<tr id="t2108A" class="h"><td><a href="#t2108A">21:08</a></td><td class="n1">kl</td><td>xnil: lol, no. I'm not a Java proponent :)</td></tr>
+<tr id="t2108A" class="h r"><td><a href="#t2108A">21:08</a></td><td class="n1">kl</td><td>xnil: it was more &quot;why infect clojure with java&quot;</td></tr>
+<tr id="t2109A" class="h"><td><a href="#t2109A">21:09</a></td><td class="nm">xnil</td><td>you don't necessarily have to, as it's also on the .NET platform and compiles down to javascript, but the JVM's just cool, man.</td></tr>
+<tr id="t2116A"><td><a href="#t2116A">21:16</a></td><td class="nx">tadni_</td><td>Okay, probable nap time. o/</td></tr>
+<tr id="t2119A" class="h"><td><a href="#t2119A">21:19</a></td><td class="nm">xnil</td><td>\o</td></tr>
+<tr id="t2124A"><td><a href="#t2124A">21:24</a></td><td class="n1">kl</td><td>xnil: that, I didn't know.</td></tr>
+<tr id="t2125A" class="h r"><td><a href="#t2125A">21:25</a></td><td class="n1">kl</td><td>(Clojure on CLR)</td></tr>
+<tr id="t2125A" class="h"><td><a href="#t2125A">21:25</a></td><td class="nm">xnil</td><td>:)</td></tr>
+<tr id="t2125A" class="h"><td><a href="#t2125A">21:25</a></td><td class="n1">kl</td><td>I've been learning Scala for a while - I'm not convinced it's *the* language for me, but I like a lot of the stuff I've come across. Primarily because it's my first foray away from the &quot;mutable&quot; kind of languages</td></tr>
+<tr id="t2126A" class="h r"><td><a href="#t2126A">21:26</a></td><td class="n1">kl</td><td>I'm going to spend the evening looking at Clojure for comparison - the only thing that concerns me is its lack of static typing. I was never concerned about such things pre-Scala: but a rich type system seems to bring a lot.</td></tr>
+<tr id="t2127A" class="h"><td><a href="#t2127A">21:27</a></td><td class="nm">xnil</td><td>between scala and clojure, i've got to say clojure rubs me the right way. and i'm a massive fan of static typing</td></tr>
+<tr id="t2127A" class="h r"><td><a href="#t2127A">21:27</a></td><td class="nm">xnil</td><td>just wait until you try haskell</td></tr>
+<tr id="t2127A" class="h r"><td><a href="#t2127A">21:27</a></td><td class="nm">xnil</td><td>kl: <a href="https://github.com/clojure/core.typed">https://github.com/clojure/core.typed</a></td></tr>
+<tr id="t2127A" class="h"><td><a href="#t2127A">21:27</a></td><td class="n1">kl</td><td>It's possible to know Scala without already knowing Haskell? :)</td></tr>
+<tr id="t2128A" class="h r"><td><a href="#t2128A">21:28</a></td><td class="n1">kl</td><td>(Scala seems a much more complicated, distorted, far removed version!)</td></tr>
+<tr id="t2128A" class="h"><td><a href="#t2128A">21:28</a></td><td class="nm">xnil</td><td>barely</td></tr>
+<tr id="t2128A" class="h r"><td><a href="#t2128A">21:28</a></td><td class="nm">xnil</td><td>i'd say haskell is that to ocaml, and scala is that to ruby if i were the one concocting the rhetoric</td></tr>
+<tr id="t2129A" class="h"><td><a href="#t2129A">21:29</a></td><td class="n1">kl</td><td>I'm not sure I felt any kind of relationship between Scala and Ruby</td></tr>
+<tr id="t2129A" class="h r"><td><a href="#t2129A">21:29</a></td><td class="n1">kl</td><td>(And Ruby is my day-job)</td></tr>
+<tr id="t2129A" class="h"><td><a href="#t2129A">21:29</a></td><td class="nm">xnil</td><td>well, i like neither</td></tr>
+<tr id="t2129A" class="h"><td><a href="#t2129A">21:29</a></td><td class="n7">godd2</td><td>yea scala syntax reminds me more of ruby than most things</td></tr>
+<tr id="t2129A" class="h"><td><a href="#t2129A">21:29</a></td><td class="nm">xnil</td><td>i'm more of a lispy person. python over ruby for me</td></tr>
+<tr id="t2130A"><td><a href="#t2130A">21:30</a></td><td class="n1">kl</td><td>xnil: I just find when dealing with Python/Ruby... I have to rely much more upon grep than I'd like</td></tr>
+<tr id="t2130A" class="h r"><td><a href="#t2130A">21:30</a></td><td class="n1">kl</td><td>I mean, there's only so much following you can do when everything's so dynamic</td></tr>
+<tr id="t2130A" class="h"><td><a href="#t2130A">21:30</a></td><td class="nm">xnil</td><td>as a result of dynamic typing?</td></tr>
+<tr id="t2130A" class="h"><td><a href="#t2130A">21:30</a></td><td class="n1">kl</td><td>Maybe that. I'm not sure.</td></tr>
+<tr id="t2130A" class="h"><td><a href="#t2130A">21:30</a></td><td class="nm">xnil</td><td>ah</td></tr>
+<tr id="t2132A" class="h"><td><a href="#t2132A">21:32</a></td><td class="n1">kl</td><td>xnil: is that a sentiment you could at all agree with, from experience?</td></tr>
+<tr id="t2133A" class="h r"><td><a href="#t2133A">21:33</a></td><td class="n1">kl</td><td>I understand Clojure to be dynamic, too. But I'm not really sure what dynamic with lisp actually means.</td></tr>
+<tr id="t2133A" class="h"><td><a href="#t2133A">21:33</a></td><td class="nm">xnil</td><td>clojure's dynamic typing is only a boon in my experience</td></tr>
+<tr id="t2133A" class="h r"><td><a href="#t2133A">21:33</a></td><td class="nm">xnil</td><td>well</td></tr>
+<tr id="t2133A" class="h r"><td><a href="#t2133A">21:33</a></td><td class="nm">xnil</td><td>scratch the only</td></tr>
+<tr id="t2134A" class="h r"><td><a href="#t2134A">21:34</a></td><td class="nm">xnil</td><td>there are some places i would like static typing but usually i can whip up something cool to compensate for the lack of mojosa-ness</td></tr>
+<tr id="t2135A" class="h"><td><a href="#t2135A">21:35</a></td><td class="n1">kl</td><td>Would you say that Clojure's dynamic typing is more beneficial+less detrimental, say, than that existing in Ruby/Python?</td></tr>
+<tr id="t2135A" class="h"><td><a href="#t2135A">21:35</a></td><td class="nm">xnil</td><td>yes, by far</td></tr>
+<tr id="t2135A" class="h"><td><a href="#t2135A">21:35</a></td><td class="n1">kl</td><td>Or would you say it's pretty much of same consequence.</td></tr>
+<tr id="t2135A" class="h r"><td><a href="#t2135A">21:35</a></td><td class="n1">kl</td><td>Oh</td></tr>
+<tr id="t2136A" class="h"><td><a href="#t2136A">21:36</a></td><td class="nm">xnil</td><td>i feel python and ruby achieve almost a comparatively toyish feel to them because they try to be something lisp yet traditional</td></tr>
+<tr id="t2136A" class="h r"><td><a href="#t2136A">21:36</a></td><td class="nm">xnil</td><td>it's a very usable awkward middleground</td></tr>
+<tr id="t2136A" class="h"><td><a href="#t2136A">21:36</a></td><td class="n1">kl</td><td>I'm pretty sure I'm going to feel more rounded as a developer with Clojure in my arsenal</td></tr>
+<tr id="t2136A" class="h"><td><a href="#t2136A">21:36</a></td><td class="nm">xnil</td><td>absolutely</td></tr>
+<tr id="t2136A" class="h r"><td><a href="#t2136A">21:36</a></td><td class="nm">xnil</td><td>but then again, surely i'm biased</td></tr>
+<tr id="t2137A" class="h"><td><a href="#t2137A">21:37</a></td><td class="n1">kl</td><td>I used to think (and sound, to many) that I was a real polyglot. I've done so many languages.</td></tr>
+<tr id="t2137A" class="h r"><td><a href="#t2137A">21:37</a></td><td class="n1">kl</td><td>But none were in the functional sphere</td></tr>
+<tr id="t2137A" class="h r"><td><a href="#t2137A">21:37</a></td><td class="n1">kl</td><td>C/C++, Perl, PHP, Python, JS, Ruby</td></tr>
+<tr id="t2137A" class="h"><td><a href="#t2137A">21:37</a></td><td class="nm">xnil</td><td>to be honest, japanese is harder than mandarin chinese</td></tr>
+<tr id="t2137A" class="h"><td><a href="#t2137A">21:37</a></td><td class="n1">kl</td><td>I'm sure I've done others for extended periods that I couldn't even recall</td></tr>
+<tr id="t2140A" class="r"><td><a href="#t2140A">21:40</a></td><td class="n1">kl</td><td>xnil: I wish my capacity for learning formally specified languages extended to the spoken ones</td></tr>
+<tr id="t2140A" class="h"><td><a href="#t2140A">21:40</a></td><td class="nm">xnil</td><td>C, C++, PHP, Ocaml, Haskell, PHP, Python, JS, C#, Java, Clojure, Common Lisp (in various implementations), Racket, Rust, D, and of course the web stacks that every aspiring nerd learns as well as some other languages i didn't use for more than 4 or 5 projects</td></tr>
+<tr id="t2141A" class="h r"><td><a href="#t2141A">21:41</a></td><td class="nm">xnil</td><td>game maker language, anyone?</td></tr>
+<tr id="t2141A" class="h r"><td><a href="#t2141A">21:41</a></td><td class="nm">xnil</td><td>kl: esperanto's formally specified :^)</td></tr>
+<tr id="t2141A" class="h"><td><a href="#t2141A">21:41</a></td><td class="n1">kl</td><td>xnil: hmm. In retrospect, I'm not sure the formal specification is really the qualifying criterion for me :)</td></tr>
+<tr id="t2142A" class="h"><td><a href="#t2142A">21:42</a></td><td class="nm">xnil</td><td>you can build things with esperanto, like artism</td></tr>
+<tr id="t2143A" class="h r"><td><a href="#t2143A">21:43</a></td><td class="nm">xnil</td><td>i've got a cheesecake of 1 foot in diameter</td></tr>
+<tr id="t2144A" class="h"><td><a href="#t2144A">21:44</a></td><td class="n1">kl</td><td>I really like the idea of esperanto. If it had higher adoption, I'm quite sure I'd learn it</td></tr>
+<tr id="t2144A" class="h"><td><a href="#t2144A">21:44</a></td><td class="nm">xnil</td><td>built it with La Mastro de L'Ringoj</td></tr>
+<tr id="t2144A" class="h"><td><a href="#t2144A">21:44</a></td><td class="n1">kl</td><td>I try using English as a language which can be logically built upon, except that just doesn't work</td></tr>
+<tr id="t2144A" class="h"><td><a href="#t2144A">21:44</a></td><td class="nm">xnil</td><td>all natural languages are that way, sorry :P</td></tr>
+<tr id="t2145A" class="h"><td><a href="#t2145A">21:45</a></td><td class="n1">kl</td><td>How did every single naturally emerging language screw it up?!</td></tr>
+<tr id="t2145A" class="h r"><td><a href="#t2145A">21:45</a></td><td class="n1">kl</td><td>It seems easier to just make a consistent one!</td></tr>
+<tr id="t2145A" class="h"><td><a href="#t2145A">21:45</a></td><td class="nz">sova</td><td>until you see a tiger</td></tr>
+<tr id="t2145A" class="h"><td><a href="#t2145A">21:45</a></td><td class="nm">xnil</td><td>it's the brain's fault</td></tr>
+<tr id="t2145A" class="h r"><td><a href="#t2145A">21:45</a></td><td class="nm">xnil</td><td>sova: or a leopard</td></tr>
+<tr id="t2145A" class="h r"><td><a href="#t2145A">21:45</a></td><td class="nm">xnil</td><td>i type better with leopards</td></tr>
+<tr id="t2145A" class="h"><td><a href="#t2145A">21:45</a></td><td class="nz">sova</td><td>and have to shout &quot;HOLY S*** A TIGER/LEOPARD&quot;</td></tr>
+<tr id="t2146A" class="h r"><td><a href="#t2146A">21:46</a></td><td class="nz">sova</td><td>sorry to rudely throw in my two cents, i enjoy language discussions</td></tr>
+<tr id="t2146A" class="h r"><td><a href="#t2146A">21:46</a></td><td class="nz">sova</td><td>*lurks back to the shadows*</td></tr>
+<tr id="t2150A"><td><a href="#t2150A">21:50</a></td><td class="nm">xnil</td><td>Did you mean &quot;Holly, shoot a torque laser&quot;?</td></tr>
+<tr id="t2150A" class="h r"><td><a href="#t2150A">21:50</a></td><td class="nm">xnil</td><td>anyone here from the greater Boston area?</td></tr>
+<tr id="t2218A" class="r"><td><a href="#t2218A">22:18</a></td><td class="nm">xnil</td><td>sova: language discussions are fun. i say we implement a natural language with lisp</td></tr>
+<tr id="t2218A" class="h r"><td><a href="#t2218A">22:18</a></td><td class="nm">xnil</td><td>in fact, i think i have a conthept for it right now.</td></tr>
+<tr id="t2219A" class="h"><td><a href="#t2219A">22:19</a></td><td class="nj">munderwo</td><td>this is probably a long shot, but has anybody used <a href="https://github.com/nodegit/promise">https://github.com/nodegit/promise</a> from clojurescript?</td></tr>
+<tr id="t2257A"><td><a href="#t2257A">22:57</a></td><td class="nz">kenrestivo</td><td>ugh, debugging locked-up async channels is no fun.</td></tr>
+<tr id="t2258A" class="h"><td><a href="#t2258A">22:58</a></td><td class="nc">sdegutis</td><td>xnil_: I dunno, why s-expressions?</td></tr>
+<tr id="t2258A" class="h r"><td><a href="#t2258A">22:58</a></td><td class="nc">sdegutis</td><td>There doesn't seem anything inherently worthwhile in using s-expressions. It seems merely to be a matter of preference.</td></tr>
+<tr id="t2258A" class="h"><td><a href="#t2258A">22:58</a></td><td class="nz">kenrestivo</td><td>how about t-expressions</td></tr>
+<tr id="t2259A" class="h r"><td><a href="#t2259A">22:59</a></td><td class="nz">kenrestivo</td><td>maybe it's time to move off of s</td></tr>
+<tr id="t2259A" class="h"><td><a href="#t2259A">22:59</a></td><td class="nc">sdegutis</td><td>Then we should have S++-expressions.</td></tr>
+<tr id="t2259A" class="h"><td><a href="#t2259A">22:59</a></td><td class="nz">kenrestivo</td><td>msft can have s# expressions</td></tr>
+<tr id="t2259A" class="h"><td><a href="#t2259A">22:59</a></td><td class="nc">sdegutis</td><td>kick picasso it's a spambot</td></tr>
+<tr id="t2259A" class="h"><td><a href="#t2259A">22:59</a></td><td class="ng">arrdem</td><td>the core value of sexprs is homoiconicity for generated programs.</td></tr>
+<tr id="t2300A"><td><a href="#t2300A">23:00</a></td><td class="nc">sdegutis</td><td>arrdem: I think it's been done without s-expressions though.</td></tr>
+<tr id="t2300A" class="h"><td><a href="#t2300A">23:00</a></td><td class="ng">arrdem</td><td>sdegutis: eh you need some equivalent representation of a &quot;form&quot; tho.</td></tr>
+<tr id="t2300A" class="h"><td><a href="#t2300A">23:00</a></td><td class="nc">sdegutis</td><td>True.</td></tr>
+<tr id="t2300A" class="h r"><td><a href="#t2300A">23:00</a></td><td class="nc">sdegutis</td><td>I suppose code&lt;-&gt;data is a legitimate benefit.</td></tr>
+<tr id="t2301A" class="h r"><td><a href="#t2301A">23:01</a></td><td class="nc">sdegutis</td><td>I guess its value is what's really arguable.</td></tr>
+<tr id="t2301A" class="h"><td><a href="#t2301A">23:01</a></td><td class="ng">arrdem</td><td>code &lt;-!-&gt; data, we have read-eval</td></tr>
+<tr id="t2301A" class="h r"><td><a href="#t2301A">23:01</a></td><td class="ng">arrdem</td><td>:c</td></tr>
+<tr id="t2301A" class="h r"><td><a href="#t2301A">23:01</a></td><td class="ng">arrdem</td><td>@ops picasso indeed is a spammer.</td></tr>
+<tr id="t2301A" class="h r"><td><a href="#t2301A">23:01</a></td><td class="ng">arrdem</td><td>amalloy / oh shit where'd technomancy go</td></tr>
+<tr id="t2302A" class="h"><td><a href="#t2302A">23:02</a></td><td class="nm">amalloy</td><td>arrdem: i tried to deal with that earlier but apparently don't know how</td></tr>
+<tr id="t2302A" class="h"><td><a href="#t2302A">23:02</a></td><td class="ng">arrdem</td><td>amalloy: thanks</td></tr>
+<tr id="t2309A" class="h"><td><a href="#t2309A">23:09</a></td><td class="nt">xnil_</td><td>sdegutis: wrong</td></tr>
+<tr id="t2309A" class="h r"><td><a href="#t2309A">23:09</a></td><td class="nt">xnil_</td><td>sdegutis: s-expressions achieve a particular simplicity and minimalism that nothing else i've seen does</td></tr>
+<tr id="t2309A" class="h r"><td><a href="#t2309A">23:09</a></td><td class="nt">xnil_</td><td>and expressiveness!</td></tr>
+<tr id="t2310A"><td><a href="#t2310A">23:10</a></td><td class="nc">sdegutis</td><td>xnil_: sure, but expressiveness is subjective</td></tr>
+<tr id="t2310A" class="h r"><td><a href="#t2310A">23:10</a></td><td class="nc">sdegutis</td><td>xnil_: and the value of simplicity and minimalism is also subjective</td></tr>
+<tr id="t2310A" class="h"><td><a href="#t2310A">23:10</a></td><td class="nt">xnil_</td><td>subjectivity is simply expressive</td></tr>
+<tr id="t2310A" class="h r"><td><a href="#t2310A">23:10</a></td><td class="nt">xnil_</td><td>minimalism? i hardly knew 'er</td></tr>
+<tr id="t2310A" class="h"><td><a href="#t2310A">23:10</a></td><td class="nc">sdegutis</td><td>xnil_: I have written many languages, some with s-expressions, some without, and enjoyed them all, but I would not say s-expressions are superior and it's not my favorite syntax</td></tr>
+<tr id="t2311A" class="h"><td><a href="#t2311A">23:11</a></td><td class="nt">xnil_</td><td>i've done the same and i have the opposite opinion</td></tr>
+<tr id="t2311A" class="h r"><td><a href="#t2311A">23:11</a></td><td class="nt">xnil_</td><td>i respect yours though</td></tr>
+<tr id="t2311A" class="h r"><td><a href="#t2311A">23:11</a></td><td class="nt">xnil_</td><td>i just think it's totally wrong</td></tr>
+<tr id="t2315A" class="h"><td><a href="#t2315A">23:15</a></td><td class="nc">sdegutis</td><td>:)</td></tr>
+<tr id="t2315A" class="h r"><td><a href="#t2315A">23:15</a></td><td class="nc">sdegutis</td><td>I respect yours too.</td></tr>
+<tr id="t2315A" class="h r"><td><a href="#t2315A">23:15</a></td><td class="nc">sdegutis</td><td>And I don't think yours is wrong.</td></tr>
+<tr id="t2315A" class="h r"><td><a href="#t2315A">23:15</a></td><td class="nc">sdegutis</td><td>Because opinions can't be right or wrong ;)</td></tr>
+<tr id="t2316A" class="h r"><td><a href="#t2316A">23:16</a></td><td class="nc">sdegutis</td><td>(i.e. I don't hold it strongly enough to consider that mine is Right™.)</td></tr>
+<tr id="t2329A"><td><a href="#t2329A">23:29</a></td><td class="ng">arrdem</td><td>Naming: a linked document / hypertext editor &amp; stack based browser</td></tr>
+<tr id="t2341A"><td><a href="#t2341A">23:41</a></td><td class="nt">xnil_</td><td>it is my opinion that righteousness is a matter of subjectivity</td></tr>
+<tr id="t2345A" class="h"><td><a href="#t2345A">23:45</a></td><td class="n1">kl</td><td>xnil_: your opinion is also a matter of subjectivity. :P</td></tr>
+<tr id="t2346A" class="h r"><td><a href="#t2346A">23:46</a></td><td class="n1">kl</td><td>(I completely agree ;)</td></tr>
+<tr id="t2353A"><td><a href="#t2353A">23:53</a></td><td class="ng">arrdem</td><td>andyf: ping</td></tr>
+</tbody></table></main></body></html>

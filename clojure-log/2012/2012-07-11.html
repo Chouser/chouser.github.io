@@ -1,0 +1,225 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#clojure – 2012-07-11</title><link rel="stylesheet" href="../style.css"></head><body>
+<header class="sh"><a class="st" href="../index.html">#clojure logs</a><nav class="dn"><a href="2012-07-10.html">&larr;</a><span>2012-07-11</span><a href="2012-07-12.html">&rarr;</a></nav></header>
+<main><p class="dh">2012-07-11</p><table class="lg"><tbody>
+<tr id="t0048A"><td><a href="#t0048A">00:48</a></td><td class="ni">noidi</td><td>sjl, save the worst error messages along with what they _should've_ said. that would make a great reference for when someone(tm) decides to do something about them :)</td></tr>
+<tr id="t0049A" class="h r"><td><a href="#t0049A">00:49</a></td><td class="ni">noidi</td><td>(re: <a href="https://twitter.com/stevelosh/status/222910504987926529)">https://twitter.com/stevelosh/status/222910504987926529)</a></td></tr>
+<tr id="t0050A"><td><a href="#t0050A">00:50</a></td><td class="na">sjl</td><td>noidi: heh, {#&quot;No single method: .* of interface: .* found for function .*&quot; (rand-nth [&quot;You called a protocol method with the wrong arity&quot; &quot;Clojure/Lein fucked up the AOT compilation; run lein clean.&quot;])}</td></tr>
+<tr id="t0051A" class="h"><td><a href="#t0051A">00:51</a></td><td class="ni">noidi</td><td>I don't think you should be AOT compiling anything unless you're doing interop</td></tr>
+<tr id="t0052A" class="h r"><td><a href="#t0052A">00:52</a></td><td class="ni">noidi</td><td>at least then you can just restart your REPL when things get weird, and everything gets recompiled</td></tr>
+<tr id="t0052A" class="h"><td><a href="#t0052A">00:52</a></td><td class="na">sjl</td><td>noidi: no, this problem persists across repl restarts</td></tr>
+<tr id="t0052A" class="h r"><td><a href="#t0052A">00:52</a></td><td class="na">sjl</td><td>noidi: lein thinks the AOT compiled stuff is done even though I've changed a protocol</td></tr>
+<tr id="t0053A" class="h r"><td><a href="#t0053A">00:53</a></td><td class="na">sjl</td><td>so it doesn't recompile it, and when I try to use the changed version it's still using the old one</td></tr>
+<tr id="t0053A" class="h"><td><a href="#t0053A">00:53</a></td><td class="na">dnolen</td><td>sjl: but what triggers AOT in the first place?</td></tr>
+<tr id="t0053A" class="h"><td><a href="#t0053A">00:53</a></td><td class="na">sjl</td><td>which certainly isn't going to work</td></tr>
+<tr id="t0053A" class="h r"><td><a href="#t0053A">00:53</a></td><td class="na">sjl</td><td>dnolen: that's a wonderful question</td></tr>
+<tr id="t0053A" class="h"><td><a href="#t0053A">00:53</a></td><td class="na">dnolen</td><td>sjl: certainly not Clojure</td></tr>
+<tr id="t0053A" class="h"><td><a href="#t0053A">00:53</a></td><td class="na">sjl</td><td>dnolen: <a href="https://github.com/sjl/caves">https://github.com/sjl/caves</a></td></tr>
+<tr id="t0054A" class="h r"><td><a href="#t0054A">00:54</a></td><td class="na">sjl</td><td>grep -R aot . returns nothing</td></tr>
+<tr id="t0054A" class="h"><td><a href="#t0054A">00:54</a></td><td class="na">dnolen</td><td>sjl: are you re-compiling some namespaces interactively and not others?</td></tr>
+<tr id="t0054A" class="h"><td><a href="#t0054A">00:54</a></td><td class="ni">noidi</td><td>I generally prefer multimethods to protocols, because they're slightly easier to deal with because of things like this</td></tr>
+<tr id="t0056A" class="h"><td><a href="#t0056A">00:56</a></td><td class="na">sjl</td><td>dnolen: okay I can consistently repro it, one sec</td></tr>
+<tr id="t0057A" class="h"><td><a href="#t0057A">00:57</a></td><td class="ni">noidi</td><td>defmulti has defonce semantics, which is surprising and annoying, but once you know that you can redefine things (using ns-unmap) without restarting the repl</td></tr>
+<tr id="t0057A" class="h r"><td><a href="#t0057A">00:57</a></td><td class="ni">noidi</td><td>(well, surprising = annoying when it comes to programming)</td></tr>
+<tr id="t0103A"><td><a href="#t0103A">01:03</a></td><td class="na">sjl</td><td>dnolen: noidi: <a href="https://gist.github.com/3088120">https://gist.github.com/3088120</a></td></tr>
+<tr id="t0105A" class="h"><td><a href="#t0105A">01:05</a></td><td class="na">dnolen</td><td>sjl: so that only occurs under lein repl, not interactive dev?</td></tr>
+<tr id="t0106A" class="h"><td><a href="#t0106A">01:06</a></td><td class="na">sjl</td><td>dnolen: if by interactive dev you mean lein swank then oh no, it definitely appears there too</td></tr>
+<tr id="t0106A" class="h"><td><a href="#t0106A">01:06</a></td><td class="na">dnolen</td><td>sjl: so this is a bug that exists in your code right now? what's at line 39?</td></tr>
+<tr id="t0106A" class="h"><td><a href="#t0106A">01:06</a></td><td class="na">sjl</td><td>dnolen: it's not a bug in my code.  if you run 'lein clean; lein repl' the repl works again</td></tr>
+<tr id="t0108A" class="h r"><td><a href="#t0108A">01:08</a></td><td class="na">sjl</td><td>dnolen: that sed call changes the name of the method in the protocol, and updates the places where it's used.  The problem is that Clojure thinks the protocol method still has the old name</td></tr>
+<tr id="t0108A" class="h"><td><a href="#t0108A">01:08</a></td><td class="ni">noidi</td><td>yeah, I can reproduce it</td></tr>
+<tr id="t0108A" class="h"><td><a href="#t0108A">01:08</a></td><td class="na">sjl</td><td>so when I try to use the updated name, it explodes</td></tr>
+<tr id="t0108A" class="h"><td><a href="#t0108A">01:08</a></td><td class="ni">noidi</td><td>when I run &quot;lein repl&quot;, it tells &quot;All namespaces already :aot compiled.&quot;</td></tr>
+<tr id="t0108A" class="h"><td><a href="#t0108A">01:08</a></td><td class="na">dnolen</td><td>sjl: only lein2? or lein1 as well?</td></tr>
+<tr id="t0108A" class="h"><td><a href="#t0108A">01:08</a></td><td class="na">sjl</td><td>and by &quot;Clojure thinks&quot; I mean &quot;something in the Clojure/leiningen chain thinks&quot;</td></tr>
+<tr id="t0109A" class="h"><td><a href="#t0109A">01:09</a></td><td class="na">dnolen</td><td>sjl: Clojure doesn't AOT by default.</td></tr>
+<tr id="t0109A" class="h"><td><a href="#t0109A">01:09</a></td><td class="ni">noidi</td><td>sjl, you have caves.core marked as containing the main class for the project</td></tr>
+<tr id="t0109A" class="h"><td><a href="#t0109A">01:09</a></td><td class="na">sjl</td><td>dnolen: hm, no idea.  I can try it with lein1 if it's not much work to backport the project file I guess...</td></tr>
+<tr id="t0109A" class="h"><td><a href="#t0109A">01:09</a></td><td class="ni">noidi</td><td>which means caves.core needs to be AOT compiled</td></tr>
+<tr id="t0109A" class="h r"><td><a href="#t0109A">01:09</a></td><td class="ni">noidi</td><td>AOT compilation is transitive</td></tr>
+<tr id="t0109A" class="h r"><td><a href="#t0109A">01:09</a></td><td class="ni">noidi</td><td>which triggers the compilation of the protocols</td></tr>
+<tr id="t0110A"><td><a href="#t0110A">01:10</a></td><td class="na">sjl</td><td>noidi: Okay, so that explains the AOT compilation, but not the failure to notice updates to the files and recompile.</td></tr>
+<tr id="t0110A" class="h"><td><a href="#t0110A">01:10</a></td><td class="ni">noidi</td><td>lein only knows that caves.core is AOT'd -- it doesn't know that it should check the other namespaces for modifications and recompile them</td></tr>
+<tr id="t0111A" class="h"><td><a href="#t0111A">01:11</a></td><td class="na">dnolen</td><td>noidi: I'm confused as to why lein repl should trigger AOT</td></tr>
+<tr id="t0111A" class="h"><td><a href="#t0111A">01:11</a></td><td class="na">sjl</td><td>It know it needs to AOT them the first time...</td></tr>
+<tr id="t0111A" class="h"><td><a href="#t0111A">01:11</a></td><td class="na">dnolen</td><td>noidi: regardless of project settings</td></tr>
+<tr id="t0112A" class="h"><td><a href="#t0112A">01:12</a></td><td class="ni">noidi</td><td>dnolen, that's probably to make lein repl nicer to use with gen-class</td></tr>
+<tr id="t0112A" class="h r"><td><a href="#t0112A">01:12</a></td><td class="ni">noidi</td><td>I used to do a lot of lein compile, repl before I noticed that lein does that by default</td></tr>
+<tr id="t0113A" class="h r"><td><a href="#t0113A">01:13</a></td><td class="ni">noidi</td><td>sjl, the transitive compilation bit is done by the Clojure compiler. lein just asks it to compile clojure.core.</td></tr>
+<tr id="t0113A" class="h r"><td><a href="#t0113A">01:13</a></td><td class="ni">noidi</td><td>so I think this could be considered a bug in lein</td></tr>
+<tr id="t0113A" class="h"><td><a href="#t0113A">01:13</a></td><td class="nk">akhudek</td><td>I guess you could ask to to AOT the whole project as a not so nice work around...</td></tr>
+<tr id="t0114A" class="h r"><td><a href="#t0114A">01:14</a></td><td class="nk">akhudek</td><td>of course beware of core.match if you do that, it doesn't work with AOT</td></tr>
+<tr id="t0114A" class="h"><td><a href="#t0114A">01:14</a></td><td class="na">sjl</td><td>lol</td></tr>
+<tr id="t0114A" class="h r"><td><a href="#t0114A">01:14</a></td><td class="na">sjl</td><td>alias lein='lein2 clean; lein2'</td></tr>
+<tr id="t0114A" class="h r"><td><a href="#t0114A">01:14</a></td><td class="na">sjl</td><td>problem solved.</td></tr>
+<tr id="t0115A" class="h"><td><a href="#t0115A">01:15</a></td><td class="nk">akhudek</td><td>that works too :D</td></tr>
+<tr id="t0115A" class="h"><td><a href="#t0115A">01:15</a></td><td class="na">dnolen</td><td>akhudek: heh, yes - the warnings has since been added to the repo.</td></tr>
+<tr id="t0116A" class="h"><td><a href="#t0116A">01:16</a></td><td class="nk">akhudek</td><td>dnolen: I discovered that the hard way :-(</td></tr>
+<tr id="t0116A" class="h"><td><a href="#t0116A">01:16</a></td><td class="na">dnolen</td><td>akhudek: sadly no patches yet.</td></tr>
+<tr id="t0117A" class="h r"><td><a href="#t0117A">01:17</a></td><td class="na">dnolen</td><td>akhudek: finding AOT bug are a PITA.</td></tr>
+<tr id="t0117A" class="h r"><td><a href="#t0117A">01:17</a></td><td class="na">dnolen</td><td>bugs</td></tr>
+<tr id="t0117A" class="h"><td><a href="#t0117A">01:17</a></td><td class="nk">akhudek</td><td>I was pretty surprised that such a thing could even happen!</td></tr>
+<tr id="t0117A" class="h"><td><a href="#t0117A">01:17</a></td><td class="na">dnolen</td><td>akhudek: it easier than you think.</td></tr>
+<tr id="t0117A" class="h"><td><a href="#t0117A">01:17</a></td><td class="nk">akhudek</td><td>I'll take your word for it. :-)</td></tr>
+<tr id="t0118A" class="h"><td><a href="#t0118A">01:18</a></td><td class="na">dnolen</td><td>akhudek: with enough dynamism your code can easily only make sense only at runtime.</td></tr>
+<tr id="t0118A" class="h"><td><a href="#t0118A">01:18</a></td><td class="ni">noidi</td><td>I'd work around sjl's issue by adding (ns caves.core.Main (:gen-class :impl-ns caves.core)), and in project.clj set :main caves.core.Main</td></tr>
+<tr id="t0118A" class="h r"><td><a href="#t0118A">01:18</a></td><td class="ni">noidi</td><td>(or whatever, I never get the ns syntax right, but maybe you got the idea)</td></tr>
+<tr id="t0119A" class="h r"><td><a href="#t0119A">01:19</a></td><td class="ni">noidi</td><td>impl-ns does _not_ get transitively AOT'd so its requirements aren't either</td></tr>
+<tr id="t0119A" class="h"><td><a href="#t0119A">01:19</a></td><td class="nx">seaword</td><td>I'm diving into my first clojure program using ring and can't get the wrap-reload syntax quite right. <a href="http://pastie.org/4235725">http://pastie.org/4235725</a></td></tr>
+<tr id="t0119A" class="h"><td><a href="#t0119A">01:19</a></td><td class="ni">noidi</td><td>but yes, the AOT stuff is quite a trainwreck at the moment</td></tr>
+<tr id="t0119A" class="h"><td><a href="#t0119A">01:19</a></td><td class="nx">seaword</td><td>I get this error: IllegalArgumentException Parameter declaration wrap-reload should be a vector</td></tr>
+<tr id="t0119A" class="h"><td><a href="#t0119A">01:19</a></td><td class="na">sjl</td><td>noidi: okay it's late, what exactly does that do?</td></tr>
+<tr id="t0119A" class="h"><td><a href="#t0119A">01:19</a></td><td class="nx">seaword</td><td>Would be grateful for a nudge in the right direction, cheers.</td></tr>
+<tr id="t0119A" class="h"><td><a href="#t0119A">01:19</a></td><td class="ni">noidi</td><td>sjl, do you have o'reilly's clojure book?</td></tr>
+<tr id="t0120A" class="r"><td><a href="#t0120A">01:20</a></td><td class="ni">noidi</td><td>sjl, the impl-ns trick is mentioned somewhere in it</td></tr>
+<tr id="t0120A" class="h"><td><a href="#t0120A">01:20</a></td><td class="na">sjl</td><td>noidi: is that programming clojure?</td></tr>
+<tr id="t0120A" class="h"><td><a href="#t0120A">01:20</a></td><td class="ni">noidi</td><td>wait a sec, I'll check the book right now</td></tr>
+<tr id="t0120A" class="h"><td><a href="#t0120A">01:20</a></td><td class="na">sjl</td><td>or clojure programming?</td></tr>
+<tr id="t0120A" class="h r"><td><a href="#t0120A">01:20</a></td><td class="na">sjl</td><td>lol naming</td></tr>
+<tr id="t0120A" class="h"><td><a href="#t0120A">01:20</a></td><td class="nk">ssutch</td><td>is there any difference between (defn a-&gt;b [x] x) and (defn a [x] x)</td></tr>
+<tr id="t0120A" class="h"><td><a href="#t0120A">01:20</a></td><td class="na">dnolen</td><td>akhudek: (def foo (partial bar baz)) was one bad pattern I used.</td></tr>
+<tr id="t0121A" class="h"><td><a href="#t0121A">01:21</a></td><td class="na">sjl</td><td>ssutch: ... one is named 'a' and one is named 'a-&gt;b'?</td></tr>
+<tr id="t0121A" class="h"><td><a href="#t0121A">01:21</a></td><td class="nk">ssutch</td><td>that's what i figured</td></tr>
+<tr id="t0121A" class="h r"><td><a href="#t0121A">01:21</a></td><td class="nk">ssutch</td><td>just wanted to make sure, what is the convention for using a-&gt;b?</td></tr>
+<tr id="t0121A" class="h"><td><a href="#t0121A">01:21</a></td><td class="na">dnolen</td><td>akhudek: extend-type was also a problem.</td></tr>
+<tr id="t0121A" class="h"><td><a href="#t0121A">01:21</a></td><td class="ni">noidi</td><td>sjl, check the note on page 338 of Clojure Programming if you have it</td></tr>
+<tr id="t0123A" class="h"><td><a href="#t0123A">01:23</a></td><td class="na">sjl</td><td>noidi: the thing about the modification dates?</td></tr>
+<tr id="t0123A" class="h"><td><a href="#t0123A">01:23</a></td><td class="no">xumingmingv</td><td>hey guys, any comments on this? <a href="http://martinsprogrammingblog.blogspot.de/2012/02/why-is-clojure-so-slow.html">http://martinsprogrammingblog.blogspot.de/2012/02/why-is-clojure-so-slow.html</a></td></tr>
+<tr id="t0123A" class="h"><td><a href="#t0123A">01:23</a></td><td class="na">sjl</td><td>I'm quite sure the mtime is getting set when I save the file with Vim...</td></tr>
+<tr id="t0124A" class="h r"><td><a href="#t0124A">01:24</a></td><td class="na">sjl</td><td>xumingmingv: My thoughts: &quot;Get an SSD and don't use Clojure for shell scripts.&quot;</td></tr>
+<tr id="t0124A" class="h"><td><a href="#t0124A">01:24</a></td><td class="nf">ivan</td><td>you can use -Xbootclasspath to reduce the startup time</td></tr>
+<tr id="t0125A" class="h r"><td><a href="#t0125A">01:25</a></td><td class="nf">ivan</td><td>that is, -Xbootclasspath/a:clojure.jar</td></tr>
+<tr id="t0125A" class="h"><td><a href="#t0125A">01:25</a></td><td class="ni">noidi</td><td>sjl, nope, the note about gen-class and transitive dependencies. I'm talking about the o'reilly book with the bird on the cover... :P</td></tr>
+<tr id="t0125A" class="h r"><td><a href="#t0125A">01:25</a></td><td class="ni">noidi</td><td>by emerick, carper and grand</td></tr>
+<tr id="t0125A" class="h"><td><a href="#t0125A">01:25</a></td><td class="na">sjl</td><td>noidi: oh I have the rough cuts version -- I think the note you're talking about is on a different page for me</td></tr>
+<tr id="t0126A" class="h r"><td><a href="#t0126A">01:26</a></td><td class="na">sjl</td><td>noidi: this thing? <a href="http://i.imgur.com/UgQLM.png">http://i.imgur.com/UgQLM.png</a></td></tr>
+<tr id="t0126A" class="h"><td><a href="#t0126A">01:26</a></td><td class="ni">noidi</td><td>that's it</td></tr>
+<tr id="t0127A" class="h"><td><a href="#t0127A">01:27</a></td><td class="na">dnolen</td><td>xumingmingv: do you have some specific concern?</td></tr>
+<tr id="t0127A" class="h"><td><a href="#t0127A">01:27</a></td><td class="ni">noidi</td><td>of course, if you don't really need to be able to run &quot;java -jar caves.jar&quot;, just drop the :main from project.clj and be done with it &gt;(</td></tr>
+<tr id="t0127A" class="h r"><td><a href="#t0127A">01:27</a></td><td class="ni">noidi</td><td>:)</td></tr>
+<tr id="t0127A" class="h"><td><a href="#t0127A">01:27</a></td><td class="na">sjl</td><td>noidi: so the solution is to make a special ns that uses some special ns voodoo to only generate one AOTed class</td></tr>
+<tr id="t0127A" class="h r"><td><a href="#t0127A">01:27</a></td><td class="na">sjl</td><td>and then let the rest of the project be unAOTed</td></tr>
+<tr id="t0127A" class="h r"><td><a href="#t0127A">01:27</a></td><td class="na">sjl</td><td>which means protocol definitions will be loaded from the clojure sources</td></tr>
+<tr id="t0128A" class="h r"><td><a href="#t0128A">01:28</a></td><td class="na">sjl</td><td>roughly?</td></tr>
+<tr id="t0128A" class="h"><td><a href="#t0128A">01:28</a></td><td class="no">xumingmingv</td><td>dnolen:  just feel not good when a language I like marked *slow*</td></tr>
+<tr id="t0128A" class="h"><td><a href="#t0128A">01:28</a></td><td class="nk">akhudek</td><td>dnolen: why was the partial pattern bad for AOT?</td></tr>
+<tr id="t0128A" class="h"><td><a href="#t0128A">01:28</a></td><td class="na">dnolen</td><td>xumingmingv: what languages do you use that are *fast*?</td></tr>
+<tr id="t0128A" class="h"><td><a href="#t0128A">01:28</a></td><td class="ni">noidi</td><td>sjl, instead of AOT'ing a class _containing_ functions that need stuff in other namespaces (which then get transitively AOT'd), you AOT a class that will, at runtime, load up the impl-ns and call functions in it</td></tr>
+<tr id="t0129A" class="h r"><td><a href="#t0129A">01:29</a></td><td class="ni">noidi</td><td>sjl, at least that's my understanding</td></tr>
+<tr id="t0129A" class="h"><td><a href="#t0129A">01:29</a></td><td class="na">dnolen</td><td>akhudek: partial combined with instance? I think specifically.</td></tr>
+<tr id="t0129A" class="h"><td><a href="#t0129A">01:29</a></td><td class="na">sjl</td><td>ah</td></tr>
+<tr id="t0130A"><td><a href="#t0130A">01:30</a></td><td class="nk">akhudek</td><td>ah, interesting. I'll remember to try to avoid that in the project I'm using a lot of AOT in</td></tr>
+<tr id="t0130A" class="h"><td><a href="#t0130A">01:30</a></td><td class="na">sjl</td><td>Okay I think that's my limit of JVM bullshit for the night.  Time to go to bed.</td></tr>
+<tr id="t0130A" class="h"><td><a href="#t0130A">01:30</a></td><td class="no">xumingmingv</td><td>dnolen: I use java at work</td></tr>
+<tr id="t0130A" class="h"><td><a href="#t0130A">01:30</a></td><td class="na">sjl</td><td>noidi: btw &quot;Programming Clojure&quot; and &quot;Clojure Programming&quot; both have birds on the covers :P</td></tr>
+<tr id="t0130A" class="h"><td><a href="#t0130A">01:30</a></td><td class="na">dnolen</td><td>xumingmingv: apologies I misread what you wrote. Martin (the writer) is actually a Clojure fan, certainly some of what he's says is true - idiomatic Clojure is often slower.</td></tr>
+<tr id="t0131A" class="h"><td><a href="#t0131A">01:31</a></td><td class="ni">noidi</td><td>sjl, argh :D</td></tr>
+<tr id="t0131A" class="h"><td><a href="#t0131A">01:31</a></td><td class="na">dnolen</td><td>xumingmingv: and the community hasn't been proactive about updating the Alioth benchmarks to leverage 1.3 enhancements. We've got 3 more benchmarks to go before we have the full suite competitive w/ Java (and of course Scala)</td></tr>
+<tr id="t0137A" class="h"><td><a href="#t0137A">01:37</a></td><td class="no">xumingmingv</td><td>dnolen: thanks for the information</td></tr>
+<tr id="t0138A" class="h"><td><a href="#t0138A">01:38</a></td><td class="na">dnolen</td><td>xumingmingv: <a href="http://github.com/clojure/test.benchmark">http://github.com/clojure/test.benchmark</a></td></tr>
+<tr id="t0138A" class="h"><td><a href="#t0138A">01:38</a></td><td class="nj">adu</td><td>hey</td></tr>
+<tr id="t0139A" class="h r"><td><a href="#t0139A">01:39</a></td><td class="nj">adu</td><td>is anyone here in the DC area?</td></tr>
+<tr id="t0139A" class="h"><td><a href="#t0139A">01:39</a></td><td class="no">xumingmingv</td><td>I found a stackoverflow question talking about this: <a href="http://stackoverflow.com/questions/4148382/why-does-clojure-do-worse-than-scala-in-the-alioth-benchmarks">http://stackoverflow.com/questions/4148382/why-does-clojure-do-worse-than-scala-in-the-alioth-benchmarks</a></td></tr>
+<tr id="t0139A" class="h r"><td><a href="#t0139A">01:39</a></td><td class="no">xumingmingv</td><td>but i dont quite agree with the accepted answer</td></tr>
+<tr id="t0139A" class="h"><td><a href="#t0139A">01:39</a></td><td class="na">dnolen</td><td>xumingmingv: yes, old question. run test.benchmark for yourself and see.</td></tr>
+<tr id="t0140A" class="r"><td><a href="#t0140A">01:40</a></td><td class="na">dnolen</td><td>xumingmingv: better yet submit one of the 3 remaining benchmarks, then Alioth will be update to date and people can go back to complaining about too many parens ;)</td></tr>
+<tr id="t0141A" class="h"><td><a href="#t0141A">01:41</a></td><td class="no">xumingmingv</td><td>dnolen: haha</td></tr>
+<tr id="t0146A" class="h"><td><a href="#t0146A">01:46</a></td><td class="nb">brainproxy</td><td>dnolen: in your study of prolog/datalog, did you spend any time with DES, &quot;datalog educational system&quot;?</td></tr>
+<tr id="t0146A" class="h r"><td><a href="#t0146A">01:46</a></td><td class="nb">brainproxy</td><td><a href="http://www.fdi.ucm.es/profesor/fernan/des/">http://www.fdi.ucm.es/profesor/fernan/des/</a></td></tr>
+<tr id="t0146A" class="h"><td><a href="#t0146A">01:46</a></td><td class="na">dnolen</td><td>brainproxy: I've seen it but I've never played around with it.</td></tr>
+<tr id="t0147A" class="h"><td><a href="#t0147A">01:47</a></td><td class="nb">brainproxy</td><td>okay.. seems a bit harder to find datalog &quot;stuff&quot; vs. prolog books, articles, etc.</td></tr>
+<tr id="t0147A" class="h"><td><a href="#t0147A">01:47</a></td><td class="na">dnolen</td><td>brainproxy: to be honest I don't really understand Datalog that well - in fact I'm not even aware of any good explanations of how to implement it that aren't disk oriented.</td></tr>
+<tr id="t0147A" class="h"><td><a href="#t0147A">01:47</a></td><td class="nb">brainproxy</td><td>i see</td></tr>
+<tr id="t0147A" class="h"><td><a href="#t0147A">01:47</a></td><td class="na">dnolen</td><td>brainproxy: I picked Stuart Halloway's brain about this at the last Conj (I'm assuming he was working on Datomic already) and he said the same.</td></tr>
+<tr id="t0148A" class="h r"><td><a href="#t0148A">01:48</a></td><td class="na">dnolen</td><td>brainproxy: but clearly they figured something out that works well enough for real queries as well as data structures.</td></tr>
+<tr id="t0148A" class="h"><td><a href="#t0148A">01:48</a></td><td class="nb">brainproxy</td><td>is datomic a kind of datalog?</td></tr>
+<tr id="t0148A" class="h"><td><a href="#t0148A">01:48</a></td><td class="na">dnolen</td><td>brainproxy: it supports datalog style queries yes.</td></tr>
+<tr id="t0148A" class="h"><td><a href="#t0148A">01:48</a></td><td class="nb">brainproxy</td><td>i mean that's my impression</td></tr>
+<tr id="t0149A" class="h r"><td><a href="#t0149A">01:49</a></td><td class="nb">brainproxy</td><td>I'm interested to understand the crossover between something like datomic w/ datalog style queries and a project like orientdb</td></tr>
+<tr id="t0149A" class="h r"><td><a href="#t0149A">01:49</a></td><td class="nb">brainproxy</td><td>which also has a relational query engine</td></tr>
+<tr id="t0149A" class="h"><td><a href="#t0149A">01:49</a></td><td class="nk">akhudek</td><td>if you are interested in query compilation/datalog specifically</td></tr>
+<tr id="t0149A" class="h"><td><a href="#t0149A">01:49</a></td><td class="nb">brainproxy</td><td>but isn't SQL to be sure</td></tr>
+<tr id="t0149A" class="h"><td><a href="#t0149A">01:49</a></td><td class="nk">akhudek</td><td>I guess I could recommend my collegues recent book on using FOL proof systems for this</td></tr>
+<tr id="t0150A"><td><a href="#t0150A">01:50</a></td><td class="nb">brainproxy</td><td>akhudek: link, ISBN?</td></tr>
+<tr id="t0150A" class="h"><td><a href="#t0150A">01:50</a></td><td class="nk">akhudek</td><td><a href="http://www.amazon.ca/Fundamentals-Physical-Design-Query-Compilation/dp/1608452786">http://www.amazon.ca/Fundamentals-Physical-Design-Query-Compilation/dp/1608452786</a></td></tr>
+<tr id="t0150A" class="h"><td><a href="#t0150A">01:50</a></td><td class="nb">brainproxy</td><td>akhudek: thanks</td></tr>
+<tr id="t0150A" class="h"><td><a href="#t0150A">01:50</a></td><td class="nk">akhudek</td><td>if you do a google search, parts are available online as part of a class material</td></tr>
+<tr id="t0152A" class="h"><td><a href="#t0152A">01:52</a></td><td class="nb">brainproxy</td><td>akhudek: cool.. I'm still just getting my little toe wet w/ prolog, but I've saved it for future reference</td></tr>
+<tr id="t0152A" class="h"><td><a href="#t0152A">01:52</a></td><td class="nk">akhudek</td><td>brainproxy: if you have any questions on the topic, feel free to message me</td></tr>
+<tr id="t0152A" class="h"><td><a href="#t0152A">01:52</a></td><td class="nb">brainproxy</td><td>thanks!</td></tr>
+<tr id="t0153A" class="h"><td><a href="#t0153A">01:53</a></td><td class="nk">akhudek</td><td>brainproxy: I'm actively working on an implementation of what is discussed in that book (in clojure no less)</td></tr>
+<tr id="t0153A" class="h"><td><a href="#t0153A">01:53</a></td><td class="nl">gerunddev</td><td>Is there a channel specifically for core.logic?</td></tr>
+<tr id="t0154A" class="h"><td><a href="#t0154A">01:54</a></td><td class="na">dnolen</td><td>gerunddev: here</td></tr>
+<tr id="t0154A" class="h"><td><a href="#t0154A">01:54</a></td><td class="nb">brainproxy</td><td>dnolen: btw, I found another prolog primer.. <a href="http://www.ida.liu.se/~ulfni/lpp/">http://www.ida.liu.se/~ulfni/lpp/</a></td></tr>
+<tr id="t0154A" class="h r"><td><a href="#t0154A">01:54</a></td><td class="nb">brainproxy</td><td>it has a much more mathematical approach</td></tr>
+<tr id="t0154A" class="h"><td><a href="#t0154A">01:54</a></td><td class="na">dnolen</td><td>akhudek: curious, are you actually building a in memory Datalog?</td></tr>
+<tr id="t0155A" class="h"><td><a href="#t0155A">01:55</a></td><td class="nk">akhudek</td><td>dnolen: it's a first order logic theorem prover, all in memory</td></tr>
+<tr id="t0155A" class="h"><td><a href="#t0155A">01:55</a></td><td class="nl">gerunddev</td><td>dnolen: Thanks.  Know of any good primers on defne, defna, etc?</td></tr>
+<tr id="t0155A" class="h"><td><a href="#t0155A">01:55</a></td><td class="na">dnolen</td><td>brainproxy: you can avoid buying books but the Bratko one and the Sterling Shapiro one are excellent :)</td></tr>
+<tr id="t0156A" class="h r"><td><a href="#t0156A">01:56</a></td><td class="na">dnolen</td><td>brainproxy: Bratko 4th ed now covers CLP which is just around the corner for core.logic.</td></tr>
+<tr id="t0156A" class="h"><td><a href="#t0156A">01:56</a></td><td class="nb">brainproxy</td><td>dnolen: I defeinitely am interested in the Bratko one</td></tr>
+<tr id="t0156A" class="h"><td><a href="#t0156A">01:56</a></td><td class="na">dnolen</td><td>akhudek: very cool :) open source one day?</td></tr>
+<tr id="t0156A" class="h"><td><a href="#t0156A">01:56</a></td><td class="nb">brainproxy</td><td>but a number of comments suggested it's not a good first book</td></tr>
+<tr id="t0156A" class="h r"><td><a href="#t0156A">01:56</a></td><td class="nb">brainproxy</td><td>so I started looking for a &quot;first book&quot;</td></tr>
+<tr id="t0156A" class="h"><td><a href="#t0156A">01:56</a></td><td class="nk">akhudek</td><td>dnolen: that's the idea :-)</td></tr>
+<tr id="t0156A" class="h"><td><a href="#t0156A">01:56</a></td><td class="na">dnolen</td><td>akhudek: sweet</td></tr>
+<tr id="t0157A" class="h"><td><a href="#t0157A">01:57</a></td><td class="ni">noidi</td><td>sjl, btw. lein has a :skip-aot option to prevent AOT compilation of :main <a href="https://github.com/technomancy/leiningen/blob/master/sample.project.clj#L97">https://github.com/technomancy/leiningen/blob/master/sample.project.clj#L97</a></td></tr>
+<tr id="t0157A" class="h"><td><a href="#t0157A">01:57</a></td><td class="nb">brainproxy</td><td>the &quot;Art of..&quot; is supposed to be good for that purpose, but I like reading on ipad and mac, so opted for the book from springer.com, as I could pay and download it</td></tr>
+<tr id="t0157A" class="h"><td><a href="#t0157A">01:57</a></td><td class="na">dnolen</td><td>brainproxy: huh, not sure why people said that.</td></tr>
+<tr id="t0157A" class="h r"><td><a href="#t0157A">01:57</a></td><td class="na">dnolen</td><td>brainproxy: a lot of my understanding of how to actually use core.logic came from Bratko.</td></tr>
+<tr id="t0157A" class="h r"><td><a href="#t0157A">01:57</a></td><td class="na">dnolen</td><td>brainproxy: it's actually why I added the DB functionality right way.</td></tr>
+<tr id="t0157A" class="h r"><td><a href="#t0157A">01:57</a></td><td class="na">dnolen</td><td>brainproxy: so I could try the examples :)</td></tr>
+<tr id="t0157A" class="h"><td><a href="#t0157A">01:57</a></td><td class="ni">noidi</td><td>sjl, I created a bug report for lein about this <a href="https://github.com/technomancy/leiningen/issues/679">https://github.com/technomancy/leiningen/issues/679</a></td></tr>
+<tr id="t0158A" class="h"><td><a href="#t0158A">01:58</a></td><td class="nb">brainproxy</td><td>interesting... okay, well maybe it would be fine for me to start with, but I'll get to it; also reading a proper Java book now, rather than just absorbing through clojure interop</td></tr>
+<tr id="t0200A" class="r"><td><a href="#t0200A">02:00</a></td><td class="nb">brainproxy</td><td>as DES is built entirely w/ prolog, i.e. it rides on top of your prolog runtime of choice, i hope to study it as well, to see how a datalog system can emerge from prolog</td></tr>
+<tr id="t0203A" class="h"><td><a href="#t0203A">02:03</a></td><td class="nl">gerunddev</td><td>Every core.logic demo shows that you can query goals in both directions.  But I can't quite figure how to share code to do that.</td></tr>
+<tr id="t0203A" class="h"><td><a href="#t0203A">02:03</a></td><td class="na">dnolen</td><td>gerunddev: what do you mean?</td></tr>
+<tr id="t0206A" class="h"><td><a href="#t0206A">02:06</a></td><td class="nl">gerunddev</td><td>(run* [q] (membero q '(1 2 3))) &amp; (run* [q] (membero 2 q)), but I'd like to be able to use the same relationship with [item coll] then pass a value for one and bind the other to an lvar.</td></tr>
+<tr id="t0207A" class="h r"><td><a href="#t0207A">02:07</a></td><td class="nl">gerunddev</td><td>I thought something like (defne [item coll] (memero item coll)), but apparently I don't grok defne.</td></tr>
+<tr id="t0207A" class="h"><td><a href="#t0207A">02:07</a></td><td class="na">dnolen</td><td>gerunddev: defne/a/u are just for pattern matching sugar</td></tr>
+<tr id="t0208A" class="h r"><td><a href="#t0208A">02:08</a></td><td class="na">dnolen</td><td>gerunddev: just make a regular function. (defn my-rel [item coll] (membero item coll))</td></tr>
+<tr id="t0210A"><td><a href="#t0210A">02:10</a></td><td class="nl">gerunddev</td><td>dnolen: I had gotten the impression that mixing functions and their logic cousins was a bad idea… now I can't even remember where I got that idea.</td></tr>
+<tr id="t0211A" class="h"><td><a href="#t0211A">02:11</a></td><td class="na">dnolen</td><td>gerunddev: yeah not true, the whole point of core.logic (really miniKanren) is that the two approaches can coexist.</td></tr>
+<tr id="t0212A" class="h"><td><a href="#t0212A">02:12</a></td><td class="nm">amalloy</td><td>btw dnolen, what do the -a/e/o suffixes mean? i've been just putting an o at the end of my relation-based function names, but it feels cargo-cult because i don't know why</td></tr>
+<tr id="t0213A" class="h"><td><a href="#t0213A">02:13</a></td><td class="na">Raynes</td><td>I wish I had a condo.</td></tr>
+<tr id="t0213A" class="h"><td><a href="#t0213A">02:13</a></td><td class="nk">madsy</td><td>Can I somehow set &quot;lein trampoline cljsbuild repl-listen&quot; to inferior-lisp-program in emacs?</td></tr>
+<tr id="t0214A" class="h r"><td><a href="#t0214A">02:14</a></td><td class="nk">madsy</td><td>When I do I get &quot;Wrong type argument: stringp, nil&quot;</td></tr>
+<tr id="t0214A" class="h"><td><a href="#t0214A">02:14</a></td><td class="na">dnolen</td><td>amalloy: I guess o generally mean the goal is pure, inputs and outputs don't matter.</td></tr>
+<tr id="t0215A" class="h r"><td><a href="#t0215A">02:15</a></td><td class="na">dnolen</td><td>amalloy: -a means soft cut, other branches will not be looked at (unlike conde)</td></tr>
+<tr id="t0215A" class="h"><td><a href="#t0215A">02:15</a></td><td class="na">Raynes</td><td>dnolen: I'll learn core.logic if you find something in refheap that could make use of it. :D</td></tr>
+<tr id="t0216A" class="h"><td><a href="#t0216A">02:16</a></td><td class="na">dnolen</td><td>amalloy: -u mean committed choice. not only with other branches not be looked at, all the goals after the first goal of a clause will only be run once.</td></tr>
+<tr id="t0216A" class="h r"><td><a href="#t0216A">02:16</a></td><td class="na">dnolen</td><td>&quot;not only will&quot;</td></tr>
+<tr id="t0216A" class="h r"><td><a href="#t0216A">02:16</a></td><td class="na">dnolen</td><td>Raynes: ha! kibit service?</td></tr>
+<tr id="t0216A" class="h"><td><a href="#t0216A">02:16</a></td><td class="nl">gerunddev</td><td>dnolen: I can't even find what I read that made me think that now.</td></tr>
+<tr id="t0217A" class="h"><td><a href="#t0217A">02:17</a></td><td class="nm">amalloy</td><td>he's surely missing some chances to use core.match to simplify his dispatch</td></tr>
+<tr id="t0217A" class="h"><td><a href="#t0217A">02:17</a></td><td class="na">Raynes</td><td>amalloy: There is so much I could use core.match for.</td></tr>
+<tr id="t0217A" class="h r"><td><a href="#t0217A">02:17</a></td><td class="na">Raynes</td><td>amalloy: My problem is that I purposely avoid it because if I had it, I'd use it for everything.</td></tr>
+<tr id="t0217A" class="h"><td><a href="#t0217A">02:17</a></td><td class="na">dnolen</td><td>amalloy: to be more specific, conde lines looks like this:</td></tr>
+<tr id="t0217A" class="h r"><td><a href="#t0217A">02:17</a></td><td class="na">dnolen</td><td>[(head) ... bunch of other goals ...]</td></tr>
+<tr id="t0217A" class="h"><td><a href="#t0217A">02:17</a></td><td class="na">Raynes</td><td>dnolen: That's a damn good idea.</td></tr>
+<tr id="t0218A" class="h r"><td><a href="#t0218A">02:18</a></td><td class="na">Raynes</td><td>I'm honestly going to open an issue for that.</td></tr>
+<tr id="t0218A" class="h"><td><a href="#t0218A">02:18</a></td><td class="nl">gerunddev</td><td>As a famous author once said, &quot;Contradictions do not exist. Whenever you think you are facing a contradiction, check your premises. You will find that one of them is wrong.&quot;</td></tr>
+<tr id="t0219A" class="h"><td><a href="#t0219A">02:19</a></td><td class="na">dnolen</td><td>amalloy: with conda, if a head succeeds, other [...] [...] are ignored. the remaining goals of the succeeding line can succeed many times (produce many answers)</td></tr>
+<tr id="t0219A" class="h r"><td><a href="#t0219A">02:19</a></td><td class="na">dnolen</td><td>amalloy: with condu, if a head succeeds those remaining goals can only produce one answer</td></tr>
+<tr id="t0219A" class="h"><td><a href="#t0219A">02:19</a></td><td class="na">Raynes</td><td>dnolen: If I wanted to get the mention of cake out of the core.logic readme, how would I go about that? Open a jira ticket? Ask you to do it for me? My CA is under a non-legal name and I haven't sent in a new one yet, so I can't just give you a patch.</td></tr>
+<tr id="t0219A" class="h r"><td><a href="#t0219A">02:19</a></td><td class="na">Raynes</td><td>:(</td></tr>
+<tr id="t0219A" class="h"><td><a href="#t0219A">02:19</a></td><td class="nm">amalloy</td><td>i've at least figured out how conde/conda behave (still not 100% sure about condu), but i'm wondering what the dang letters mean</td></tr>
+<tr id="t0220A"><td><a href="#t0220A">02:20</a></td><td class="na">dnolen</td><td>Raynes: where do I meantion cake?</td></tr>
+<tr id="t0220A" class="h"><td><a href="#t0220A">02:20</a></td><td class="na">Raynes</td><td>dnolen: 'Usage'</td></tr>
+<tr id="t0221A" class="h r"><td><a href="#t0221A">02:21</a></td><td class="na">Raynes</td><td>dnolen: core.match, sorry.</td></tr>
+<tr id="t0221A" class="h r"><td><a href="#t0221A">02:21</a></td><td class="na">Raynes</td><td>I get your core.things mixed up all the time.</td></tr>
+<tr id="t0221A" class="h"><td><a href="#t0221A">02:21</a></td><td class="na">dnolen</td><td>amalloy: condu can be use to implement (onceo g). conda can't. condu can guarantee that g will only produce one solution.</td></tr>
+<tr id="t0222A" class="h r"><td><a href="#t0222A">02:22</a></td><td class="na">dnolen</td><td>Raynes: done</td></tr>
+<tr id="t0222A" class="h"><td><a href="#t0222A">02:22</a></td><td class="na">Raynes</td><td>Cool.</td></tr>
+<tr id="t0224A" class="h"><td><a href="#t0224A">02:24</a></td><td class="na">dnolen</td><td>amalloy: both are used for pruning search so should be used care - they both disable in many instances the ability to run programs &quot;backwards&quot;.</td></tr>
+<tr id="t0226A" class="h"><td><a href="#t0226A">02:26</a></td><td class="nm">amalloy</td><td>okay. i'll plan on continuing to have a great new usage for conda and then eventually rewrite it when i realize i was wrong</td></tr>
+<tr id="t0228A" class="h"><td><a href="#t0228A">02:28</a></td><td class="nl">gerunddev</td><td>I'm hoping to use logic programming in a schema on read no-sql environment.</td></tr>
+<tr id="t0228A" class="h"><td><a href="#t0228A">02:28</a></td><td class="na">dnolen</td><td>amalloy: I believe their inclusion in miniKanren was to show they could get nearly all the functional of &quot;real&quot; Prolog as it's used in practice.</td></tr>
+<tr id="t0228A" class="h"><td><a href="#t0228A">02:28</a></td><td class="nk">ssutch</td><td>if i just want to return a body as-is from an if exp, what would i do?</td></tr>
+<tr id="t0228A" class="h"><td><a href="#t0228A">02:28</a></td><td class="nl">gerunddev</td><td>We currently have problems where document structures evolve over time, and writing migration scripts seems to defeat the purpose of using a no-sql datastore.</td></tr>
+<tr id="t0229A" class="h"><td><a href="#t0229A">02:29</a></td><td class="na">dnolen</td><td>amalloy: I've found them useful in making it easy to port Prolog. then it's fun to see if cuts can be eliminated w/o slowing things down too much.</td></tr>
+<tr id="t0229A" class="h"><td><a href="#t0229A">02:29</a></td><td class="nk">ssutch</td><td>eg (if ((a) (b)) c) i want to get ((a) (b))</td></tr>
+<tr id="t0229A" class="h"><td><a href="#t0229A">02:29</a></td><td class="nl">gerunddev</td><td>What if you could use rules to say, can this be interpreted as something valid?</td></tr>
+<tr id="t0229A" class="h"><td><a href="#t0229A">02:29</a></td><td class="nm">amalloy</td><td>(or)</td></tr>
+<tr id="t0229A" class="h r"><td><a href="#t0229A">02:29</a></td><td class="nm">amalloy</td><td>specifically, (or ((a) (b)) c)</td></tr>
+<tr id="t0230A"><td><a href="#t0230A">02:30</a></td><td class="nk">ssutch</td><td>sorry, i didn't quite explain well enough</td></tr>
+</tbody></table></main></body></html>

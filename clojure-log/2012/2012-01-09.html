@@ -1,0 +1,521 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#clojure – 2012-01-09</title><link rel="stylesheet" href="../style.css"></head><body>
+<header class="sh"><a class="st" href="../index.html">#clojure logs</a><nav class="dn"><a href="2012-01-08.html">&larr;</a><span>2012-01-09</span><a href="2012-01-10.html">&rarr;</a></nav></header>
+<main><p class="dh">2012-01-09</p><table class="lg"><tbody>
+<tr id="t0014A"><td><a href="#t0014A">00:14</a></td><td class="n5">mrevil</td><td>F333: there are some docs in the forthcomming &quot;Clojure Programming&quot; which you can get via rough cuts.</td></tr>
+<tr id="t0022A"><td><a href="#t0022A">00:22</a></td><td class="nf">lnostdal</td><td>,(. (int 261) equals 261)</td></tr>
+<tr id="t0022A" class="h"><td><a href="#t0022A">00:22</a></td><td class="nl">clojurebot</td><td>true</td></tr>
+<tr id="t0022A" class="h"><td><a href="#t0022A">00:22</a></td><td class="nf">lnostdal</td><td>ah, so it differs between clojure versions</td></tr>
+<tr id="t0022A" class="h r"><td><a href="#t0022A">00:22</a></td><td class="nf">lnostdal</td><td>..on 1.4.x from git this yields false</td></tr>
+<tr id="t0024A" class="h"><td><a href="#t0024A">00:24</a></td><td class="ns">technomancy</td><td>lnostdal: it's not that .equals is behaving differently, it's that 261 is evaluating differently</td></tr>
+<tr id="t0024A" class="h r"><td><a href="#t0024A">00:24</a></td><td class="ns">technomancy</td><td>err--reading differently</td></tr>
+<tr id="t0024A" class="h r"><td><a href="#t0024A">00:24</a></td><td class="ns">technomancy</td><td>anyway, if you want correct equality semantics you won't get them from .equals; that's what RT/equiv is for</td></tr>
+<tr id="t0024A" class="h"><td><a href="#t0024A">00:24</a></td><td class="nm">amalloy</td><td>technomancy: no, i think it's that (int 261) is boxing differently</td></tr>
+<tr id="t0025A" class="h r"><td><a href="#t0025A">00:25</a></td><td class="nm">amalloy</td><td>they changed it back to boxing int as Integer in 1.4</td></tr>
+<tr id="t0025A" class="h"><td><a href="#t0025A">00:25</a></td><td class="ns">technomancy</td><td>oh, right. anyway, relying on .equals is just going to cause problems</td></tr>
+<tr id="t0026A" class="h"><td><a href="#t0026A">00:26</a></td><td class="nm">amalloy</td><td>yes, .equals is contractually required to suck</td></tr>
+<tr id="t0028A" class="h"><td><a href="#t0028A">00:28</a></td><td class="nf">lnostdal</td><td>yeah, i'd never use equals like that; i'm using an external (java) library for weak hash-table support</td></tr>
+<tr id="t0029A" class="h r"><td><a href="#t0029A">00:29</a></td><td class="nf">lnostdal</td><td>hm, but perhaps there are other ways? ..  i haven't found weak hash-table support &quot;tuned for&quot; clojure</td></tr>
+<tr id="t0029A" class="h r"><td><a href="#t0029A">00:29</a></td><td class="nf">lnostdal</td><td>what i do now though is (let [id (long id)] ...)   around my put and gets vs. the hash-table .. to make sure everything's the same with regards to type</td></tr>
+<tr id="t0031A"><td><a href="#t0031A">00:31</a></td><td class="nm">amalloy</td><td>lnostdal: that's not a good way to use int/long</td></tr>
+<tr id="t0031A" class="h"><td><a href="#t0031A">00:31</a></td><td class="nf">lnostdal</td><td>ok?</td></tr>
+<tr id="t0031A" class="h"><td><a href="#t0031A">00:31</a></td><td class="nm">amalloy</td><td>they're only guaranteed to be useful for creating primitive int and long locals inside a function</td></tr>
+<tr id="t0032A" class="h r"><td><a href="#t0032A">00:32</a></td><td class="nm">amalloy</td><td>if you want to force boxing in a particular way, use (Integer. blah)</td></tr>
+<tr id="t0032A" class="h"><td><a href="#t0032A">00:32</a></td><td class="nf">lnostdal</td><td>ah, yeah, i'm ok with the actual object &quot;on the outside&quot; still being something not a long</td></tr>
+<tr id="t0033A" class="h r"><td><a href="#t0033A">00:33</a></td><td class="nf">lnostdal</td><td>that way i don't have to deal with casting/coercing _everywhere_ some number might be created</td></tr>
+<tr id="t0033A" class="h"><td><a href="#t0033A">00:33</a></td><td class="nm">amalloy</td><td>but...if you pass it to put/get, it's not local</td></tr>
+<tr id="t0033A" class="h"><td><a href="#t0033A">00:33</a></td><td class="nf">lnostdal</td><td>the let i mentioned above is code inside the (my) put/get function</td></tr>
+<tr id="t0033A" class="h r"><td><a href="#t0033A">00:33</a></td><td class="nf">lnostdal</td><td>(defn my-put [id ..] (let [id (long id)] ...call java hash-table thing here..))</td></tr>
+<tr id="t0034A" class="h r"><td><a href="#t0034A">00:34</a></td><td class="nf">lnostdal</td><td>..like that or so</td></tr>
+<tr id="t0034A" class="h"><td><a href="#t0034A">00:34</a></td><td class="nm">amalloy</td><td>right, which is exactly what i'm saying you can't count on</td></tr>
+<tr id="t0034A" class="h"><td><a href="#t0034A">00:34</a></td><td class="nf">lnostdal</td><td>&quot;count on&quot;?</td></tr>
+<tr id="t0034A" class="h"><td><a href="#t0034A">00:34</a></td><td class="nm">amalloy</td><td>because you have to box the thing up to call a method on it</td></tr>
+<tr id="t0034A" class="h"><td><a href="#t0034A">00:34</a></td><td class="nf">lnostdal</td><td>count on for what? .. i need ID to always be LONG</td></tr>
+<tr id="t0034A" class="h"><td><a href="#t0034A">00:34</a></td><td class="nm">amalloy</td><td>so it's not used only in the local scope</td></tr>
+<tr id="t0035A" class="h"><td><a href="#t0035A">00:35</a></td><td class="nf">lnostdal</td><td>i'm ok with it only being used in this local scope!</td></tr>
+<tr id="t0035A" class="h"><td><a href="#t0035A">00:35</a></td><td class="nm">amalloy</td><td>but it *isn't* used only in this local scope! you're giving it right to this other hashtable lib</td></tr>
+<tr id="t0035A" class="h"><td><a href="#t0035A">00:35</a></td><td class="nf">lnostdal</td><td>yes, as a java.lang.Long</td></tr>
+<tr id="t0035A" class="h r"><td><a href="#t0035A">00:35</a></td><td class="nf">lnostdal</td><td>always</td></tr>
+<tr id="t0036A" class="h"><td><a href="#t0036A">00:36</a></td><td class="nm">amalloy</td><td>if you want to be sure it's always a Long you should use (Long. x), not (long x)</td></tr>
+<tr id="t0036A" class="h"><td><a href="#t0036A">00:36</a></td><td class="nf">lnostdal</td><td>why? .. what does (long ..) do if not cast it to java.lang.Long??</td></tr>
+<tr id="t0036A" class="h"><td><a href="#t0036A">00:36</a></td><td class="nx">lazybot</td><td>lnostdal: What are you, crazy? Of course not!</td></tr>
+<tr id="t0036A" class="h"><td><a href="#t0036A">00:36</a></td><td class="nf">lnostdal</td><td>lazybot, shut up now</td></tr>
+<tr id="t0036A" class="h r"><td><a href="#t0036A">00:36</a></td><td class="nf">lnostdal</td><td>:P</td></tr>
+<tr id="t0036A" class="h"><td><a href="#t0036A">00:36</a></td><td class="nm">amalloy</td><td>&amp;(class (int 5))</td></tr>
+<tr id="t0036A" class="h"><td><a href="#t0036A">00:36</a></td><td class="nx">lazybot</td><td>⇒ java.lang.Long</td></tr>
+<tr id="t0037A" class="h"><td><a href="#t0037A">00:37</a></td><td class="nm">amalloy</td><td>the int/long hints are *only* hints for letting the compiler do primitive arithmetic on numbers that don't leave your scope</td></tr>
+<tr id="t0037A" class="h"><td><a href="#t0037A">00:37</a></td><td class="nf">lnostdal</td><td>(class (int 5)) =&gt; java.lang.Integer    here</td></tr>
+<tr id="t0037A" class="h"><td><a href="#t0037A">00:37</a></td><td class="nm">amalloy</td><td>on 1.4, yes</td></tr>
+<tr id="t0037A" class="h"><td><a href="#t0037A">00:37</a></td><td class="nf">lnostdal</td><td>*sigh*</td></tr>
+<tr id="t0037A" class="h"><td><a href="#t0037A">00:37</a></td><td class="nm">amalloy</td><td>on every version of clojure that i'm aware of, (long x) happens to be boxed into a Long, and i can't really see it changing anytime soon, but (Long. x) is more semantically-correct if your goal is to make sure the boxed type is correct</td></tr>
+<tr id="t0038A" class="h"><td><a href="#t0038A">00:38</a></td><td class="nf">lnostdal</td><td>wtf. is up with this stuff ..   ok,    (let [id (Long. id)] ...)    it is then ..     so god damn stupid</td></tr>
+<tr id="t0100A"><td><a href="#t0100A">01:00</a></td><td class="nl">gmarceau</td><td>What would be idiomatic clojure for loop down two list at the same time? Is this how you would do it? (for [[fst snd] (map list (cons nil s) s)</td></tr>
+<tr id="t0100A" class="h r"><td><a href="#t0100A">01:00</a></td><td class="nl">gmarceau</td><td>         :when (not= fst snd)] snd)</td></tr>
+<tr id="t0101A" class="h r"><td><a href="#t0101A">01:01</a></td><td class="nl">gmarceau</td><td>this is an expression that removes duplicate adjacent to each other in a list.</td></tr>
+<tr id="t0109A" class="h"><td><a href="#t0109A">01:09</a></td><td class="nm">amalloy</td><td>(map first (partition-by identity s))?</td></tr>
+<tr id="t0111A" class="r"><td><a href="#t0111A">01:11</a></td><td class="nm">amalloy</td><td>that probably breaks on an empty list but should work for everything else</td></tr>
+<tr id="t0114A" class="h"><td><a href="#t0114A">01:14</a></td><td class="nl">gmarceau</td><td>Neat. but I'm actually curious for the general case.</td></tr>
+<tr id="t0116A" class="h r"><td><a href="#t0116A">01:16</a></td><td class="nl">gmarceau</td><td>(for [[fst lst] (map list firstNames lastNames)] (concat fst &quot; &quot;lst))</td></tr>
+<tr id="t0117A" class="h r"><td><a href="#t0117A">01:17</a></td><td class="nl">gmarceau</td><td>or to give number to lines</td></tr>
+<tr id="t0117A" class="h r"><td><a href="#t0117A">01:17</a></td><td class="nl">gmarceau</td><td>(for [[n ln] (map list (range) lines)] (concat (str n) &quot; &quot; lines))</td></tr>
+<tr id="t0121A"><td><a href="#t0121A">01:21</a></td><td class="nt">clj_newb</td><td>i recently discovered somethign as awesome as clojure</td></tr>
+<tr id="t0125A" class="h"><td><a href="#t0125A">01:25</a></td><td class="nm">amalloy</td><td>*nod* if you want the general case *and* you want to use a for-expression, you probably want to map list</td></tr>
+<tr id="t0125A" class="h r"><td><a href="#t0125A">01:25</a></td><td class="nm">amalloy</td><td>i think for all of your examples there's a nicer way, though</td></tr>
+<tr id="t0126A" class="h r"><td><a href="#t0126A">01:26</a></td><td class="nm">amalloy</td><td>(map #(str %1 &quot; &quot; %2) first-names last-names), (map-indexed (fn [n line] (str n &quot; &quot; line)))</td></tr>
+<tr id="t0128A" class="h"><td><a href="#t0128A">01:28</a></td><td class="nl">gmarceau</td><td>ah, awesome.</td></tr>
+<tr id="t0129A" class="h r"><td><a href="#t0129A">01:29</a></td><td class="nl">gmarceau</td><td>but if I need for's :when feature as well, then I should use keep-index I suppose?</td></tr>
+<tr id="t0130A"><td><a href="#t0130A">01:30</a></td><td class="nm">amalloy</td><td>and i think your first for-expression fails, right? if s is '(nil 1 2 3), you drop the nil out from the beginning</td></tr>
+<tr id="t0131A" class="h r"><td><a href="#t0131A">01:31</a></td><td class="nm">amalloy</td><td>for walking a single list in pairs, i generally use (for [[a b] (partition 2 1 coll)] ..)</td></tr>
+<tr id="t0151A"><td><a href="#t0151A">01:51</a></td><td class="nl">gmarceau</td><td>awesome</td></tr>
+<tr id="t0152A" class="h"><td><a href="#t0152A">01:52</a></td><td class="nt">clj_newb</td><td>I consider it a crime against humanity that I can not run clojure on my ipad.</td></tr>
+<tr id="t0213A"><td><a href="#t0213A">02:13</a></td><td class="n7">notostraca</td><td>clj_newb, iPads are crimes against humanity, in a more literal sense <a href="http://www.thisamericanlife.org/radio-archives/episode/454/mr-daisey-and-the-apple-factory">http://www.thisamericanlife.org/radio-archives/episode/454/mr-daisey-and-the-apple-factory</a></td></tr>
+<tr id="t0225A"><td><a href="#t0225A">02:25</a></td><td class="n0">markerdmann</td><td>notostraca: do you know if there's a transcript of the audio somewhere?</td></tr>
+<tr id="t0225A" class="h"><td><a href="#t0225A">02:25</a></td><td class="n7">notostraca</td><td>markerdmann, sure i will check</td></tr>
+<tr id="t0228A" class="h"><td><a href="#t0228A">02:28</a></td><td class="na">Raynes</td><td>clj_newb: I bet tryclj.com works. Not exactly a substitute for a REPL, but beggars can't be choosers.</td></tr>
+<tr id="t0244A"><td><a href="#t0244A">02:44</a></td><td class="n7">notostraca</td><td>markerdmann, no luck, too new for a human to have transcribed it.</td></tr>
+<tr id="t0247A" class="h"><td><a href="#t0247A">02:47</a></td><td class="nm">amalloy</td><td>it's pretty captivating to listen to though</td></tr>
+<tr id="t0307A"><td><a href="#t0307A">03:07</a></td><td class="np">Magnars</td><td>idiomatic way of checking if a list has just one element?</td></tr>
+<tr id="t0307A" class="h"><td><a href="#t0307A">03:07</a></td><td class="nm">amalloy</td><td>exactly one, or at most one?</td></tr>
+<tr id="t0308A" class="h"><td><a href="#t0308A">03:08</a></td><td class="np">Magnars</td><td>in my case I've already checked if it is empty</td></tr>
+<tr id="t0308A" class="h"><td><a href="#t0308A">03:08</a></td><td class="nm">amalloy</td><td>(not (next x))</td></tr>
+<tr id="t0308A" class="h"><td><a href="#t0308A">03:08</a></td><td class="np">Magnars</td><td>thanks!</td></tr>
+<tr id="t0311A" class="r"><td><a href="#t0311A">03:11</a></td><td class="np">Magnars</td><td>how about exactly one then?</td></tr>
+<tr id="t0312A" class="h r"><td><a href="#t0312A">03:12</a></td><td class="np">Magnars</td><td>(= 1 (count x)) ?</td></tr>
+<tr id="t0312A" class="h"><td><a href="#t0312A">03:12</a></td><td class="nm">amalloy</td><td>&amp;(= 1 (count (range)))</td></tr>
+<tr id="t0312A" class="h r"><td><a href="#t0312A">03:12</a></td><td class="nm">amalloy</td><td>no good</td></tr>
+<tr id="t0312A" class="h"><td><a href="#t0312A">03:12</a></td><td class="nu">Guest82940</td><td>Execution Timed Out!</td></tr>
+<tr id="t0312A" class="h"><td><a href="#t0312A">03:12</a></td><td class="nm">amalloy</td><td>haha Raynes, lazybot has lost his login</td></tr>
+<tr id="t0312A" class="h"><td><a href="#t0312A">03:12</a></td><td class="nl">clojurebot</td><td>It's greek to me.</td></tr>
+<tr id="t0313A" class="h"><td><a href="#t0313A">03:13</a></td><td class="na">Raynes</td><td>amalloy: That's pretty awesome.</td></tr>
+<tr id="t0313A" class="h"><td><a href="#t0313A">03:13</a></td><td class="nm">amalloy</td><td>Magnars: (and (seq x) (not (next x))), i suppose</td></tr>
+<tr id="t0314A" class="h"><td><a href="#t0314A">03:14</a></td><td class="np">Magnars</td><td>aye, more performant than count</td></tr>
+<tr id="t0317A" class="h"><td><a href="#t0317A">03:17</a></td><td class="nm">amalloy</td><td>if the thing happens to implement Counted, then you might do slightly better with the &lt;= version</td></tr>
+<tr id="t0318A" class="h"><td><a href="#t0318A">03:18</a></td><td class="np">Magnars</td><td>sometimes I miss cadr cddr and its ilk ^^</td></tr>
+<tr id="t0318A" class="h"><td><a href="#t0318A">03:18</a></td><td class="nm">amalloy</td><td>it's pretty easy to write them, of course, especially with macros</td></tr>
+<tr id="t0319A" class="h"><td><a href="#t0319A">03:19</a></td><td class="np">Magnars</td><td>yeah, but I'm trying to learn idiomatic clojure :)</td></tr>
+<tr id="t0319A" class="h r"><td><a href="#t0319A">03:19</a></td><td class="np">Magnars</td><td>but then again, there's second and nnext - it's just that I have to go digging after what they're called</td></tr>
+<tr id="t0326A"><td><a href="#t0326A">03:26</a></td><td class="nm">amalloy</td><td>indeed, i don't encourage it. but you might enjoy <a href="https://gist.github.com/1581911,">https://gist.github.com/1581911,</a> which defines all the cadrs and cadaadars you could ever want in just a couple lines</td></tr>
+<tr id="t0328A" class="h r"><td><a href="#t0328A">03:28</a></td><td class="nm">amalloy</td><td>Magnars: ^</td></tr>
+<tr id="t0329A" class="h"><td><a href="#t0329A">03:29</a></td><td class="na">Raynes</td><td>amalloy: Traitor.</td></tr>
+<tr id="t0408A"><td><a href="#t0408A">04:08</a></td><td class="nq">bart1</td><td>hello</td></tr>
+<tr id="t0408A" class="h r"><td><a href="#t0408A">04:08</a></td><td class="nq">bart1</td><td>how to get clojure.lang.Compiler.load(new StringReader(text)); to string? It outs output to console</td></tr>
+<tr id="t0410A" class="r"><td><a href="#t0410A">04:10</a></td><td class="nq">bart1</td><td>don't know why, but this: <a href="http://pastebin.com/TwjxYmaK">http://pastebin.com/TwjxYmaK</a> works only at first time</td></tr>
+<tr id="t0450A"><td><a href="#t0450A">04:50</a></td><td class="nl">kral</td><td>hi pals</td></tr>
+<tr id="t0501A"><td><a href="#t0501A">05:01</a></td><td class="n2">Blkt</td><td>good (late) morning everyone</td></tr>
+<tr id="t0505A" class="h"><td><a href="#t0505A">05:05</a></td><td class="n9">gf3</td><td>GOOD LATE MORNING</td></tr>
+<tr id="t0603A"><td><a href="#t0603A">06:03</a></td><td class="nc">casperc</td><td>What is the idiomatic in clojure to spawn a thread to update a GUI component?</td></tr>
+<tr id="t0604A" class="h r"><td><a href="#t0604A">06:04</a></td><td class="nc">casperc</td><td>Is it just passing a function to Thread?</td></tr>
+<tr id="t0608A" class="h"><td><a href="#t0608A">06:08</a></td><td class="n6">G0SUB</td><td>casperc: you could use an agent.</td></tr>
+<tr id="t0611A"><td><a href="#t0611A">06:11</a></td><td class="nq">bart1</td><td>how to get clojure.lang.Compiler.load(new StringReader(text)); to string? It outs output to console</td></tr>
+<tr id="t0611A" class="h r"><td><a href="#t0611A">06:11</a></td><td class="nq">bart1</td><td>don't know why, but this: <a href="http://pastebin.com/TwjxYmaK works">http://pastebin.com/TwjxYmaK works</a> only at first time</td></tr>
+<tr id="t0611A" class="h"><td><a href="#t0611A">06:11</a></td><td class="nc">casperc</td><td>G0SUB, i was thinking about that, but what would i put in the agent? The GUI component itself?</td></tr>
+<tr id="t0612A" class="h"><td><a href="#t0612A">06:12</a></td><td class="n6">G0SUB</td><td>casperc: possible, or the function can two args and ignore the first one (the agent)</td></tr>
+<tr id="t0612A" class="h r"><td><a href="#t0612A">06:12</a></td><td class="n6">G0SUB</td><td>casperc: the GUI can be in a global var as well.</td></tr>
+<tr id="t0614A" class="h"><td><a href="#t0614A">06:14</a></td><td class="nc">casperc</td><td>G0SUB: yeah, I might try keeping my gui components in a global map and then using send-off every time i want to update it</td></tr>
+<tr id="t0614A" class="h"><td><a href="#t0614A">06:14</a></td><td class="n6">G0SUB</td><td>right</td></tr>
+<tr id="t0615A" class="h"><td><a href="#t0615A">06:15</a></td><td class="nc">casperc</td><td>the is there any way to interrupt a previous thread working on the agent though?</td></tr>
+<tr id="t0615A" class="h"><td><a href="#t0615A">06:15</a></td><td class="n6">G0SUB</td><td>casperc: why would you want to do that?</td></tr>
+<tr id="t0616A" class="h"><td><a href="#t0616A">06:16</a></td><td class="nc">casperc</td><td>say i am in the process of updating a component and i get a new event to update the same component</td></tr>
+<tr id="t0616A" class="h r"><td><a href="#t0616A">06:16</a></td><td class="nc">casperc</td><td>maybe i am overthinking it though</td></tr>
+<tr id="t0616A" class="h"><td><a href="#t0616A">06:16</a></td><td class="n6">G0SUB</td><td>casperc: all fns sent off to an agent are serialised. they are performed in order.</td></tr>
+<tr id="t0618A" class="h"><td><a href="#t0618A">06:18</a></td><td class="nc">casperc</td><td>G0SUB: yeah, so if one is long running it would block the other one until done. What I would really want in a GUI is for the new event to stop existing and execute itself instead</td></tr>
+<tr id="t0619A" class="h"><td><a href="#t0619A">06:19</a></td><td class="n6">G0SUB</td><td>casperc: hmm, that could be a problem. may be you need to rethink your solution.</td></tr>
+<tr id="t0619A" class="h r"><td><a href="#t0619A">06:19</a></td><td class="n6">G0SUB</td><td>casperc: if you are not doing IO, the function shouldn't be &quot;long running&quot;.</td></tr>
+<tr id="t0621A"><td><a href="#t0621A">06:21</a></td><td class="nc">casperc</td><td>G0SUB: I agree, but it might be slightly slower than realtime. Again i think i am just overthinking the problem, so I will try the agent solution you suggested :)</td></tr>
+<tr id="t0621A" class="h"><td><a href="#t0621A">06:21</a></td><td class="n6">G0SUB</td><td>:-)</td></tr>
+<tr id="t0621A" class="h"><td><a href="#t0621A">06:21</a></td><td class="nc">casperc</td><td>G0SUB: thanks alot for the input</td></tr>
+<tr id="t0621A" class="h"><td><a href="#t0621A">06:21</a></td><td class="n6">G0SUB</td><td>casperc: my pleasure.</td></tr>
+<tr id="t0635A"><td><a href="#t0635A">06:35</a></td><td class="ny">Vinzent</td><td>lein-clojurescript?</td></tr>
+<tr id="t0642A"><td><a href="#t0642A">06:42</a></td><td class="nt">broquaint</td><td>For building clojurescript -&gt; JS IIRC.</td></tr>
+<tr id="t1044A"><td><a href="#t1044A">10:44</a></td><td class="n8">jsabeaudry</td><td>What is the status of clojure on android? Hve the initial problems been resolved?</td></tr>
+<tr id="t1045A" class="h"><td><a href="#t1045A">10:45</a></td><td class="nn">AWizzArd</td><td>I would like to add to that question: isn't it possible to install a full JVM on Android? Todays devices should be powerful enough I guess.</td></tr>
+<tr id="t1048A" class="h"><td><a href="#t1048A">10:48</a></td><td class="n8">jsabeaudry</td><td>AWizzArd: Yes it it but a lot of them are not very stable</td></tr>
+<tr id="t1048A" class="h r"><td><a href="#t1048A">10:48</a></td><td class="n8">jsabeaudry</td><td>AWizzArd: Shark and Cacao sometimes crash</td></tr>
+<tr id="t1048A" class="h r"><td><a href="#t1048A">10:48</a></td><td class="n8">jsabeaudry</td><td>AWizzArd: Jamvm seems more stable but slower</td></tr>
+<tr id="t1052A"><td><a href="#t1052A">10:52</a></td><td class="no">jkkramer</td><td>jsabeaudry: AWizzArd: Daniel Gomez seems to be leading the charge on that front. He gave an excellent presentation at clojure conj about it. This is probably the state of the art: <a href="https://github.com/sattvik/neko">https://github.com/sattvik/neko</a></td></tr>
+<tr id="t1054A" class="h"><td><a href="#t1054A">10:54</a></td><td class="n8">jsabeaudry</td><td>jkkramer: Thanks!</td></tr>
+<tr id="t1302A"><td><a href="#t1302A">13:02</a></td><td class="n9">TimMc</td><td>Since the room is fairly quiet, a Git question: I sent a pull request to merge mine:topic-branch into someone:version-branch. Should I have merged my changes first into the version-branch, or is everything gonna be OK?</td></tr>
+<tr id="t1304A" class="h"><td><a href="#t1304A">13:04</a></td><td class="n9">nlew</td><td>TimMc: Not sure I follow. Are you asking if you should first have merged them into your local copy of version-branch?</td></tr>
+<tr id="t1305A" class="h"><td><a href="#t1305A">13:05</a></td><td class="n9">TimMc</td><td>yep</td></tr>
+<tr id="t1306A" class="h r"><td><a href="#t1306A">13:06</a></td><td class="n9">TimMc</td><td>Or is it OK, since the topic branch came off the version branch.</td></tr>
+<tr id="t1306A" class="h"><td><a href="#t1306A">13:06</a></td><td class="n9">nlew</td><td>Ah, then you're fine. The only branches considered are the ones being merged together.</td></tr>
+<tr id="t1306A" class="h"><td><a href="#t1306A">13:06</a></td><td class="n9">TimMc</td><td>(I've gotten gun-shy about intuition and git...)</td></tr>
+<tr id="t1307A" class="h r"><td><a href="#t1307A">13:07</a></td><td class="n9">TimMc</td><td>nlew: Phew. I already screwed up 2 pull requests and was going to give up forever if this one went wrong too.</td></tr>
+<tr id="t1307A" class="h"><td><a href="#t1307A">13:07</a></td><td class="n9">nlew</td><td>Github will show you specifically which commits will be pulled in by your merge, which is quite helpful to make sure you at least didn't mess anything up.</td></tr>
+<tr id="t1308A" class="h"><td><a href="#t1308A">13:08</a></td><td class="n9">TimMc</td><td>Yeah, the diff looks fine, but I don't know git enough yet to tell if this could lead to a giant conflict later.</td></tr>
+<tr id="t1357A"><td><a href="#t1357A">13:57</a></td><td class="nt">clj_newb</td><td>fn Foo calls fn Bar. Bar throws an exception e =  (throw (Throwable. &quot;Some string&quot;)). Now, I want Foo to catch e, and change &quot;Some string&quot; to &quot;in Foo, from Bar: Some string&quot;. Now, I know how to use try/catch. My question is the following, given &quot;e&quot;, how do I extract the &quot;Some String&quot; out of it?</td></tr>
+<tr id="t1358A" class="h"><td><a href="#t1358A">13:58</a></td><td class="ny">Vinzent</td><td>,(.getMessage (Exception. &quot;foo&quot;))</td></tr>
+<tr id="t1358A" class="h"><td><a href="#t1358A">13:58</a></td><td class="nl">clojurebot</td><td>&quot;foo&quot;</td></tr>
+<tr id="t1358A" class="h"><td><a href="#t1358A">13:58</a></td><td class="nt">clj_newb</td><td>Vinzent: nice; thanks</td></tr>
+<tr id="t1359A" class="h"><td><a href="#t1359A">13:59</a></td><td class="ny">Vinzent</td><td>clj_newb, see javadoc for the Exception class</td></tr>
+<tr id="t1406A"><td><a href="#t1406A">14:06</a></td><td class="nt">clj_newb</td><td>is there a name for (fn [a b c] (a b c)) ?</td></tr>
+<tr id="t1406A" class="h"><td><a href="#t1406A">14:06</a></td><td class="ns">technomancy</td><td>list?</td></tr>
+<tr id="t1407A" class="h"><td><a href="#t1407A">14:07</a></td><td class="n9">kumarshantanu</td><td>Hi, is it possible to detect the current environment -- CLJS or CLJ?</td></tr>
+<tr id="t1408A" class="h"><td><a href="#t1408A">14:08</a></td><td class="nt">clj_newb</td><td>no, the a is a funtion, applied to args b &amp; c</td></tr>
+<tr id="t1408A" class="h"><td><a href="#t1408A">14:08</a></td><td class="ny">Vinzent</td><td>clj_newb, (a b c)? :)</td></tr>
+<tr id="t1408A" class="h"><td><a href="#t1408A">14:08</a></td><td class="ns">technomancy</td><td>oh right</td></tr>
+<tr id="t1408A" class="h"><td><a href="#t1408A">14:08</a></td><td class="n9">TimMc</td><td>clj_newb: Do you know about partial?</td></tr>
+<tr id="t1408A" class="h"><td><a href="#t1408A">14:08</a></td><td class="nt">clj_newb</td><td>Vinzent: it needs to be a function I pass to map.</td></tr>
+<tr id="t1408A" class="h"><td><a href="#t1408A">14:08</a></td><td class="ns">technomancy</td><td>I think amalloy had a trick for that</td></tr>
+<tr id="t1408A" class="h"><td><a href="#t1408A">14:08</a></td><td class="np">jhirn</td><td>Anyone here familiar with Pinot for cljs?</td></tr>
+<tr id="t1408A" class="h"><td><a href="#t1408A">14:08</a></td><td class="nt">clj_newb</td><td>,(doc partial)</td></tr>
+<tr id="t1408A" class="h"><td><a href="#t1408A">14:08</a></td><td class="nl">clojurebot</td><td>&quot;([f arg1] [f arg1 arg2] [f arg1 arg2 arg3] [f arg1 arg2 arg3 &amp; ...]); Takes a function f and fewer than the normal arguments to f, and returns a fn that takes a variable number of additional args. When called, the returned function calls f with args + additional args.&quot;</td></tr>
+<tr id="t1409A" class="h"><td><a href="#t1409A">14:09</a></td><td class="nt">clj_newb</td><td>wait wait wait</td></tr>
+<tr id="t1409A" class="h r"><td><a href="#t1409A">14:09</a></td><td class="nt">clj_newb</td><td>I think this is called eval</td></tr>
+<tr id="t1409A" class="h r"><td><a href="#t1409A">14:09</a></td><td class="nt">clj_newb</td><td>,(eval '(+ 1 2 3))</td></tr>
+<tr id="t1409A" class="h"><td><a href="#t1409A">14:09</a></td><td class="nl">clojurebot</td><td>#&lt;Exception java.lang.Exception: SANBOX DENIED&gt;</td></tr>
+<tr id="t1409A" class="h"><td><a href="#t1409A">14:09</a></td><td class="ny">Vinzent</td><td>clj_newb, you don't need eval</td></tr>
+<tr id="t1409A" class="h"><td><a href="#t1409A">14:09</a></td><td class="nt">clj_newb</td><td>saying that I don't need Eval is like saying that I don't need nukes to kill ants</td></tr>
+<tr id="t1410A"><td><a href="#t1410A">14:10</a></td><td class="n9">TimMc</td><td>clj_newb: I think you want #(% %2 %3)</td></tr>
+<tr id="t1410A" class="h"><td><a href="#t1410A">14:10</a></td><td class="nt">clj_newb</td><td>TimMc: lol; nice</td></tr>
+<tr id="t1410A" class="h"><td><a href="#t1410A">14:10</a></td><td class="n9">kumarshantanu</td><td>technomancy: trick to detect CLJS or CLJ?</td></tr>
+<tr id="t1410A" class="h"><td><a href="#t1410A">14:10</a></td><td class="ns">technomancy</td><td>kumarshantanu: (resolve 'var) maybe?</td></tr>
+<tr id="t1410A" class="h r"><td><a href="#t1410A">14:10</a></td><td class="ns">technomancy</td><td>no idea; I've never used cljs</td></tr>
+<tr id="t1412A" class="h"><td><a href="#t1412A">14:12</a></td><td class="n9">kumarshantanu</td><td>technomancy: CLJS doesn't have true vars, so no resolve</td></tr>
+<tr id="t1412A" class="h"><td><a href="#t1412A">14:12</a></td><td class="ns">technomancy</td><td>derp</td></tr>
+<tr id="t1414A" class="h r"><td><a href="#t1414A">14:14</a></td><td class="ns">technomancy</td><td>maybe try to add a bunch of integers together and if you don't get floating-point errors introduced you must not be on JS =)</td></tr>
+<tr id="t1416A" class="h"><td><a href="#t1416A">14:16</a></td><td class="n9">TimMc</td><td>kumarshantanu: (defn cljs? [] (string? :a))</td></tr>
+<tr id="t1416A" class="h r"><td><a href="#t1416A">14:16</a></td><td class="n9">TimMc</td><td>That's a bit of a dirty trick, so don't come running when it stops working... :-P</td></tr>
+<tr id="t1417A" class="h"><td><a href="#t1417A">14:17</a></td><td class="n9">kumarshantanu</td><td>TimMC: (string? :a) returns false on the CLJS REPL</td></tr>
+<tr id="t1418A" class="h"><td><a href="#t1418A">14:18</a></td><td class="n9">TimMc</td><td>Huh. Another thing to investigate in my Try-CLJS code.</td></tr>
+<tr id="t1419A" class="h r"><td><a href="#t1419A">14:19</a></td><td class="n9">TimMc</td><td>kumarshantanu: What happens if you write (clojure.core/string? :a) ?</td></tr>
+<tr id="t1419A" class="h r"><td><a href="#t1419A">14:19</a></td><td class="n9">TimMc</td><td>I mean, should be the same...</td></tr>
+<tr id="t1420A"><td><a href="#t1420A">14:20</a></td><td class="n9">kumarshantanu</td><td>TimMC: It is the same</td></tr>
+<tr id="t1421A" class="h"><td><a href="#t1421A">14:21</a></td><td class="n9">TimMc</td><td>kumarshantanu: OK, there's a chance there's a difference between compiled and REPL'd CLJS. I give up.</td></tr>
+<tr id="t1421A" class="h"><td><a href="#t1421A">14:21</a></td><td class="ne">OgMaciel</td><td>hi, first question here: if I have a defn that takes [foo {:keys [baz bar]}], how do I pass the second arg to another defn that has the same signature as this one?</td></tr>
+<tr id="t1422A" class="h"><td><a href="#t1422A">14:22</a></td><td class="ny">Vinzent</td><td>TimMc, <a href="https://groups.google.com/forum/#!topic/clojure/dGMJrztg-C0">https://groups.google.com/forum/#!topic/clojure/dGMJrztg-C0</a></td></tr>
+<tr id="t1422A" class="h"><td><a href="#t1422A">14:22</a></td><td class="n9">TimMc</td><td>OgMaciel: Check out the :as option.</td></tr>
+<tr id="t1423A" class="h"><td><a href="#t1423A">14:23</a></td><td class="n9">kumarshantanu</td><td>TimMC: I remember that keywords used to be just strings, but no idea if that's still the case</td></tr>
+<tr id="t1423A" class="h"><td><a href="#t1423A">14:23</a></td><td class="ne">OgMaciel</td><td>TimMc, cool, I'm guessing that I'd change the signature to give the second arg an &quot;alias&quot; that can be used then to pass it along?</td></tr>
+<tr id="t1424A" class="h"><td><a href="#t1424A">14:24</a></td><td class="n9">TimMc</td><td>OgMaciel: Right, it's something like {:keys ... :as arg2}. By the way, the signature doesn't change -- it's still a binary function.</td></tr>
+<tr id="t1424A" class="h"><td><a href="#t1424A">14:24</a></td><td class="ne">OgMaciel</td><td>TimMc, thanks a bunch... learning Clojure coming from Python :)</td></tr>
+<tr id="t1431A"><td><a href="#t1431A">14:31</a></td><td class="nl">abp</td><td>hi, why isn't there a interleave-all function in clojure.core?</td></tr>
+<tr id="t1436A" class="h r"><td><a href="#t1436A">14:36</a></td><td class="nl">abp</td><td>for sure because there are other ways to solve problems</td></tr>
+<tr id="t1437A" class="h r"><td><a href="#t1437A">14:37</a></td><td class="nl">abp</td><td>but with my current skill in fp and clojure i'm not able to find them without help</td></tr>
+<tr id="t1442A"><td><a href="#t1442A">14:42</a></td><td class="n9">TimMc</td><td>abp: What would interleave-all do?</td></tr>
+<tr id="t1442A" class="h r"><td><a href="#t1442A">14:42</a></td><td class="n9">TimMc</td><td>I guess (interleave-all '[a b] [1 2 3 4 5]) would be '[a 1 b 2 3 4 5]</td></tr>
+<tr id="t1442A" class="h"><td><a href="#t1442A">14:42</a></td><td class="nl">abp</td><td>TimMc: combine seqs of different lengths</td></tr>
+<tr id="t1443A" class="h r"><td><a href="#t1443A">14:43</a></td><td class="nl">abp</td><td>TimMc: yes</td></tr>
+<tr id="t1443A" class="h"><td><a href="#t1443A">14:43</a></td><td class="n9">TimMc</td><td>Like the reverse of how I eat Skittles.</td></tr>
+<tr id="t1445A" class="h r"><td><a href="#t1445A">14:45</a></td><td class="n9">TimMc</td><td>If that's not already a problem on 4Clojure, it should be.</td></tr>
+<tr id="t1446A" class="h"><td><a href="#t1446A">14:46</a></td><td class="no">jkkramer</td><td>abp: i have a version of interleave-all coded if you want it</td></tr>
+<tr id="t1446A" class="h"><td><a href="#t1446A">14:46</a></td><td class="nl">abp</td><td>jkkramer: yes, found one, could write one, but why isn't it in core?</td></tr>
+<tr id="t1448A" class="h"><td><a href="#t1448A">14:48</a></td><td class="n9">TimMc</td><td>abp: Not enough people had the need.</td></tr>
+<tr id="t1448A" class="h"><td><a href="#t1448A">14:48</a></td><td class="nl">abp</td><td>TimMc: oh ok</td></tr>
+<tr id="t1449A" class="h"><td><a href="#t1449A">14:49</a></td><td class="n9">TimMc</td><td>I doubt there's any philosophical reason for that one.</td></tr>
+<tr id="t1449A" class="h"><td><a href="#t1449A">14:49</a></td><td class="nl">abp</td><td>TimMc: so how would i go about different length input seqs, transforming them and reducing the results in steps until *nothing* is left</td></tr>
+<tr id="t1451A"><td><a href="#t1451A">14:51</a></td><td class="n9">TimMc</td><td>abp: I think I would use the lazy-seq macro for this, dropping input seqs as they run out of elements.</td></tr>
+<tr id="t1454A" class="h"><td><a href="#t1454A">14:54</a></td><td class="nl">abp</td><td>TimMc: but this would be interleave-all, i just getting accustomed to hofs and then there are some missing, leaving me searching and thinking i'am doing something wrong before implementing it myself</td></tr>
+<tr id="t1456A" class="h"><td><a href="#t1456A">14:56</a></td><td class="ny">Vinzent</td><td>then there should be map-all, mapcat-all, etc</td></tr>
+<tr id="t1457A" class="h"><td><a href="#t1457A">14:57</a></td><td class="nl">abp</td><td>Vinzent: sure, but what level do you thereafter? map + map-all is like single- and multi-arity implementation, or not?</td></tr>
+<tr id="t1459A" class="h r"><td><a href="#t1459A">14:59</a></td><td class="nl">abp</td><td>TimMc, jkkramer, Vinzent: and i wonder what is considered more idiomatic now, implementing or searching for interleave-all once, or writing my lazy-seqs whenever i need them</td></tr>
+<tr id="t1459A" class="h"><td><a href="#t1459A">14:59</a></td><td class="ny">Vinzent</td><td>abp, no, arity is the number of arguments of a function (and both map and map-all takes any number of args)</td></tr>
+<tr id="t1459A" class="h"><td><a href="#t1459A">14:59</a></td><td class="n9">TimMc</td><td>Vinzent: map-all's f would take a variable number of args</td></tr>
+<tr id="t1501A"><td><a href="#t1501A">15:01</a></td><td class="ny">Vinzent</td><td>TimMc, indeed. But I thought abp was talking about arity of map and map-all</td></tr>
+<tr id="t1503A" class="h"><td><a href="#t1503A">15:03</a></td><td class="n9">TimMc</td><td>Oh, I see.</td></tr>
+<tr id="t1503A" class="h"><td><a href="#t1503A">15:03</a></td><td class="nl">abp</td><td>Vinzent: No, that was just a kind of analogy, I need interleave and interleave-all, just like sometimes I need functions with single and multiple arity</td></tr>
+<tr id="t1504A" class="h"><td><a href="#t1504A">15:04</a></td><td class="ny">Vinzent</td><td>abp, ah, ok. Yeah, it's definitely kind of pattern</td></tr>
+<tr id="t1505A" class="h"><td><a href="#t1505A">15:05</a></td><td class="nl">abp</td><td>Sorry for confusing the hell out of everyone.</td></tr>
+<tr id="t1510A"><td><a href="#t1510A">15:10</a></td><td class="nt">OnResolve</td><td>is there a working plugin for clojure with the newest version of netbeans(prerequisite is a must) that anyone can recommend?</td></tr>
+<tr id="t1512A" class="h"><td><a href="#t1512A">15:12</a></td><td class="nm">amalloy</td><td>technomancy: my trick for (fn [a b] (a b)) only works for one-arg functions: that happens to be how deliver is implemented</td></tr>
+<tr id="t1515A" class="h"><td><a href="#t1515A">15:15</a></td><td class="ns">technomancy</td><td>you keep telling me that, and I keep forgetting it</td></tr>
+<tr id="t1516A" class="h"><td><a href="#t1516A">15:16</a></td><td class="nm">amalloy</td><td>i'll tell you about fnil too if you want</td></tr>
+<tr id="t1517A" class="h r"><td><a href="#t1517A">15:17</a></td><td class="nm">amalloy</td><td>i liked fnil before it was cool</td></tr>
+<tr id="t1517A" class="h"><td><a href="#t1517A">15:17</a></td><td class="na">Raynes</td><td>You broke 4clojure with fnil before it was cool.</td></tr>
+<tr id="t1517A" class="h"><td><a href="#t1517A">15:17</a></td><td class="nm">amalloy</td><td>haha that's sorta true</td></tr>
+<tr id="t1517A" class="h"><td><a href="#t1517A">15:17</a></td><td class="na">Raynes</td><td>Only for developers with empty databases.</td></tr>
+<tr id="t1517A" class="h"><td><a href="#t1517A">15:17</a></td><td class="n9">TimMc</td><td>$findfn + 8 8</td></tr>
+<tr id="t1517A" class="h"><td><a href="#t1517A">15:17</a></td><td class="na">Raynes</td><td>But still.</td></tr>
+<tr id="t1517A" class="h"><td><a href="#t1517A">15:17</a></td><td class="nx">lazybot</td><td>[clojure.core/max-key clojure.core/cond clojure.core/dosync clojure.core/sync clojure.core/char-escape-string clojure.core/deliver clojure.core/with-loading-context clojure.core/*clojure-version* clojure.core/case clojure.core/min-key clojure.core/and clojure.core/lo... <a href="https://refheap.com/paste/217">https://refheap.com/paste/217</a></td></tr>
+<tr id="t1518A" class="h"><td><a href="#t1518A">15:18</a></td><td class="n9">TimMc</td><td>So many options!</td></tr>
+<tr id="t1518A" class="h"><td><a href="#t1518A">15:18</a></td><td class="nm">amalloy</td><td>and it wasn't really my code either. it was a pull request i OKed because i didn't see the issue</td></tr>
+<tr id="t1518A" class="h r"><td><a href="#t1518A">15:18</a></td><td class="nm">amalloy</td><td>&amp;(case + 8 8)</td></tr>
+<tr id="t1518A" class="h"><td><a href="#t1518A">15:18</a></td><td class="nx">lazybot</td><td>java.lang.IllegalArgumentException: No matching clause: clojure.core$_PLUS_@aaff8e</td></tr>
+<tr id="t1518A" class="h"><td><a href="#t1518A">15:18</a></td><td class="na">Raynes</td><td>TimMc: All of them neatly organized in a lovely pastebin for your consumption.</td></tr>
+<tr id="t1518A" class="h"><td><a href="#t1518A">15:18</a></td><td class="n9">TimMc</td><td>No more gist?</td></tr>
+<tr id="t1519A" class="h"><td><a href="#t1519A">15:19</a></td><td class="nm">amalloy</td><td>TimMc: you didn't hear? Raynes bought github</td></tr>
+<tr id="t1519A" class="h"><td><a href="#t1519A">15:19</a></td><td class="n9">TimMc</td><td>Hmm, that test was wrong.</td></tr>
+<tr id="t1519A" class="h"><td><a href="#t1519A">15:19</a></td><td class="na">Raynes</td><td>Heh</td></tr>
+<tr id="t1520A"><td><a href="#t1520A">15:20</a></td><td class="n9">TimMc</td><td>$findfn - 2 -2</td></tr>
+<tr id="t1520A" class="h"><td><a href="#t1520A">15:20</a></td><td class="nx">lazybot</td><td>[clojure.core/deliver clojure.core/trampoline]</td></tr>
+<tr id="t1521A" class="h"><td><a href="#t1521A">15:21</a></td><td class="n9">TimMc</td><td>$findfn + 2 3 5</td></tr>
+<tr id="t1521A" class="h"><td><a href="#t1521A">15:21</a></td><td class="nx">lazybot</td><td>[clojure.core/trampoline]</td></tr>
+<tr id="t1528A" class="h"><td><a href="#t1528A">15:28</a></td><td class="nt">clj_newb</td><td>is there something like with-handler in clojure?</td></tr>
+<tr id="t1533A"><td><a href="#t1533A">15:33</a></td><td class="nm">amalloy</td><td>aha, trampoline. an even better hack than deliver, as long as you don't want to return a function</td></tr>
+<tr id="t1534A" class="h"><td><a href="#t1534A">15:34</a></td><td class="n9">TimMc</td><td>trampoline: No good in lambda calculus</td></tr>
+<tr id="t1543A"><td><a href="#t1543A">15:43</a></td><td class="n9">troydm</td><td>is cljr not maintained any more?</td></tr>
+<tr id="t1543A" class="h r"><td><a href="#t1543A">15:43</a></td><td class="n9">troydm</td><td>what's the best way to start using clojure ?</td></tr>
+<tr id="t1544A" class="h"><td><a href="#t1544A">15:44</a></td><td class="nm">amalloy</td><td>$google technomancy leiningen readme</td></tr>
+<tr id="t1544A" class="h"><td><a href="#t1544A">15:44</a></td><td class="nx">lazybot</td><td>[technomancy/leiningen - GitHub] <a href="https://github.com/technomancy/leiningen">https://github.com/technomancy/leiningen</a></td></tr>
+<tr id="t1544A" class="h"><td><a href="#t1544A">15:44</a></td><td class="nm">amalloy</td><td>troydm: ^</td></tr>
+<tr id="t1545A" class="h"><td><a href="#t1545A">15:45</a></td><td class="n9">troydm</td><td>amalloy: i see i thought you need to have clojure already installed to use leiningen</td></tr>
+<tr id="t1545A" class="h r"><td><a href="#t1545A">15:45</a></td><td class="n9">troydm</td><td>troydm: so i was looking for something like rvm for ruby</td></tr>
+<tr id="t1545A" class="h r"><td><a href="#t1545A">15:45</a></td><td class="n9">troydm</td><td>only for clojure</td></tr>
+<tr id="t1546A" class="h"><td><a href="#t1546A">15:46</a></td><td class="nm">amalloy</td><td>nope. installing clojure is something you only do if you're confused (and a lot of people are, when they get here)</td></tr>
+<tr id="t1546A" class="h"><td><a href="#t1546A">15:46</a></td><td class="n9">troydm</td><td>amalloy: i see, thx</td></tr>
+<tr id="t1606A"><td><a href="#t1606A">16:06</a></td><td class="ny">Vinzent</td><td>abp, are you still here? It seems like I found an interesting solution for your interleave-all problem, see <a href="https://gist.github.com/1584947">https://gist.github.com/1584947</a> (warning, the code is a bloody mess)</td></tr>
+<tr id="t1607A" class="h"><td><a href="#t1607A">16:07</a></td><td class="nt">choffstein</td><td>If I am in emacs and connected to lein via lein swank, and I discover I need to add a new dep to my project, is there a more efficient way than having to close down swank, edit my project file, call `lein deps`, then start swank again?</td></tr>
+<tr id="t1607A" class="h"><td><a href="#t1607A">16:07</a></td><td class="n9">TimMc</td><td>Vinzent: Unfortunately, that will realize all the input seqs.</td></tr>
+<tr id="t1608A" class="h"><td><a href="#t1608A">16:08</a></td><td class="n9">troydm</td><td>how do i get clojure version when using lein repl</td></tr>
+<tr id="t1608A" class="h"><td><a href="#t1608A">16:08</a></td><td class="n9">TimMc</td><td>troydm: *clojure-version*</td></tr>
+<tr id="t1608A" class="h"><td><a href="#t1608A">16:08</a></td><td class="n9">troydm</td><td>i want to know what version of clojure i'm using</td></tr>
+<tr id="t1608A" class="h r"><td><a href="#t1608A">16:08</a></td><td class="n9">troydm</td><td>TimMc: thx</td></tr>
+<tr id="t1608A" class="h"><td><a href="#t1608A">16:08</a></td><td class="n9">TimMc</td><td>Probably 1.2.1 if you aren't inside a project.</td></tr>
+<tr id="t1609A" class="h"><td><a href="#t1609A">16:09</a></td><td class="ny">Vinzent</td><td>TimMc, yeah, but it's not intended for a real use :)</td></tr>
+<tr id="t1611A"><td><a href="#t1611A">16:11</a></td><td class="n9">troydm</td><td>TimMc: yes it's 1.2.1</td></tr>
+<tr id="t1613A" class="h"><td><a href="#t1613A">16:13</a></td><td class="n9">TimMc</td><td>troydm: Leiningen itself uses 1.2.1, so that's the default repl's version of Clojure. I recommend creating ~/tmp and running `lein new adhoc` from there to create a project you can use for experimentation.</td></tr>
+<tr id="t1613A" class="h r"><td><a href="#t1613A">16:13</a></td><td class="n9">TimMc</td><td>(And edit the project.clj in there to use 1.3.0)</td></tr>
+<tr id="t1613A" class="h"><td><a href="#t1613A">16:13</a></td><td class="n9">troydm</td><td>TimMc: i see, thx</td></tr>
+<tr id="t1622A" class="r"><td><a href="#t1622A">16:22</a></td><td class="n9">troydm</td><td>as i see leiningen is something like maven only for clojure projects?</td></tr>
+<tr id="t1622A" class="h r"><td><a href="#t1622A">16:22</a></td><td class="n9">troydm</td><td>or i'm missing something?</td></tr>
+<tr id="t1624A" class="h"><td><a href="#t1624A">16:24</a></td><td class="nv">FrankS</td><td>appreciate any repl-guru who could shed some light on how to programmatically exit/end a leon-repl session...</td></tr>
+<tr id="t1624A" class="h"><td><a href="#t1624A">16:24</a></td><td class="n9">troydm</td><td>FrankS: type (exit)</td></tr>
+<tr id="t1624A" class="h"><td><a href="#t1624A">16:24</a></td><td class="nv">FrankS</td><td>see <a href="http://tinyurl.com/87743lz">http://tinyurl.com/87743lz</a> for details</td></tr>
+<tr id="t1624A" class="h"><td><a href="#t1624A">16:24</a></td><td class="n9">troydm</td><td>FrankS: ot</td></tr>
+<tr id="t1624A" class="h"><td><a href="#t1624A">16:24</a></td><td class="n9">TimMc</td><td>troydm: That's basically correct -- it's a dev and build environment.</td></tr>
+<tr id="t1627A" class="h"><td><a href="#t1627A">16:27</a></td><td class="nv">FrankS</td><td>troydm: what ns is that exit function located?</td></tr>
+<tr id="t1627A" class="h"><td><a href="#t1627A">16:27</a></td><td class="n9">TimMc</td><td>FrankS: It should already be refer'd.</td></tr>
+<tr id="t1628A" class="h r"><td><a href="#t1628A">16:28</a></td><td class="n9">TimMc</td><td>FrankS: (var exit) to find out</td></tr>
+<tr id="t1628A" class="h"><td><a href="#t1628A">16:28</a></td><td class="n9">troydm</td><td>FrankS: i know Common Lisp a bit, so it'll basicly be in cl-init or something like that</td></tr>
+<tr id="t1628A" class="h"><td><a href="#t1628A">16:28</a></td><td class="nv">FrankS</td><td>troydm: cljsh.core=&gt; (exit) CompilerException java.lang.RuntimeException: Unable to resolve symbol: exit in this context, compiling:(NO_SOURCE_PATH:1)  cljsh.core=&gt;</td></tr>
+<tr id="t1628A" class="h"><td><a href="#t1628A">16:28</a></td><td class="n9">TimMc</td><td>That's unusual...</td></tr>
+<tr id="t1628A" class="h"><td><a href="#t1628A">16:28</a></td><td class="n9">troydm</td><td>FrankS: that's cljsh, does lein use cljsh ?</td></tr>
+<tr id="t1629A" class="h"><td><a href="#t1629A">16:29</a></td><td class="n8">jsabeaudry</td><td>lein noir new popo; cd popo; lein uberjar; java -jar popo...-stadalone.jar  could not find the main class popo.server! Am I missing something here?</td></tr>
+<tr id="t1630A"><td><a href="#t1630A">16:30</a></td><td class="n9">TimMc</td><td>FrankS: Ah, I see. Anyway, just use Ctrl+d</td></tr>
+<tr id="t1630A" class="h"><td><a href="#t1630A">16:30</a></td><td class="n9">troydm</td><td>does lein repl start swank server or it has some custom server and i have to start swank using other method?</td></tr>
+<tr id="t1630A" class="h"><td><a href="#t1630A">16:30</a></td><td class="nv">FrankS</td><td>troydm: cljsh is my ns</td></tr>
+<tr id="t1630A" class="h"><td><a href="#t1630A">16:30</a></td><td class="nt">djh__</td><td>I get the unresovled symbol error too when I run (exit)</td></tr>
+<tr id="t1630A" class="h"><td><a href="#t1630A">16:30</a></td><td class="nc">jowag</td><td>use (System/exit 0)</td></tr>
+<tr id="t1630A" class="h"><td><a href="#t1630A">16:30</a></td><td class="n9">TimMc</td><td>djh__: You probably have a :main specified in your project.</td></tr>
+<tr id="t1630A" class="h"><td><a href="#t1630A">16:30</a></td><td class="nv">FrankS</td><td>TimMc: i know about ctrl-d :-), this is about doing it programmatically</td></tr>
+<tr id="t1630A" class="h"><td><a href="#t1630A">16:30</a></td><td class="n9">TimMc</td><td>People, it's a shell -- just use Ctrl + d.</td></tr>
+<tr id="t1631A" class="h"><td><a href="#t1631A">16:31</a></td><td class="n9">troydm</td><td>i type lein repl</td></tr>
+<tr id="t1631A" class="h"><td><a href="#t1631A">16:31</a></td><td class="nt">djh__</td><td>TimMc - interesting I see</td></tr>
+<tr id="t1631A" class="h"><td><a href="#t1631A">16:31</a></td><td class="n9">troydm</td><td>and it starts repl</td></tr>
+<tr id="t1631A" class="h"><td><a href="#t1631A">16:31</a></td><td class="nv">FrankS</td><td>see <a href="http://tinyurl.com/87743lz">http://tinyurl.com/87743lz</a> for details</td></tr>
+<tr id="t1631A" class="h"><td><a href="#t1631A">16:31</a></td><td class="n9">troydm</td><td>and then i type</td></tr>
+<tr id="t1631A" class="h r"><td><a href="#t1631A">16:31</a></td><td class="n9">troydm</td><td>user=&gt; (exit)</td></tr>
+<tr id="t1631A" class="h r"><td><a href="#t1631A">16:31</a></td><td class="n9">troydm</td><td>and it exists it</td></tr>
+<tr id="t1632A" class="h"><td><a href="#t1632A">16:32</a></td><td class="nt">djh__</td><td>I like the way you can quit GHCI (haskell repl) by just typing :q</td></tr>
+<tr id="t1632A" class="h"><td><a href="#t1632A">16:32</a></td><td class="n9">troydm</td><td>so my question is can i connect to lein's repl socket using swank from emacs?</td></tr>
+<tr id="t1632A" class="h"><td><a href="#t1632A">16:32</a></td><td class="n9">TimMc</td><td>FrankS: And System/exit is not an option?</td></tr>
+<tr id="t1632A" class="h"><td><a href="#t1632A">16:32</a></td><td class="nt">djh__</td><td>but I guess that's a VIM thing</td></tr>
+<tr id="t1632A" class="h"><td><a href="#t1632A">16:32</a></td><td class="n8">jsabeaudry</td><td>Can anyone tell me if this works on your side? lein noir new popo; cd popo; lein uberjar; java -jar popo...-stadalone.jar</td></tr>
+<tr id="t1632A" class="h"><td><a href="#t1632A">16:32</a></td><td class="nm">Somelauw</td><td>(exit) doesn't work when using slime for me (System/exit 0) does work on the other hand</td></tr>
+<tr id="t1632A" class="h"><td><a href="#t1632A">16:32</a></td><td class="n9">troydm</td><td>djh__: it's more like ghci in that context</td></tr>
+<tr id="t1633A" class="h r"><td><a href="#t1633A">16:33</a></td><td class="n9">troydm</td><td>djh__: rather than vi</td></tr>
+<tr id="t1633A" class="h"><td><a href="#t1633A">16:33</a></td><td class="n9">TimMc</td><td>jsabeaudry: You haven't specified a :main in your project.</td></tr>
+<tr id="t1633A" class="h"><td><a href="#t1633A">16:33</a></td><td class="nv">FrankS</td><td>troydm: i do not want to quit/exit the jvm, only the repl session</td></tr>
+<tr id="t1633A" class="h"><td><a href="#t1633A">16:33</a></td><td class="n9">troydm</td><td>FrankS: ohh i see</td></tr>
+<tr id="t1633A" class="h"><td><a href="#t1633A">16:33</a></td><td class="n8">jsabeaudry</td><td>TimMc: Yes there is a :main, its made by lein noir new</td></tr>
+<tr id="t1633A" class="h"><td><a href="#t1633A">16:33</a></td><td class="nv">FrankS</td><td>troydm: what do you get for (var exit)?</td></tr>
+<tr id="t1633A" class="h"><td><a href="#t1633A">16:33</a></td><td class="n9">TimMc</td><td>Ah, missed the noir bit.</td></tr>
+<tr id="t1633A" class="h"><td><a href="#t1633A">16:33</a></td><td class="n9">troydm</td><td>#'leiningen.core/exit</td></tr>
+<tr id="t1635A" class="h"><td><a href="#t1635A">16:35</a></td><td class="n9">TimMc</td><td>jsabeaudry: Open up the jar and check if the .class files are there.</td></tr>
+<tr id="t1636A" class="h"><td><a href="#t1636A">16:36</a></td><td class="nv">FrankS</td><td>troydm: looking at the source code, that leiningen.core/exit does bring down the whole jvm...</td></tr>
+<tr id="t1637A" class="h"><td><a href="#t1637A">16:37</a></td><td class="ns">technomancy</td><td>troydm: control-d is the way to close a repl session</td></tr>
+<tr id="t1637A" class="h r"><td><a href="#t1637A">16:37</a></td><td class="ns">technomancy</td><td>in pretty much anything</td></tr>
+<tr id="t1637A" class="h"><td><a href="#t1637A">16:37</a></td><td class="n8">jsabeaudry</td><td>TimMc: I'm definitely not a java expert but there is a server$_main.class in the jar</td></tr>
+<tr id="t1637A" class="h"><td><a href="#t1637A">16:37</a></td><td class="nv">FrankS</td><td>technomancy: sorry, but i want to do it programmatically...</td></tr>
+<tr id="t1638A" class="h"><td><a href="#t1638A">16:38</a></td><td class="n9">troydm</td><td>technomancy: doesn't C-d brings the JVM down too</td></tr>
+<tr id="t1638A" class="h"><td><a href="#t1638A">16:38</a></td><td class="ns">technomancy</td><td>FrankS: oh, oops. are you the one who wrote to the mailing list?</td></tr>
+<tr id="t1638A" class="h"><td><a href="#t1638A">16:38</a></td><td class="nv">FrankS</td><td>yup</td></tr>
+<tr id="t1638A" class="h"><td><a href="#t1638A">16:38</a></td><td class="ns">technomancy</td><td>troydm: if it's the main repl session, yes. if you're telnetting into a &quot;lein repl&quot; server, no.</td></tr>
+<tr id="t1639A" class="h"><td><a href="#t1639A">16:39</a></td><td class="n9">troydm</td><td>technomancy: yes i mean in main repl</td></tr>
+<tr id="t1639A" class="h"><td><a href="#t1639A">16:39</a></td><td class="ns">technomancy</td><td>FrankS: I don't know of a way with the currently-released one, but I'll make it possible in 1.7.0</td></tr>
+<tr id="t1639A" class="h r"><td><a href="#t1639A">16:39</a></td><td class="ns">technomancy</td><td>FrankS: the trick is to both close *in* and return request-exit# when the kill-switch is entered</td></tr>
+<tr id="t1640A"><td><a href="#t1640A">16:40</a></td><td class="n8">jsabeaudry</td><td>technomancy: Any known issue with uberjar in lein 1.6.2?</td></tr>
+<tr id="t1640A" class="h"><td><a href="#t1640A">16:40</a></td><td class="n9">troydm</td><td>well you could try doing control-z and the bg %1 but it's not good way to do it</td></tr>
+<tr id="t1640A" class="h"><td><a href="#t1640A">16:40</a></td><td class="ns">technomancy</td><td>well, no way to do it in 1.6.2 apart from closing the actual socket, but apparently you want to do it by sending something along the socket</td></tr>
+<tr id="t1641A" class="h r"><td><a href="#t1641A">16:41</a></td><td class="ns">technomancy</td><td>jsabeaudry: sure: <a href="https://github.com/technomancy/leiningen/issues/search?q=uberjar&amp;amp;state=open&amp;amp;assignee=">https://github.com/technomancy/leiningen/issues/search?q=uberjar&amp;amp;state=open&amp;amp;assignee=</a></td></tr>
+<tr id="t1641A" class="h"><td><a href="#t1641A">16:41</a></td><td class="nv">FrankS</td><td>technomancy: (close *in*) generates a loong stack trace - not very &quot;graceful&quot;...</td></tr>
+<tr id="t1641A" class="h"><td><a href="#t1641A">16:41</a></td><td class="n8">jsabeaudry</td><td>technomancy: Thanks, problem must not be with lein</td></tr>
+<tr id="t1642A" class="h"><td><a href="#t1642A">16:42</a></td><td class="ns">technomancy</td><td>jsabeaudry: or it's a problem that's not known</td></tr>
+<tr id="t1642A" class="h r"><td><a href="#t1642A">16:42</a></td><td class="ns">technomancy</td><td>FrankS: that's why you need to do both</td></tr>
+<tr id="t1642A" class="h"><td><a href="#t1642A">16:42</a></td><td class="nv">FrankS</td><td>technomancy: i'm using 1.7.0</td></tr>
+<tr id="t1643A" class="h"><td><a href="#t1643A">16:43</a></td><td class="ns">technomancy</td><td>FrankS: check the latest commit on the 1.x branch</td></tr>
+<tr id="t1645A" class="h"><td><a href="#t1645A">16:45</a></td><td class="nw">gtrak`</td><td>troydm: C-d sends an EOF character</td></tr>
+<tr id="t1648A" class="h"><td><a href="#t1648A">16:48</a></td><td class="n8">jsabeaudry</td><td>TimMc: Ah thanks for your help, I just figured out that I forgot the (:gen-class)</td></tr>
+<tr id="t1648A" class="h"><td><a href="#t1648A">16:48</a></td><td class="nv">FrankS</td><td>technomancy: tried (do (.close *in*) request-exit) before seeing you patch... funny :-)</td></tr>
+<tr id="t1649A" class="h"><td><a href="#t1649A">16:49</a></td><td class="ns">technomancy</td><td>nice =)</td></tr>
+<tr id="t1649A" class="h"><td><a href="#t1649A">16:49</a></td><td class="nv">FrankS</td><td>technomancy: but that seems to work - thanks!!!</td></tr>
+<tr id="t1649A" class="h"><td><a href="#t1649A">16:49</a></td><td class="ns">technomancy</td><td>no problem</td></tr>
+<tr id="t1652A"><td><a href="#t1652A">16:52</a></td><td class="n9">TimMc</td><td>jsabeaudry: Oh, I figured it would set that up too!</td></tr>
+<tr id="t1653A" class="h"><td><a href="#t1653A">16:53</a></td><td class="n8">jsabeaudry</td><td>TimMc: same I had just assumed that it did! Especially if it sets up :main... I guess I'll talk with chris or send him a pull request</td></tr>
+<tr id="t1658A" class="h"><td><a href="#t1658A">16:58</a></td><td class="nv">FrankS</td><td>technomancy: sorry... it worked for &quot;bye-bye&quot;, but what do i specify as command for your patch - ::exit doesn't seem to work (evils to :cljsh.core/exit)</td></tr>
+<tr id="t1702A" class="r"><td><a href="#t1702A">17:02</a></td><td class="nv">FrankS</td><td>technomancy: :leiningen.repl/exit works (just read your post...)</td></tr>
+<tr id="t1702A" class="h"><td><a href="#t1702A">17:02</a></td><td class="ns">technomancy</td><td>FrankS: it's expanded at compile-time, so it's :leiningen.repl/exit</td></tr>
+<tr id="t1704A" class="h"><td><a href="#t1704A">17:04</a></td><td class="n9">TimMc</td><td>FrankS: ::foo is reader sugar for :this-namespace/foo</td></tr>
+<tr id="t1708A" class="h"><td><a href="#t1708A">17:08</a></td><td class="nv">mattmitchell</td><td>is there a &quot;built-in&quot; that does this kind of grouping? <a href="https://gist.github.com/1585231">https://gist.github.com/1585231</a></td></tr>
+<tr id="t1710A" class="r"><td><a href="#t1710A">17:10</a></td><td class="nv">mattmitchell</td><td>partition-by-relative-diff etc..?</td></tr>
+<tr id="t1711A" class="h"><td><a href="#t1711A">17:11</a></td><td class="n9">TimMc</td><td>I can pretty much guarantee: No.</td></tr>
+<tr id="t1711A" class="h"><td><a href="#t1711A">17:11</a></td><td class="nv">mattmitchell</td><td>Yeah, thought so :)</td></tr>
+<tr id="t1711A" class="h"><td><a href="#t1711A">17:11</a></td><td class="n9">TimMc</td><td>What constitutes near? How many groups? Max group size?</td></tr>
+<tr id="t1712A" class="h"><td><a href="#t1712A">17:12</a></td><td class="nv">mattmitchell</td><td>TimMc: near means, how close in value it is to a neighbor. No limit on groups/group-size</td></tr>
+<tr id="t1713A" class="h"><td><a href="#t1713A">17:13</a></td><td class="n9">TimMc</td><td>mattmitchell: How would you group this? [1 2 4 8 16 32 64 128 256]</td></tr>
+<tr id="t1714A" class="h"><td><a href="#t1714A">17:14</a></td><td class="nv">mattmitchell</td><td>... thinking</td></tr>
+<tr id="t1714A" class="h"><td><a href="#t1714A">17:14</a></td><td class="n9">TimMc</td><td>The best I could come up with for a *formal* definition of grouping was &quot;every number goes with the closest neighbor&quot;, but that gets into problems like the middle number in [10 30 50 70 90]</td></tr>
+<tr id="t1714A" class="h"><td><a href="#t1714A">17:14</a></td><td class="nm">amalloy</td><td>yeah, that gist reads as group-by-psychic-powers</td></tr>
+<tr id="t1715A" class="h"><td><a href="#t1715A">17:15</a></td><td class="nv">mattmitchell</td><td>... malfunction</td></tr>
+<tr id="t1715A" class="h"><td><a href="#t1715A">17:15</a></td><td class="n9">TimMc</td><td>heh</td></tr>
+<tr id="t1715A" class="h"><td><a href="#t1715A">17:15</a></td><td class="nv">mattmitchell</td><td>haha, yeah, your example throws that off a bit</td></tr>
+<tr id="t1716A" class="h"><td><a href="#t1716A">17:16</a></td><td class="n9">TimMc</td><td>It's fair to say &quot;My data will always be clumpy, pathological cases won't matter&quot;.</td></tr>
+<tr id="t1716A" class="h r"><td><a href="#t1716A">17:16</a></td><td class="n9">TimMc</td><td>...but you still have to have a heuristic of some sort.</td></tr>
+<tr id="t1716A" class="h r"><td><a href="#t1716A">17:16</a></td><td class="n9">TimMc</td><td>(Side note, I was all set to type &quot;frequencies&quot; before I read your gist.)</td></tr>
+<tr id="t1716A" class="h"><td><a href="#t1716A">17:16</a></td><td class="nm">amalloy</td><td>the best way i could interpret the gist was like &quot;introduce a break between Xn and Xn+1 if Xn is closer to Xn-1 than it is to Xn+1&quot;, but it doesn't quite work even on the example input</td></tr>
+<tr id="t1717A" class="h"><td><a href="#t1717A">17:17</a></td><td class="nv">mattmitchell</td><td>amalloy: yeah that was the wording i had in my thoughts too</td></tr>
+<tr id="t1717A" class="h"><td><a href="#t1717A">17:17</a></td><td class="nm">amalloy</td><td>mattmitchell: in that case you put 50 in the wrong group :P</td></tr>
+<tr id="t1718A" class="h"><td><a href="#t1718A">17:18</a></td><td class="nv">mattmitchell</td><td>amalloy: yes you're right, i fixed that</td></tr>
+<tr id="t1718A" class="h"><td><a href="#t1718A">17:18</a></td><td class="n9">TimMc</td><td>50 should be by itself</td></tr>
+<tr id="t1718A" class="h"><td><a href="#t1718A">17:18</a></td><td class="nm">amalloy</td><td>right, your original version is correct given the definition i made up. your correction breaks the rule</td></tr>
+<tr id="t1718A" class="h"><td><a href="#t1718A">17:18</a></td><td class="nv">mattmitchell</td><td>ahh actually, it would make sense to have it by itself, yes</td></tr>
+<tr id="t1719A" class="h"><td><a href="#t1719A">17:19</a></td><td class="n9">TimMc</td><td>Its neighbor deltas are way higher than the next deltas.</td></tr>
+<tr id="t1719A" class="h"><td><a href="#t1719A">17:19</a></td><td class="nm">amalloy</td><td>anyway, an algorithm for doing this is not actually that easy to imagine</td></tr>
+<tr id="t1721A"><td><a href="#t1721A">17:21</a></td><td class="nv">mattmitchell</td><td>it would seem so. I'm &quot;just&quot; trying to cluster close values into their own group as an exercise, really</td></tr>
+<tr id="t1722A" class="h"><td><a href="#t1722A">17:22</a></td><td class="n9">TimMc</td><td>It's a domain-dependent problem.</td></tr>
+<tr id="t1723A" class="h"><td><a href="#t1723A">17:23</a></td><td class="nm">amalloy</td><td>mattmitchell: you might like to take a look at <a href="https://github.com/flatland/useful/blob/develop/src/useful/seq.clj#L191">https://github.com/flatland/useful/blob/develop/src/useful/seq.clj#L191</a> as a jumping-off point - it only allows for knowledge about two nearby numbers rather than three, but i suspect you can use a similar approach</td></tr>
+<tr id="t1723A" class="h"><td><a href="#t1723A">17:23</a></td><td class="nv">mattmitchell</td><td>amalloy: hey thanks, that sounds very close to what i'd like to do</td></tr>
+<tr id="t1725A" class="h"><td><a href="#t1725A">17:25</a></td><td class="nv">FrankS</td><td>TimC: thanks for the clarification</td></tr>
+<tr id="t1732A"><td><a href="#t1732A">17:32</a></td><td class="nv">mattmitchell</td><td>amalloy TimMc: thanks for your help!</td></tr>
+<tr id="t1755A"><td><a href="#t1755A">17:55</a></td><td class="nm">zzach</td><td>How to terminate a Clojure CLR session? (. System exit 0) is not working.</td></tr>
+<tr id="t1758A" class="h"><td><a href="#t1758A">17:58</a></td><td class="nd">hiredman</td><td>zzach: that is a static method on a class provided by the jvm (the System class) you'll need to figure out what the C#/CLR call is</td></tr>
+<tr id="t1807A"><td><a href="#t1807A">18:07</a></td><td class="nm">zzach</td><td>hiredman: Thanks for reply. (Environment/Exit 0) seems to work.</td></tr>
+<tr id="t1811A"><td><a href="#t1811A">18:11</a></td><td class="nv">FrankS</td><td>technomancy: it's still a little raw, but I'd love your (early) feedback on &quot;<a href="https://github.com/franks42/cljsh&amp;quot;">https://github.com/franks42/cljsh&amp;quot;</a></td></tr>
+<tr id="t1846A"><td><a href="#t1846A">18:46</a></td><td class="ns">technomancy</td><td>FrankS: hey, I was wondering if you'd looked into jark at all: <a href="http://icylisper.in/jark/">http://icylisper.in/jark/</a></td></tr>
+<tr id="t1852A"><td><a href="#t1852A">18:52</a></td><td class="nv">FrankS</td><td>technomancy: I did, but the OCaml dependency put me off... using the repl-server directly thru socat/netcat-like tools seemed like a more simple approach... it was also an exercise/challenge to see if this approach would work - if there is no interest or if there is another better tool, I will gladly use that - what is your take on this?</td></tr>
+<tr id="t1855A" class="h"><td><a href="#t1855A">18:55</a></td><td class="na">Raynes</td><td>FrankS: You shouldn't put closing parens on their own lines. They get lonely down there.</td></tr>
+<tr id="t1855A" class="h r"><td><a href="#t1855A">18:55</a></td><td class="na">Raynes</td><td>FrankS: Not sure what editor you're using, but that indentation is definitely not standard.</td></tr>
+<tr id="t1856A" class="h"><td><a href="#t1856A">18:56</a></td><td class="ns">technomancy</td><td>jark's got a fair bit of momentum.</td></tr>
+<tr id="t1856A" class="h r"><td><a href="#t1856A">18:56</a></td><td class="ns">technomancy</td><td>(but maybe I'm just biased towards ocaml?)</td></tr>
+<tr id="t1856A" class="h"><td><a href="#t1856A">18:56</a></td><td class="na">Raynes</td><td>Should have been done in Haskell. Let's have a bias party!</td></tr>
+<tr id="t1857A" class="h"><td><a href="#t1857A">18:57</a></td><td class="ns">technomancy</td><td>haskell? for something that's basically all I/O? I think not =P</td></tr>
+<tr id="t1859A" class="h"><td><a href="#t1859A">18:59</a></td><td class="nm">amalloy</td><td>technomancy: i haven't really gotten the impression that jark has any momentum. when someone asks about persistent repls or whatever, i say &quot;hey maybe you should try jark&quot;. but i've never heard of anyone actually using it successfully</td></tr>
+<tr id="t1859A" class="h"><td><a href="#t1859A">18:59</a></td><td class="na">Raynes</td><td>That's pretty stereotypical limiting.</td></tr>
+<tr id="t1859A" class="h"><td><a href="#t1859A">18:59</a></td><td class="nm">amalloy</td><td>Raynes: it's cool, technomancy only uses clojure for things that are basically all parens</td></tr>
+<tr id="t1859A" class="h"><td><a href="#t1859A">18:59</a></td><td class="na">Raynes</td><td>Haskell is fine for I/O heavy tasks. They have this whole monad for it!</td></tr>
+<tr id="t1859A" class="h"><td><a href="#t1859A">18:59</a></td><td class="nv">FrankS</td><td>Raynes: thanks for the esthetics feedback - didn't do a lot of lisp coding for 20+ years - i'll see if i can make my parens to behave more sociable ;-)</td></tr>
+<tr id="t1900A"><td><a href="#t1900A">19:00</a></td><td class="na">Raynes</td><td>:)</td></tr>
+<tr id="t1900A" class="h"><td><a href="#t1900A">19:00</a></td><td class="ns">technomancy</td><td>maybe momentum is the wrong word</td></tr>
+<tr id="t1900A" class="h r"><td><a href="#t1900A">19:00</a></td><td class="ns">technomancy</td><td>it has an existing codebase</td></tr>
+<tr id="t1900A" class="h"><td><a href="#t1900A">19:00</a></td><td class="na">Raynes</td><td>And it theoretically does... things.</td></tr>
+<tr id="t1904A" class="h"><td><a href="#t1904A">19:04</a></td><td class="nv">FrankS</td><td>Raynes: are your the &quot;Raynes&quot; from fs? if so, (set-prompt repl-cwd-prompt) will give you a file-path prompt in the repl ;-)</td></tr>
+<tr id="t1914A" class="r"><td><a href="#t1914A">19:14</a></td><td class="nv">FrankS</td><td>technomancy: since this afternoon this cljsh has a codebase too ;-)  - but seriously, I am not pushing - just interested to see if this cljsh approach holds water - the only advantage that made me pursue this prototype was the inherent simplicity to interact with your repl server thru stdin/stdout</td></tr>
+<tr id="t1916A" class="h"><td><a href="#t1916A">19:16</a></td><td class="ns">technomancy</td><td>yeah, right now jark's lack of activity and packaging make it annoying. long-term I would love to see it take off, but the problem it's trying to solve is more difficult.</td></tr>
+<tr id="t1918A" class="h r"><td><a href="#t1918A">19:18</a></td><td class="ns">technomancy</td><td>the simplest thing, of course, is just the shell equivalent of (comp rlwrap (partial netcat &quot;localhost&quot; $LEIN_REPL_PORT))</td></tr>
+<tr id="t1918A" class="h r"><td><a href="#t1918A">19:18</a></td><td class="ns">technomancy</td><td>and this lies somewhere between those two</td></tr>
+<tr id="t1922A"><td><a href="#t1922A">19:22</a></td><td class="nv">FrankS</td><td>technomancy: exactly - this cljsh just adds some syntactic sugar to make it appear more like a unix'y shell/filter</td></tr>
+<tr id="t1923A" class="h r"><td><a href="#t1923A">19:23</a></td><td class="nv">FrankS</td><td>technomancy: btw, couldn't make nc/netcat behave well on macosx - wouldn't listen to ctrl-d and other weird behavior  - may work better on other unix-variants (?)</td></tr>
+<tr id="t1925A" class="h"><td><a href="#t1925A">19:25</a></td><td class="ns">technomancy</td><td>weird. did you have to get it through a package manager, or is it built-in?</td></tr>
+<tr id="t1927A" class="h"><td><a href="#t1927A">19:27</a></td><td class="nv">FrankS</td><td>technomancy: believe an old version comes with the OS, but i tries to get newer ones from macport - no success with those either (?) - then socat worked as a charm so didn't go back to see if it could be fixed</td></tr>
+<tr id="t1929A" class="h"><td><a href="#t1929A">19:29</a></td><td class="ns">technomancy</td><td>I was going to guess weird gnu/bsd differences, but apparently the canonical netcat is released under a nonsense non-license.</td></tr>
+<tr id="t1930A" class="r"><td><a href="#t1930A">19:30</a></td><td class="ns">technomancy</td><td>&quot;It is freely given away to the Internet community in the hope that it  will be  useful,  with no restrictions except giving credit where it is due...&quot; yeah, the courts will love that.</td></tr>
+<tr id="t1934A" class="h"><td><a href="#t1934A">19:34</a></td><td class="nv">FrankS</td><td>technomancy: if it comes with the OS, then all should be ok, and it's apple/M$/RH's issue - otherwise your point is well taken - i see it's in my /usr/bin, so Apple put it there - although there seem to be many different version out there in the wild</td></tr>
+<tr id="t1936A" class="h"><td><a href="#t1936A">19:36</a></td><td class="ns">technomancy</td><td>oh, not saying it's a problem for the end user at all</td></tr>
+<tr id="t1936A" class="h r"><td><a href="#t1936A">19:36</a></td><td class="ns">technomancy</td><td>it's just surprising that it didn't raise a red flag for the OS vendors</td></tr>
+<tr id="t1957A"><td><a href="#t1957A">19:57</a></td><td class="n9">TimMc</td><td>&quot;This software is released under the GPLv3 if the Higgs Boson exists, otherwise it is released under the EPL v1.0.</td></tr>
+<tr id="t1957A" class="h r"><td><a href="#t1957A">19:57</a></td><td class="n9">TimMc</td><td>&quot; I guess</td></tr>
+<tr id="t2022A"><td><a href="#t2022A">20:22</a></td><td class="n8">arohner</td><td>is it possible to make midje stub an apply call?</td></tr>
+<tr id="t2023A" class="h r"><td><a href="#t2023A">20:23</a></td><td class="n8">arohner</td><td>i.e. (provided (apply foo anything) =&gt; 42)</td></tr>
+<tr id="t2043A"><td><a href="#t2043A">20:43</a></td><td class="ny">brudrick</td><td>good day</td></tr>
+<tr id="t2043A" class="h r"><td><a href="#t2043A">20:43</a></td><td class="ny">brudrick</td><td>I'm working on repurposing noir-blog into a regular website, with the added benefit of being able to edit the pages using a wysiwyg editor.</td></tr>
+<tr id="t2045A" class="h r"><td><a href="#t2045A">20:45</a></td><td class="ny">brudrick</td><td>and, so what would be blog posts are instead regular pages.  I'm spitting those out into a menu.</td></tr>
+<tr id="t2045A" class="h r"><td><a href="#t2045A">20:45</a></td><td class="ny">brudrick</td><td>Thing is, I'd like to have categories to my navigation menu.</td></tr>
+<tr id="t2045A" class="h r"><td><a href="#t2045A">20:45</a></td><td class="ny">brudrick</td><td>the &quot;about&quot; section... the &quot;Concepts&quot; section, &quot;Resources&quot; etc.</td></tr>
+<tr id="t2046A" class="h r"><td><a href="#t2046A">20:46</a></td><td class="ny">brudrick</td><td>the simple.db is already managing 3 different datastructures and something like an atom</td></tr>
+<tr id="t2047A" class="h r"><td><a href="#t2047A">20:47</a></td><td class="ny">brudrick</td><td>And I'm wondering where to stick this new catagory information... I could add it as another attribute of the posts themselves.. but</td></tr>
+<tr id="t2048A" class="h r"><td><a href="#t2048A">20:48</a></td><td class="ny">brudrick</td><td>I'd like the user to be able to easily add and remove categories, and manage the organization of pages within the navigation menu</td></tr>
+<tr id="t2048A" class="h r"><td><a href="#t2048A">20:48</a></td><td class="ny">brudrick</td><td>so I'm wondering how to attack this</td></tr>
+<tr id="t2051A" class="r"><td><a href="#t2051A">20:51</a></td><td class="ny">brudrick</td><td>in terms of ordering of pages in categories: [[1 2 3] [4 5] [6 7 8 9]] or {1 [1 2 3] 2 [4 5] 3 [6 7 8 9]} ??</td></tr>
+<tr id="t2051A" class="h"><td><a href="#t2051A">20:51</a></td><td class="nx">lazybot</td><td>brudrick: Uh, no. Why would you even ask?</td></tr>
+<tr id="t2051A" class="h"><td><a href="#t2051A">20:51</a></td><td class="na">Raynes</td><td>Heh.</td></tr>
+<tr id="t2051A" class="h r"><td><a href="#t2051A">20:51</a></td><td class="na">Raynes</td><td>lazybot: Don't be mean.</td></tr>
+<tr id="t2051A" class="h"><td><a href="#t2051A">20:51</a></td><td class="ny">brudrick</td><td>droids these days</td></tr>
+<tr id="t2052A" class="h r"><td><a href="#t2052A">20:52</a></td><td class="ny">brudrick</td><td>and I could have a post called &quot;welcome!&quot; with a post ID of 2.</td></tr>
+<tr id="t2054A" class="h r"><td><a href="#t2054A">20:54</a></td><td class="ny">brudrick</td><td>and then have a &quot;:nav&quot; key on that post that has a mapping of where it belongs: {:nav {:about 1}} which would place it in the &quot;About&quot; section as the first page.</td></tr>
+<tr id="t2054A" class="h r"><td><a href="#t2054A">20:54</a></td><td class="ny">brudrick</td><td>but I'm not sure how complex the logic would need to be to keep all posts in the correct state at all times.</td></tr>
+<tr id="t2055A" class="h r"><td><a href="#t2055A">20:55</a></td><td class="ny">brudrick</td><td>building the nav menu means iterating across all posts, every time, to generate the menu</td></tr>
+<tr id="t2057A" class="h r"><td><a href="#t2057A">20:57</a></td><td class="ny">brudrick</td><td>whereas the other option is another datastructure. One which is always in the correct order and which the user/admin edits (like in the examples above)</td></tr>
+<tr id="t2059A" class="h r"><td><a href="#t2059A">20:59</a></td><td class="ny">brudrick</td><td>I'm in favor of &quot;one datastructure, many functions&quot;</td></tr>
+<tr id="t2101A" class="r"><td><a href="#t2101A">21:01</a></td><td class="ny">brudrick</td><td>but I'm worried about maintaining consistency / ensuring the derived structure is never in an invalid state</td></tr>
+<tr id="t2103A" class="h r"><td><a href="#t2103A">21:03</a></td><td class="ny">brudrick</td><td>If post 5 takes the place of post 2, in the same category, post 2, 3 and 4 need to move to their later positions.  moving post 2 to another category affects all subsequent indexes of the current category, plus the other category, depending on where it went.</td></tr>
+<tr id="t2103A" class="h r"><td><a href="#t2103A">21:03</a></td><td class="ny">brudrick</td><td>sorry to be half thinking out loud</td></tr>
+<tr id="t2104A" class="h r"><td><a href="#t2104A">21:04</a></td><td class="ny">brudrick</td><td>so given that situation, please advice if there are any pearls of wisdom that apply</td></tr>
+<tr id="t2104A" class="h r"><td><a href="#t2104A">21:04</a></td><td class="ny">brudrick</td><td>*advise</td></tr>
+<tr id="t2109A" class="h r"><td><a href="#t2109A">21:09</a></td><td class="ny">brudrick</td><td>plus, if I don't use another datastructure, what says what order the categories go in?</td></tr>
+<tr id="t2134A"><td><a href="#t2134A">21:34</a></td><td class="nl">kcin</td><td>sometime when i tried to (use 'clojure.repl) in slime it gave me class not found error, why? (slime connected to 'lein swank')</td></tr>
+<tr id="t2137A" class="h"><td><a href="#t2137A">21:37</a></td><td class="nl">tmciver</td><td>kcin: are you running lein swank from a project directory?</td></tr>
+<tr id="t2137A" class="h"><td><a href="#t2137A">21:37</a></td><td class="nl">kcin</td><td>tmciver: yes</td></tr>
+<tr id="t2138A" class="h"><td><a href="#t2138A">21:38</a></td><td class="nl">tmciver</td><td>kcin: hmm, don't know then.  I usually 'clojure-jack-in' (essentially the same thing) and it works for me.</td></tr>
+<tr id="t2139A" class="h"><td><a href="#t2139A">21:39</a></td><td class="nm">amalloy</td><td>you probably forgot the ' in 'clojure.repl</td></tr>
+<tr id="t2140A" class="r"><td><a href="#t2140A">21:40</a></td><td class="nm">amalloy</td><td>&amp;(require clojure.repl)</td></tr>
+<tr id="t2140A" class="h"><td><a href="#t2140A">21:40</a></td><td class="nx">lazybot</td><td>java.lang.ClassNotFoundException: clojure.repl</td></tr>
+<tr id="t2140A" class="h"><td><a href="#t2140A">21:40</a></td><td class="nm">amalloy</td><td>&amp;(require 'clojure.repl)</td></tr>
+<tr id="t2140A" class="h"><td><a href="#t2140A">21:40</a></td><td class="nx">lazybot</td><td>⇒ nil</td></tr>
+<tr id="t2141A" class="h"><td><a href="#t2141A">21:41</a></td><td class="nl">kcin</td><td>amalloy: I'm not, anyway it actually works after i move (,cd from slime) to project dir after connecting. ^_^</td></tr>
+<tr id="t2144A" class="h"><td><a href="#t2144A">21:44</a></td><td class="n9">TimMc</td><td>Ooh, surprise benefit: I think uberjar-jit is faster than uberjar. It should be, since it doesn't have to compile as much...</td></tr>
+<tr id="t2152A"><td><a href="#t2152A">21:52</a></td><td class="nl">tmciver</td><td>kcin: I don't believe the current directory in emacs matters; only the directory from which you start swank.</td></tr>
+<tr id="t2157A" class="h"><td><a href="#t2157A">21:57</a></td><td class="nl">kcin</td><td>tmciver: I did run lein swank inside project dir though, i can't even run lein swank outside project dir, it will gives me &quot;Couldn't find project.clj, which is needed for swank&quot; error if i did.</td></tr>
+<tr id="t2210A"><td><a href="#t2210A">22:10</a></td><td class="nj">blong</td><td>What is the correct way to go about setting up a namespace for various helper functions or macros?  I'm not really very familiar with the way Java handles things so I'm a bit lost when it comes to the correct way to do this kind of thing with Clojure.</td></tr>
+<tr id="t2211A" class="h"><td><a href="#t2211A">22:11</a></td><td class="nt">isak_</td><td>why does (contains? [&quot;A&quot; &quot;B&quot; &quot;C&quot;] &quot;A&quot;) =&gt; false? considering (= &quot;A&quot; &quot;A&quot;) =&gt; true</td></tr>
+<tr id="t2212A" class="h r"><td><a href="#t2212A">22:12</a></td><td class="nt">isak_</td><td>oh, its a key, never mind</td></tr>
+<tr id="t2212A" class="h"><td><a href="#t2212A">22:12</a></td><td class="n9">TimMc</td><td>blong: One namespace per file in Clojure (and vice versa), so create a util.clj in your project and :require/:use it.</td></tr>
+<tr id="t2213A" class="h"><td><a href="#t2213A">22:13</a></td><td class="nj">blong</td><td>thanks TimMc</td></tr>
+<tr id="t2213A" class="h"><td><a href="#t2213A">22:13</a></td><td class="n9">TimMc</td><td>blong: If you have a bunch of helpers you want to use in multiple projects, create a &quot;useful&quot; lib and add it to your projects as a dependency.</td></tr>
+<tr id="t2215A" class="h"><td><a href="#t2215A">22:15</a></td><td class="ne">bkpattison</td><td>in clojurescript, how do i convert a javascript array to a seq?</td></tr>
+<tr id="t2220A"><td><a href="#t2220A">22:20</a></td><td class="n9">TimMc</td><td>bkpattison: seq isn't enough?</td></tr>
+<tr id="t2220A" class="h"><td><a href="#t2220A">22:20</a></td><td class="ne">bkpattison</td><td>yeah, i would have thought (seq my-js-array) would have done it</td></tr>
+<tr id="t2221A" class="h r"><td><a href="#t2221A">22:21</a></td><td class="ne">bkpattison</td><td>get an not I-Sequable error</td></tr>
+<tr id="t2221A" class="h"><td><a href="#t2221A">22:21</a></td><td class="n9">TimMc</td><td>ew</td></tr>
+<tr id="t2222A" class="h r"><td><a href="#t2222A">22:22</a></td><td class="n9">TimMc</td><td>*sigh* CLJS is very not mature.</td></tr>
+<tr id="t2222A" class="h"><td><a href="#t2222A">22:22</a></td><td class="ne">bkpattison</td><td>yeah, it has some growing pains yet</td></tr>
+<tr id="t2222A" class="h r"><td><a href="#t2222A">22:22</a></td><td class="ne">bkpattison</td><td>its still better than javascript</td></tr>
+<tr id="t2225A" class="h r"><td><a href="#t2225A">22:25</a></td><td class="ne">bkpattison</td><td>Uncaught Error: No protocol method ISeqable.-seq defined for type number:</td></tr>
+<tr id="t2226A" class="h"><td><a href="#t2226A">22:26</a></td><td class="nm">amalloy</td><td>bkpattison: seq on a native array works for me in cljs</td></tr>
+<tr id="t2227A" class="h r"><td><a href="#t2227A">22:27</a></td><td class="nm">amalloy</td><td>ClojureScript:cljs.user&gt; (seq (js/Array 1 2)) ;; returns (1 2)</td></tr>
+<tr id="t2227A" class="h"><td><a href="#t2227A">22:27</a></td><td class="ne">bkpattison</td><td>hmm, seq on a native array works? so i probably got something else wrong -- let me double check -- thanks</td></tr>
+<tr id="t2229A" class="h"><td><a href="#t2229A">22:29</a></td><td class="nm">amalloy</td><td>sounds like you're seq'ing a number, not an array</td></tr>
+<tr id="t2230A"><td><a href="#t2230A">22:30</a></td><td class="n9">TimMc</td><td>&quot;This seems like a big oversight though.&quot; &lt;-- forgot to actually hit enter</td></tr>
+<tr id="t2231A" class="h r"><td><a href="#t2231A">22:31</a></td><td class="n9">TimMc</td><td>But you can tell from how quickly I believed it was unimplemented just how low my opinion of cljs is at the moment.</td></tr>
+<tr id="t2232A" class="h"><td><a href="#t2232A">22:32</a></td><td class="nm">amalloy</td><td>eh. i'm not really interested in cljs as a product, and it's not polished, but it's a *lot* lower-friction than jvm-clojure</td></tr>
+<tr id="t2233A" class="h r"><td><a href="#t2233A">22:33</a></td><td class="nm">amalloy</td><td>cljs missing a feature you want? submit a patch, dnolen will merge it later tonight</td></tr>
+<tr id="t2233A" class="h r"><td><a href="#t2233A">22:33</a></td><td class="nm">amalloy</td><td>jvm-clojure missing a feature you want? if you can't do it &quot;locally&quot; with macros you're probably better off crying into your beer, because a patch will take a lot of patience</td></tr>
+<tr id="t2235A" class="h"><td><a href="#t2235A">22:35</a></td><td class="ny">brudrick</td><td>working example: <a href="http://www.cringely.com/2009/03/parrot-secrets/">http://www.cringely.com/2009/03/parrot-secrets/</a></td></tr>
+<tr id="t2235A" class="h r"><td><a href="#t2235A">22:35</a></td><td class="ny">brudrick</td><td>oops :)</td></tr>
+<tr id="t2235A" class="h r"><td><a href="#t2235A">22:35</a></td><td class="ny">brudrick</td><td>wtf?</td></tr>
+<tr id="t2235A" class="h"><td><a href="#t2235A">22:35</a></td><td class="n9">TimMc</td><td>No, no -- I, Cringely is always a good read.</td></tr>
+<tr id="t2235A" class="h"><td><a href="#t2235A">22:35</a></td><td class="ne">bkpattison</td><td>yep, i use (seq my-js-array) worked -- it wasn't passing in an js/array</td></tr>
+<tr id="t2236A" class="h"><td><a href="#t2236A">22:36</a></td><td class="ny">brudrick</td><td>why did I paste that?</td></tr>
+<tr id="t2236A" class="h r"><td><a href="#t2236A">22:36</a></td><td class="ny">brudrick</td><td>I probably read that article a long time ago</td></tr>
+<tr id="t2236A" class="h r"><td><a href="#t2236A">22:36</a></td><td class="ny">brudrick</td><td>anyway: working example: <a href="http://strong-fog-4203.herokuapp.com/blog/view/the-book">http://strong-fog-4203.herokuapp.com/blog/view/the-book</a></td></tr>
+<tr id="t2237A" class="h r"><td><a href="#t2237A">22:37</a></td><td class="ny">brudrick</td><td>blog/admin takes one to the login</td></tr>
+<tr id="t2237A" class="h r"><td><a href="#t2237A">22:37</a></td><td class="ny">brudrick</td><td>and when one posts a new article, it shows up in the nav bar</td></tr>
+<tr id="t2238A" class="h r"><td><a href="#t2238A">22:38</a></td><td class="ny">brudrick</td><td>of the book cover</td></tr>
+<tr id="t2238A" class="h r"><td><a href="#t2238A">22:38</a></td><td class="ny">brudrick</td><td>'/blog/' should should only show the first / splash page though</td></tr>
+<tr id="t2238A" class="h r"><td><a href="#t2238A">22:38</a></td><td class="ny">brudrick</td><td>of the book cover</td></tr>
+<tr id="t2238A" class="h r"><td><a href="#t2238A">22:38</a></td><td class="ny">brudrick</td><td>its a site I'm building for my dad, so he can edit it himself.  Current version here: questforthekingdom.com</td></tr>
+<tr id="t2239A" class="h r"><td><a href="#t2239A">22:39</a></td><td class="ny">brudrick</td><td>its his book.</td></tr>
+<tr id="t2241A"><td><a href="#t2241A">22:41</a></td><td class="n7">adiabatic</td><td>&quot;Quest for the Kingdom&quot; would make for better &lt;title&gt; contents than &quot;QFTK&quot;</td></tr>
+<tr id="t2244A" class="h"><td><a href="#t2244A">22:44</a></td><td class="n9">TimMc</td><td>brudrick: A year from now you'll look up from your full-featured Content Management System and think, &quot;Where did I go wrong? Could there have been another way?&quot;</td></tr>
+<tr id="t2245A" class="h r"><td><a href="#t2245A">22:45</a></td><td class="n9">TimMc</td><td>:-)</td></tr>
+<tr id="t2245A" class="h"><td><a href="#t2245A">22:45</a></td><td class="n7">adiabatic</td><td>heh</td></tr>
+<tr id="t2245A" class="h"><td><a href="#t2245A">22:45</a></td><td class="n9">TimMc</td><td>This is always where it starts: Modifying blog software to add non-timeline pages.</td></tr>
+<tr id="t2249A" class="h"><td><a href="#t2249A">22:49</a></td><td class="nm">amalloy</td><td>adiabatic: anyone who doesn't know what kwufftick means doesn't deserve to read my blog</td></tr>
+<tr id="t2250A"><td><a href="#t2250A">22:50</a></td><td class="n7">adiabatic</td><td>How appropriate. You fight like a cow.</td></tr>
+<tr id="t2250A" class="h r"><td><a href="#t2250A">22:50</a></td><td class="n7">adiabatic</td><td>(challenge/response failure)</td></tr>
+<tr id="t2252A" class="h"><td><a href="#t2252A">22:52</a></td><td class="ny">brudrick</td><td>adiabatic: I'm trying to make a meme out of qftk... very unique, I think.  &quot;hey, did you hear about qftk?&quot;</td></tr>
+<tr id="t2252A" class="h r"><td><a href="#t2252A">22:52</a></td><td class="ny">brudrick</td><td>TimMc: I just neeed something simple so my dad can update pages, rather than asking me to all the time</td></tr>
+<tr id="t2252A" class="h"><td><a href="#t2252A">22:52</a></td><td class="n7">adiabatic</td><td>well, you appear to have all its Googlejuice</td></tr>
+<tr id="t2252A" class="h"><td><a href="#t2252A">22:52</a></td><td class="ny">brudrick</td><td>zactly</td></tr>
+<tr id="t2254A" class="h r"><td><a href="#t2254A">22:54</a></td><td class="ny">brudrick</td><td>k'well, gotta roll.. will let y'all know when I make improvements.. Once I have some halfway clean code, too, I'll throw it up on github</td></tr>
+<tr id="t2255A" class="h r"><td><a href="#t2255A">22:55</a></td><td class="ny">brudrick</td><td>memorable phrase/word?</td></tr>
+<tr id="t2256A" class="h"><td><a href="#t2256A">22:56</a></td><td class="n7">adiabatic</td><td>just keep examining every low bid quoted for zinc etchings</td></tr>
+<tr id="t2257A" class="h"><td><a href="#t2257A">22:57</a></td><td class="nc">jodaro</td><td>this lsu/alabama game is painful to watch</td></tr>
+<tr id="t2318A"><td><a href="#t2318A">23:18</a></td><td class="n7">adiabatic</td><td>(</td></tr>
+<tr id="t2320A" class="r"><td><a href="#t2320A">23:20</a></td><td class="n7">adiabatic</td><td>I'm doing my-nth again, this time with loop and recur. Can I do (fn my-nth [coll idx] (loop [coll coll, idx idx, acc 0] ; … with the inside-the-loop names the same as the outside-of-the-loop names? Will that screw anything up?</td></tr>
+<tr id="t2322A" class="h"><td><a href="#t2322A">23:22</a></td><td class="nm">amalloy</td><td>&quot;try it and see&quot; seems like the best answer here</td></tr>
+<tr id="t2323A" class="h"><td><a href="#t2323A">23:23</a></td><td class="n7">adiabatic</td><td>An adventure!</td></tr>
+<tr id="t2323A" class="h"><td><a href="#t2323A">23:23</a></td><td class="nm">amalloy</td><td>(let [x 1] (loop [x x] (if (zero? x) :done, (recur (dec x))))) ;; what do you expect this to do?</td></tr>
+<tr id="t2327A" class="h"><td><a href="#t2327A">23:27</a></td><td class="n7">adiabatic</td><td>Now that I think about it, I have a strong hunch it won't work like I want it to because I except both 'x's of [x x] to be, um, evaluated at the same time</td></tr>
+<tr id="t2332A"><td><a href="#t2332A">23:32</a></td><td class="nm">amalloy</td><td>welp, advice still stands. try it out, and whatever it does you'll have improved your mental model of How Things Work</td></tr>
+<tr id="t2344A"><td><a href="#t2344A">23:44</a></td><td class="n7">adiabatic</td><td>Hunh. I got away with it. Makes sense, since all the macro stuff I've heard about but haven't touched yet has facilities for evaluating things at different points…</td></tr>
+<tr id="t2345A" class="h"><td><a href="#t2345A">23:45</a></td><td class="nt">clj_newb</td><td>after (defrecord Dog [name age]) and (defn new-dog ... (Dog. ... )) is there a way to hide Dog. ? I.e. I want the only way to create Dog objects is via new-Dog. If not, is there a way to give (defrecord Dog ... )a constructor?</td></tr>
+</tbody></table></main></body></html>

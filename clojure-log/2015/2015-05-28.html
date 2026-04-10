@@ -1,0 +1,447 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#clojure – 2015-05-28</title><link rel="stylesheet" href="../style.css"></head><body>
+<header class="sh"><a class="st" href="../index.html">#clojure logs</a><nav class="dn"><a href="2015-05-27.html">&larr;</a><span>2015-05-28</span><a href="2015-05-30.html">&rarr;</a></nav></header>
+<main><p class="dh">2015-05-28</p><table class="lg"><tbody>
+<tr id="t0000A"><td><a href="#t0000A">00:00</a></td><td class="n8">auxchar</td><td>Yeah, I think that'd be cheating.</td></tr>
+<tr id="t0000A" class="h"><td><a href="#t0000A">00:00</a></td><td class="nd">justin_smith</td><td>delays and promises being like reference types, but only bindable once</td></tr>
+<tr id="t0001A" class="h r"><td><a href="#t0001A">00:01</a></td><td class="nd">justin_smith</td><td>auxchar: technically the def exists before its body is evaluated (to allow recursive functions) but I wouldn't count on correctness</td></tr>
+<tr id="t0001A" class="h r"><td><a href="#t0001A">00:01</a></td><td class="nd">justin_smith</td><td>it's not an intended usage</td></tr>
+<tr id="t0001A" class="h r"><td><a href="#t0001A">00:01</a></td><td class="nd">justin_smith</td><td>,(def l (list 1 2 l))</td></tr>
+<tr id="t0001A" class="h"><td><a href="#t0001A">00:01</a></td><td class="nl">clojurebot</td><td>#'sandbox/l</td></tr>
+<tr id="t0001A" class="h"><td><a href="#t0001A">00:01</a></td><td class="nd">justin_smith</td><td>l</td></tr>
+<tr id="t0001A" class="h r"><td><a href="#t0001A">00:01</a></td><td class="nd">justin_smith</td><td>,l</td></tr>
+<tr id="t0001A" class="h"><td><a href="#t0001A">00:01</a></td><td class="nl">clojurebot</td><td>(1 2 #object[clojure.lang.Var$Unbound 0x7a27d8b4 &quot;Unbound: #'sandbox/l&quot;])</td></tr>
+<tr id="t0001A" class="h"><td><a href="#t0001A">00:01</a></td><td class="nd">justin_smith</td><td>yeah</td></tr>
+<tr id="t0002A" class="h r"><td><a href="#t0002A">00:02</a></td><td class="nd">justin_smith</td><td>so l exists, but it got caught at the wrong time</td></tr>
+<tr id="t0002A" class="h"><td><a href="#t0002A">00:02</a></td><td class="n8">auxchar</td><td>Except the list isn't holding itself, it's holding the var containing itself.</td></tr>
+<tr id="t0002A" class="h"><td><a href="#t0002A">00:02</a></td><td class="nd">justin_smith</td><td>auxchar: in clojure we don't really do the &quot;tying the knot&quot; thing you can do in haskell thanks to their pervasively lazy evaluation</td></tr>
+<tr id="t0003A" class="h r"><td><a href="#t0003A">00:03</a></td><td class="nd">justin_smith</td><td>auxchar: yes, that's in fact the only option</td></tr>
+<tr id="t0004A" class="h"><td><a href="#t0004A">00:04</a></td><td class="n8">auxchar</td><td>It would work with a LazySeq, I would imagine.</td></tr>
+<tr id="t0004A" class="h"><td><a href="#t0004A">00:04</a></td><td class="nd">justin_smith</td><td>even then it would be a hack</td></tr>
+<tr id="t0004A" class="h"><td><a href="#t0004A">00:04</a></td><td class="n8">auxchar</td><td>Otherwise a mutable list would be needed.</td></tr>
+<tr id="t0004A" class="h"><td><a href="#t0004A">00:04</a></td><td class="nd">justin_smith</td><td>,(def l (cons 1 (lazy-seq l)))</td></tr>
+<tr id="t0004A" class="h"><td><a href="#t0004A">00:04</a></td><td class="nl">clojurebot</td><td>#'sandbox/l</td></tr>
+<tr id="t0004A" class="h"><td><a href="#t0004A">00:04</a></td><td class="nd">justin_smith</td><td>,l</td></tr>
+<tr id="t0004A" class="h"><td><a href="#t0004A">00:04</a></td><td class="nl">clojurebot</td><td>(1 1 1 1 1 ...)</td></tr>
+<tr id="t0005A" class="h"><td><a href="#t0005A">00:05</a></td><td class="nd">justin_smith</td><td>I'd still consider that a hack, though it works</td></tr>
+<tr id="t0005A" class="h"><td><a href="#t0005A">00:05</a></td><td class="n8">auxchar</td><td>Yeah.</td></tr>
+<tr id="t0007A" class="h r"><td><a href="#t0007A">00:07</a></td><td class="n8">auxchar</td><td>Does its behaviour change if l is defined before some part of it's fully evaluated?</td></tr>
+<tr id="t0007A" class="h r"><td><a href="#t0007A">00:07</a></td><td class="n8">auxchar</td><td>Err, redefined.</td></tr>
+<tr id="t0008A" class="h"><td><a href="#t0008A">00:08</a></td><td class="nd">justin_smith</td><td>well, that's what happened the second time I evaluated (def l ...) just now - it had a previous value that was not used at all</td></tr>
+<tr id="t0008A" class="h r"><td><a href="#t0008A">00:08</a></td><td class="nd">justin_smith</td><td>def creates the var (or changes it to unbound) before the body is run</td></tr>
+<tr id="t0010A"><td><a href="#t0010A">00:10</a></td><td class="n8">auxchar</td><td>But if you partially evaluated l, passed its value to somewhere else, and redfined l, would it change it's behaviour in the other place?</td></tr>
+<tr id="t0010A" class="h"><td><a href="#t0010A">00:10</a></td><td class="nd">justin_smith</td><td>it depends, sometimes not unless you passed the var somewhere else</td></tr>
+<tr id="t0011A" class="h r"><td><a href="#t0011A">00:11</a></td><td class="nd">justin_smith</td><td>sometimes the other code would just seamlessly see the new l</td></tr>
+<tr id="t0011A" class="h r"><td><a href="#t0011A">00:11</a></td><td class="nd">justin_smith</td><td>by passed the var I mean passed #'l instead of l</td></tr>
+<tr id="t0011A" class="h r"><td><a href="#t0011A">00:11</a></td><td class="nd">justin_smith</td><td>(as an arg)</td></tr>
+<tr id="t0012A" class="h r"><td><a href="#t0012A">00:12</a></td><td class="nd">justin_smith</td><td>anyway, I'm out for the night</td></tr>
+<tr id="t0012A" class="h"><td><a href="#t0012A">00:12</a></td><td class="n8">auxchar</td><td>Alright, good night.</td></tr>
+<tr id="t0012A" class="h r"><td><a href="#t0012A">00:12</a></td><td class="n8">auxchar</td><td>I wanna play with this some more.</td></tr>
+<tr id="t0015A" class="h r"><td><a href="#t0015A">00:15</a></td><td class="n8">auxchar</td><td>(def l (list 1 (lazy-seq l)))</td></tr>
+<tr id="t0015A" class="h r"><td><a href="#t0015A">00:15</a></td><td class="n8">auxchar</td><td>,(def l (list 1 (lazy-seq l)))</td></tr>
+<tr id="t0015A" class="h"><td><a href="#t0015A">00:15</a></td><td class="nl">clojurebot</td><td>#'sandbox/l</td></tr>
+<tr id="t0015A" class="h"><td><a href="#t0015A">00:15</a></td><td class="n8">auxchar</td><td>,(l)</td></tr>
+<tr id="t0015A" class="h"><td><a href="#t0015A">00:15</a></td><td class="nl">clojurebot</td><td>#error {\n :cause &quot;clojure.lang.PersistentList cannot be cast to clojure.lang.IFn&quot;\n :via\n [{:type java.lang.ClassCastException\n   :message &quot;clojure.lang.PersistentList cannot be cast to clojure.lang.IFn&quot;\n   :at [sandbox$eval49 invoke &quot;NO_SOURCE_FILE&quot; 0]}]\n :trace\n [[sandbox$eval49 invoke &quot;NO_SOURCE_FILE&quot; 0]\n  [clojure.lang.Compiler eval &quot;Compiler.java&quot; 6792]\n  [clojure.lang.Compiler eval &quot;...</td></tr>
+<tr id="t0015A" class="h"><td><a href="#t0015A">00:15</a></td><td class="n8">auxchar</td><td>,l</td></tr>
+<tr id="t0015A" class="h"><td><a href="#t0015A">00:15</a></td><td class="nl">clojurebot</td><td>(1 (1 (1 (1 (1 (1 (1 (1 (1 (1 #))))))))))</td></tr>
+<tr id="t0019A" class="h"><td><a href="#t0019A">00:19</a></td><td class="n8">auxchar</td><td>,(do (def l (cons 1 (lazy-seq l))) (take 3 l) (def m l) m)</td></tr>
+<tr id="t0019A" class="h"><td><a href="#t0019A">00:19</a></td><td class="nl">clojurebot</td><td>(1 1 1 1 1 ...)</td></tr>
+<tr id="t0019A" class="h"><td><a href="#t0019A">00:19</a></td><td class="n8">auxchar</td><td>Ok, so that does work.</td></tr>
+<tr id="t0020A" class="r"><td><a href="#t0020A">00:20</a></td><td class="n8">auxchar</td><td>Cool.</td></tr>
+<tr id="t0020A" class="h r"><td><a href="#t0020A">00:20</a></td><td class="n8">auxchar</td><td>Wait.</td></tr>
+<tr id="t0020A" class="h r"><td><a href="#t0020A">00:20</a></td><td class="n8">auxchar</td><td>,(do (def l (cons 1 (lazy-seq l))) (take 3 l) (def m l) (def l nil) m)</td></tr>
+<tr id="t0020A" class="h"><td><a href="#t0020A">00:20</a></td><td class="nl">clojurebot</td><td>(1)</td></tr>
+<tr id="t0020A" class="h"><td><a href="#t0020A">00:20</a></td><td class="n8">auxchar</td><td>Nope, it's not what I'm looking for.</td></tr>
+<tr id="t0021A" class="h r"><td><a href="#t0021A">00:21</a></td><td class="n8">auxchar</td><td>,(do (def l (cons 1 (lazy-seq l))) (take 3 l) (def m l) (def l 4) m)</td></tr>
+<tr id="t0021A" class="h"><td><a href="#t0021A">00:21</a></td><td class="nl">clojurebot</td><td>#&lt;IllegalArgumentException java.lang.IllegalArgumentException: Don't know how to create ISeq from: java.lang.Long&gt;</td></tr>
+<tr id="t0022A" class="h"><td><a href="#t0022A">00:22</a></td><td class="n8">auxchar</td><td>Ok, I think I get what's going on.</td></tr>
+<tr id="t0037A"><td><a href="#t0037A">00:37</a></td><td class="na">url-</td><td>is source for clojurebot online somewhere?</td></tr>
+<tr id="t0040A"><td><a href="#t0040A">00:40</a></td><td class="nv">tolstoy</td><td>Is it this one? <a href="https://github.com/Raynes/lazybot">https://github.com/Raynes/lazybot</a> or this one? <a href="https://github.com/hiredman/clojurebot">https://github.com/hiredman/clojurebot</a> ?</td></tr>
+<tr id="t0041A" class="h r"><td><a href="#t0041A">00:41</a></td><td class="nv">tolstoy</td><td>,(+ 2 3)</td></tr>
+<tr id="t0041A" class="h"><td><a href="#t0041A">00:41</a></td><td class="nl">clojurebot</td><td>5</td></tr>
+<tr id="t0041A" class="h"><td><a href="#t0041A">00:41</a></td><td class="nv">tolstoy</td><td>.(+ 2 3)</td></tr>
+<tr id="t0048A" class="h"><td><a href="#t0048A">00:48</a></td><td class="n8">auxchar</td><td>,((fn [f n] (f f n)) (fn [f n] (f (+ n 1))))</td></tr>
+<tr id="t0048A" class="h"><td><a href="#t0048A">00:48</a></td><td class="nl">clojurebot</td><td>#error {\n :cause &quot;Wrong number of args (1) passed to: sandbox/eval49/fn--50&quot;\n :via\n [{:type clojure.lang.ArityException\n   :message &quot;Wrong number of args (1) passed to: sandbox/eval49/fn--50&quot;\n   :at [clojure.lang.AFn throwArity &quot;AFn.java&quot; 429]}]\n :trace\n [[clojure.lang.AFn throwArity &quot;AFn.java&quot; 429]\n  [clojure.lang.AFn invoke &quot;AFn.java&quot; 32]\n  [sandbox$eval49 invoke &quot;NO_SOURCE_FILE&quot; 0]\n  ...</td></tr>
+<tr id="t0048A" class="h"><td><a href="#t0048A">00:48</a></td><td class="n8">auxchar</td><td>,((fn [f n] (f f n)) (fn [f n] (f (+ n 1))) 1)</td></tr>
+<tr id="t0048A" class="h"><td><a href="#t0048A">00:48</a></td><td class="nl">clojurebot</td><td>#error {\n :cause &quot;Wrong number of args (1) passed to: sandbox/eval77/fn--80&quot;\n :via\n [{:type clojure.lang.ArityException\n   :message &quot;Wrong number of args (1) passed to: sandbox/eval77/fn--80&quot;\n   :at [clojure.lang.AFn throwArity &quot;AFn.java&quot; 429]}]\n :trace\n [[clojure.lang.AFn throwArity &quot;AFn.java&quot; 429]\n  [clojure.lang.AFn invoke &quot;AFn.java&quot; 32]\n  [sandbox$eval77$fn__80 invoke &quot;NO_SOURCE_FILE&quot;...</td></tr>
+<tr id="t0049A" class="h"><td><a href="#t0049A">00:49</a></td><td class="n8">auxchar</td><td>,((fn [f n] (f f n)) (fn [f n] (f f (+ n 1))) 1)</td></tr>
+<tr id="t0049A" class="h"><td><a href="#t0049A">00:49</a></td><td class="nl">clojurebot</td><td>#error {\n :cause nil\n :via\n [{:type java.lang.StackOverflowError\n   :message nil\n   :at [clojure.lang.Numbers$LongOps opsWith &quot;Numbers.java&quot; 423]}]\n :trace\n [[clojure.lang.Numbers$LongOps opsWith &quot;Numbers.java&quot; 423]\n  [clojure.lang.Numbers$LongOps combine &quot;Numbers.java&quot; 419]\n  [clojure.lang.Numbers add &quot;Numbers.java&quot; 128]\n  [clojure.lang.Numbers add &quot;Numbers.java&quot; 3644]\n  [sandbox$eval1...</td></tr>
+<tr id="t0049A" class="h"><td><a href="#t0049A">00:49</a></td><td class="n8">auxchar</td><td>Yay.</td></tr>
+<tr id="t0053A" class="r"><td><a href="#t0053A">00:53</a></td><td class="n8">auxchar</td><td>(#(%1 %1 %2) #(%1 %1 (+ %2 1)) 1)</td></tr>
+<tr id="t0054A" class="h r"><td><a href="#t0054A">00:54</a></td><td class="n8">auxchar</td><td>,(#(%1 %1 %2) #(%1 %1 (+ %2 1)) 1)</td></tr>
+<tr id="t0054A" class="h"><td><a href="#t0054A">00:54</a></td><td class="nl">clojurebot</td><td>#error {\n :cause nil\n :via\n [{:type java.lang.StackOverflowError\n   :message nil\n   :at [clojure.lang.Numbers$LongOps opsWith &quot;Numbers.java&quot; 423]}]\n :trace\n [[clojure.lang.Numbers$LongOps opsWith &quot;Numbers.java&quot; 423]\n  [clojure.lang.Numbers$LongOps combine &quot;Numbers.java&quot; 419]\n  [clojure.lang.Numbers add &quot;Numbers.java&quot; 128]\n  [clojure.lang.Numbers add &quot;Numbers.java&quot; 3644]\n  [sandbox$eval2...</td></tr>
+<tr id="t0055A" class="h"><td><a href="#t0055A">00:55</a></td><td class="n8">auxchar</td><td>That ought to make for some interesting production code. ^_^</td></tr>
+<tr id="t0058A" class="h"><td><a href="#t0058A">00:58</a></td><td class="nd">TEttinger</td><td>auxchar, I'm surprised that even can run</td></tr>
+<tr id="t0105A"><td><a href="#t0105A">01:05</a></td><td class="n1">WickedShell</td><td>does anyone know when the estimated release for the next version of core.async is? I saw that poll! was avalible when reading the documentation, which is exactly what I need, only to find out that it isn't in the released version</td></tr>
+<tr id="t0118A"><td><a href="#t0118A">01:18</a></td><td class="nv">tolstoy</td><td>seancorfield: Lots of commits on clojure/tools.clj since the last release. Any idea when 0.3.2 might be cut? It's been about one year.</td></tr>
+<tr id="t0118A" class="h r"><td><a href="#t0118A">01:18</a></td><td class="nv">tolstoy</td><td>seancorfield: Yours was the last. ;)</td></tr>
+<tr id="t0326A"><td><a href="#t0326A">03:26</a></td><td class="nj">wei_</td><td>came up with this function, nil-safe (defn nil-safe [f] (fn [x &amp; args] (if x (apply f x args)))), kind of like fnil but when you just want the fn to return nil when the first input is nil</td></tr>
+<tr id="t0328A" class="h"><td><a href="#t0328A">03:28</a></td><td class="n6">tslocke</td><td>Is there a core function like group-by but doesn’t group values - i.e. you get the original values from the collection, not a vector of them, as the map values</td></tr>
+<tr id="t0329A" class="h"><td><a href="#t0329A">03:29</a></td><td class="nj">wei_</td><td>is there something like this in core? or is this unecessary? the use case that prompted it was casting values in a map, etc (update-in attrs [:wingspan] (nil-safe double))</td></tr>
+<tr id="t0329A" class="h r"><td><a href="#t0329A">03:29</a></td><td class="nj">wei_</td><td>tslocke: then it wouldn’t be a group would it? could you give an example</td></tr>
+<tr id="t0331A"><td><a href="#t0331A">03:31</a></td><td class="nd">justin_smith</td><td>,(map #(update-in % [:wingspan] (fn [n] (some-&gt; n (* 2)))) [{:wingspan 1} {}])</td></tr>
+<tr id="t0331A" class="h"><td><a href="#t0331A">03:31</a></td><td class="nl">clojurebot</td><td>({:wingspan 2} {:wingspan nil})</td></tr>
+<tr id="t0331A" class="h"><td><a href="#t0331A">03:31</a></td><td class="n6">tslocke</td><td>no it wouldn’t be a group, i.e. you have a vector of maps where each has a unique key e.g. :name, and you want a map from the names to the original maps</td></tr>
+<tr id="t0332A" class="h r"><td><a href="#t0332A">03:32</a></td><td class="n6">tslocke</td><td>I realise it’s a one-liner but just wondered if there is a canonical solution</td></tr>
+<tr id="t0336A" class="h"><td><a href="#t0336A">03:36</a></td><td class="nd">justin_smith</td><td>tslocke: it's an easy thing to derive from group-by, and no it is not built in</td></tr>
+<tr id="t0337A" class="h r"><td><a href="#t0337A">03:37</a></td><td class="nd">justin_smith</td><td>,(into {} (for [m [{:a 0} {:a 1} {:a 2}]] [(:a m) m]))</td></tr>
+<tr id="t0337A" class="h"><td><a href="#t0337A">03:37</a></td><td class="nl">clojurebot</td><td>{0 {:a 0}, 1 {:a 1}, 2 {:a 2}}</td></tr>
+<tr id="t0338A" class="h"><td><a href="#t0338A">03:38</a></td><td class="nd">justin_smith</td><td>no need for group-by actually, now that I think about it</td></tr>
+<tr id="t0338A" class="h"><td><a href="#t0338A">03:38</a></td><td class="n6">tslocke</td><td>right</td></tr>
+<tr id="t0338A" class="h r"><td><a href="#t0338A">03:38</a></td><td class="n6">tslocke</td><td>thanks</td></tr>
+<tr id="t0411A"><td><a href="#t0411A">04:11</a></td><td class="nd">otfrom</td><td>morning</td></tr>
+<tr id="t0424A"><td><a href="#t0424A">04:24</a></td><td class="n1">dstockton</td><td>morning</td></tr>
+<tr id="t0500A"><td><a href="#t0500A">05:00</a></td><td class="ne">studentrob</td><td>I'm stuck.  I need a clojure punching bag.   &quot;LazySeq cannot be cast to java.lang.String&quot;  <a href="http://pastebin.com/WBHD4Gz0">http://pastebin.com/WBHD4Gz0</a></td></tr>
+<tr id="t0503A" class="h r"><td><a href="#t0503A">05:03</a></td><td class="ne">studentrob</td><td>nm got it i think</td></tr>
+<tr id="t0531A"><td><a href="#t0531A">05:31</a></td><td class="nn">luxbock</td><td>studentrob: I'd use a cond to get rid of the nested if's in dist</td></tr>
+<tr id="t0532A" class="h"><td><a href="#t0532A">05:32</a></td><td class="ne">studentrob</td><td>luxbock: ok thx</td></tr>
+<tr id="t0553A" class="r"><td><a href="#t0553A">05:53</a></td><td class="ne">studentrob</td><td>Are there any IDEs that let you step through clojure code?  I'm using Light Table , which is handy, but it seems to only show values from the last loop iteration</td></tr>
+<tr id="t0559A" class="h"><td><a href="#t0559A">05:59</a></td><td class="nn">luxbock</td><td>studentrob: Cursive has a Clojure debugger</td></tr>
+<tr id="t0559A" class="h"><td><a href="#t0559A">05:59</a></td><td class="ne">studentrob</td><td>ok.. trying to figure out how to download that</td></tr>
+<tr id="t0559A" class="h"><td><a href="#t0559A">05:59</a></td><td class="nn">luxbock</td><td>so does Emacs with CIDER these days, though you'll have to use the snapshot version</td></tr>
+<tr id="t0600A"><td><a href="#t0600A">06:00</a></td><td class="nb">cfleming</td><td>studentrob: <a href="https://cursiveclojure.com/userguide/">https://cursiveclojure.com/userguide/</a> has the details</td></tr>
+<tr id="t0605A" class="h"><td><a href="#t0605A">06:05</a></td><td class="ne">studentrob</td><td>Thanks, got it</td></tr>
+<tr id="t0727A"><td><a href="#t0727A">07:27</a></td><td class="nk">DerGuteMoritz</td><td>hello everybody, I was wondering whether there is a reason other than &quot;nobody got around to it, yet&quot; for the compiler to not to do arity checks on direct calls?</td></tr>
+<tr id="t0800A"><td><a href="#t0800A">08:00</a></td><td class="n9">TimMc</td><td>Perhaps because vars can change? :-/</td></tr>
+<tr id="t0802A" class="h"><td><a href="#t0802A">08:02</a></td><td class="nc">Bronsa</td><td>DerGuteMoritz: eastwood does that</td></tr>
+<tr id="t0804A" class="h"><td><a href="#t0804A">08:04</a></td><td class="n9">TimMc</td><td>clojurebot: there's |an| eastwood for that</td></tr>
+<tr id="t0804A" class="h"><td><a href="#t0804A">08:04</a></td><td class="nl">clojurebot</td><td>Ok.</td></tr>
+<tr id="t0810A"><td><a href="#t0810A">08:10</a></td><td class="n7">crocket</td><td>I'm close to the end of braveclojure.com</td></tr>
+<tr id="t0810A" class="h r"><td><a href="#t0810A">08:10</a></td><td class="n7">crocket</td><td>braveclojure is a good material for a beginner, but it leaves me as a starter.</td></tr>
+<tr id="t0831A"><td><a href="#t0831A">08:31</a></td><td class="nd">justin_smith</td><td>crocket: have you tried <a href="http://4clojure.com">http://4clojure.com</a> at all?</td></tr>
+<tr id="t0833A" class="h"><td><a href="#t0833A">08:33</a></td><td class="n7">crocket</td><td>justin_smith, yes</td></tr>
+<tr id="t0955A"><td><a href="#t0955A">09:55</a></td><td class="nk">DerGuteMoritz</td><td>TimMc: ah, mutability strikes again ... that would probably explain it</td></tr>
+<tr id="t0955A" class="h r"><td><a href="#t0955A">09:55</a></td><td class="nk">DerGuteMoritz</td><td>Bronsa: thanks, good tip</td></tr>
+<tr id="t1016A"><td><a href="#t1016A">10:16</a></td><td class="nn">zerokarmaleft</td><td>crocket: if I were you, I'd think about building a very small project from scratch</td></tr>
+<tr id="t1041A"><td><a href="#t1041A">10:41</a></td><td class="np">kwladyka</td><td>i want use selmer and i want have templates in directory resources/view, i have to use something like (parser/set-resource-path!  (clojure.java.io/resource &quot;view&quot;)), but how can i add this change of path to work with lein ring server?</td></tr>
+<tr id="t1042A" class="h r"><td><a href="#t1042A">10:42</a></td><td class="np">kwladyka</td><td>crocket, watch Clojure Inside Out, really :) i am also beginner and this video helped me more then anything else</td></tr>
+<tr id="t1043A" class="h r"><td><a href="#t1043A">10:43</a></td><td class="np">kwladyka</td><td>crocket, after that do <a href="http://www.4clojure.com/problems">http://www.4clojure.com/problems</a> - first i ignored it but later i found it is very usefull</td></tr>
+<tr id="t1043A" class="h"><td><a href="#t1043A">10:43</a></td><td class="nd">justin_smith</td><td>kwladyka: a) how would lein ring server make this different? b) consider not using lein ring server unless you are deploying to a container like beanstalk</td></tr>
+<tr id="t1046A" class="h"><td><a href="#t1046A">10:46</a></td><td class="np">kwladyka</td><td>justin_smith, a) just i have to run this code to change the path, it is obviously how to do that with lein run in main function, but i don't know where to put this code when using lein ring server. b) so do you recommend use main and main-dev function and in main-dev function add middleware for ring to reaload code in each reload page instead of lein ring server?</td></tr>
+<tr id="t1047A" class="h"><td><a href="#t1047A">10:47</a></td><td class="nd">justin_smith</td><td>kwladyka: I'd recommend using the setup with makes things most seamless to transition to production.</td></tr>
+<tr id="t1047A" class="h"><td><a href="#t1047A">10:47</a></td><td class="np">kwladyka</td><td>justin_smith, because the main reason why i use lein ring server is reloading sources during development</td></tr>
+<tr id="t1047A" class="h"><td><a href="#t1047A">10:47</a></td><td class="nd">justin_smith</td><td>if you are not deploying to a container, better to use -main (launched from inside a repl) during development</td></tr>
+<tr id="t1047A" class="h r"><td><a href="#t1047A">10:47</a></td><td class="nd">justin_smith</td><td>wrap-reload is easy to add</td></tr>
+<tr id="t1544A"><td><a href="#t1544A">15:44</a></td><td class="nc">sdegutis</td><td>I'm just really surprised at the lack of anyone ever admitting or agreeing to admit that Clojure has some really dumb decisions.</td></tr>
+<tr id="t1545A" class="h"><td><a href="#t1545A">15:45</a></td><td class="nd">xemdetia</td><td>sdegutis, I think part of that is because it's a lisp</td></tr>
+<tr id="t1545A" class="h"><td><a href="#t1545A">15:45</a></td><td class="n9">TimMc</td><td>andyf_: And if serenity fails, there's always alter-var-root.</td></tr>
+<tr id="t1545A" class="h"><td><a href="#t1545A">15:45</a></td><td class="n0">andyf_</td><td>I've heard a few times that there are design decisions the core team has regretted, but don't have any links to examples.  I don't know whether the name of contains? is one of them.</td></tr>
+<tr id="t1546A" class="h"><td><a href="#t1546A">15:46</a></td><td class="nd">justin_smith</td><td>I think most of the big disappointments in clojure that people mention are disagreements on the efficiency/intuition balance, where almost always clojure is doing the more efficient or simpler to implement thing, and people are asking for the more intuitive thing</td></tr>
+<tr id="t1547A" class="h"><td><a href="#t1547A">15:47</a></td><td class="n0">andyf_</td><td>sdegutis: Wait, being on #clojure for more than a week, you _must_ see examples of people complaining about Clojure quirks all of the time.  How can you say that?</td></tr>
+<tr id="t1547A" class="h"><td><a href="#t1547A">15:47</a></td><td class="nd">justin_smith</td><td>andyf_: clearly he wants to see more complaining</td></tr>
+<tr id="t1548A" class="h"><td><a href="#t1548A">15:48</a></td><td class="nd">xemdetia</td><td>please add complain quota to topic</td></tr>
+<tr id="t1549A" class="h"><td><a href="#t1549A">15:49</a></td><td class="nc">sdegutis</td><td>andyf_: those are newcomers -- I'm talking about experienced Clojurians</td></tr>
+<tr id="t1549A" class="h"><td><a href="#t1549A">15:49</a></td><td class="n0">andyf_</td><td>sdegutis: amalloy, Bronsa, cemerick, hiredman, technomancy, how many examples do you want?</td></tr>
+<tr id="t1549A" class="h"><td><a href="#t1549A">15:49</a></td><td class="nc">sdegutis</td><td>andyf_: I'm just surprised old-timers actually *defend* dumb decisions in Clojure as much as they do.</td></tr>
+<tr id="t1550A" class="r"><td><a href="#t1550A">15:50</a></td><td class="nc">sdegutis</td><td>I haven't once seen any of them admit that something in Clojure is dumb.</td></tr>
+<tr id="t1550A" class="h"><td><a href="#t1550A">15:50</a></td><td class="n0">chouser</td><td>well, hang on. There's a difference between defending and explaining, though I can see they could be easily confused.</td></tr>
+<tr id="t1550A" class="h"><td><a href="#t1550A">15:50</a></td><td class="n0">andyf_</td><td>sdegutis: I don't know if they have used the word &quot;dumb&quot;, but they have plenty of criticism for aspects of Clojure</td></tr>
+<tr id="t1550A" class="h"><td><a href="#t1550A">15:50</a></td><td class="nc">sdegutis</td><td>that may be fair</td></tr>
+<tr id="t1551A" class="h"><td><a href="#t1551A">15:51</a></td><td class="nm">amalloy</td><td>sdegutis: i think someone on andyf_'s list complains about something in clojure like once a day</td></tr>
+<tr id="t1551A" class="h"><td><a href="#t1551A">15:51</a></td><td class="n0">chouser</td><td>sdegutis: &quot;What sucks about Clojure&quot; -- an accepted talk by cemerick at Clojure/West 2012</td></tr>
+<tr id="t1551A" class="h"><td><a href="#t1551A">15:51</a></td><td class="nd">justin_smith</td><td>andyf_: I'd add ambrosebs to that list too, he has some very good criticisms. arrdem has some similarly motivated ones.</td></tr>
+<tr id="t1551A" class="h"><td><a href="#t1551A">15:51</a></td><td class="n0">chouser</td><td>...though his list was pretty different from what mine would have been.</td></tr>
+<tr id="t1552A" class="h"><td><a href="#t1552A">15:52</a></td><td class="n0">andyf_</td><td>justin_smith: I knew I was not being exhaustive.  That just spurted out without my having to think about it :)</td></tr>
+<tr id="t1552A" class="h"><td><a href="#t1552A">15:52</a></td><td class="nc">sdegutis</td><td>maybe I'm just on IRC at all the wrong times</td></tr>
+<tr id="t1552A" class="h"><td><a href="#t1552A">15:52</a></td><td class="nd">justin_smith</td><td>andyf_: not correcting you, just wanted to mention some other notables</td></tr>
+<tr id="t1552A" class="h"><td><a href="#t1552A">15:52</a></td><td class="nc">Bronsa</td><td>sdegutis: I don't defend decisions at all. you'll often see me complaining about stuff i don't like about clojure</td></tr>
+<tr id="t1552A" class="h"><td><a href="#t1552A">15:52</a></td><td class="nd">justin_smith</td><td>sdegutis: a bunch of this is happening on twitter, technomancy isn't even in this channel any more</td></tr>
+<tr id="t1553A" class="h"><td><a href="#t1553A">15:53</a></td><td class="n0">andyf_</td><td>sdegutis: Complaining about what you don't like only gets you so far (and it isn't very far).</td></tr>
+<tr id="t1554A" class="h"><td><a href="#t1554A">15:54</a></td><td class="nd">justin_smith</td><td>sdegutis: there's a difference between accepting that &quot;contains?&quot; ends up being misleading, and the expectation that &quot;contains?&quot; would ever change. This is a language that values backward compatibility very highly.</td></tr>
+<tr id="t1554A" class="h"><td><a href="#t1554A">15:54</a></td><td class="n0">andyf_</td><td>I'll agree, contains? is a name that misleads many people, and in hindsight, if I had designed Clojure, I would have picked a different name.  But inside that statement I intentionally put a very misleading suggestion: I could _not_ have designed Clojure anywhere near as well as it was.</td></tr>
+<tr id="t1555A" class="h r"><td><a href="#t1555A">15:55</a></td><td class="n0">andyf_</td><td>And I like it so well in spite of any criticisms, that it is my preferred language for hobby programming.</td></tr>
+<tr id="t1556A" class="h"><td><a href="#t1556A">15:56</a></td><td class="nc">sdegutis</td><td>justin_smith: I guess that makes sense. Though it would make way more sense if clojure.core was released separately from the Clojure compiler.</td></tr>
+<tr id="t1556A" class="h"><td><a href="#t1556A">15:56</a></td><td class="nd">justin_smith</td><td>sdegutis: explain?</td></tr>
+<tr id="t1557A" class="h"><td><a href="#t1557A">15:57</a></td><td class="nc">sdegutis</td><td>Then the core lib wouldn't have to worry so much about backwards compatibility. People could upgrade to Clojure 1.8 and it would have so many cool new compiler thingies, but still be on clojure.core 1.5 because they can't upgrade to 1.6 or anything.</td></tr>
+<tr id="t1557A" class="h"><td><a href="#t1557A">15:57</a></td><td class="nn">ToxicFrog</td><td>andyf_: what would you have named contains?</td></tr>
+<tr id="t1557A" class="h"><td><a href="#t1557A">15:57</a></td><td class="nd">justin_smith</td><td>I would name it has-key?</td></tr>
+<tr id="t1558A" class="h r"><td><a href="#t1558A">15:58</a></td><td class="nd">justin_smith</td><td>since it only applies to associative lookup</td></tr>
+<tr id="t1558A" class="h"><td><a href="#t1558A">15:58</a></td><td class="nc">sdegutis</td><td>has-key? is so intuitive</td></tr>
+<tr id="t1558A" class="h r"><td><a href="#t1558A">15:58</a></td><td class="nc">sdegutis</td><td>yes, very yes.</td></tr>
+<tr id="t1558A" class="h r"><td><a href="#t1558A">15:58</a></td><td class="nc">sdegutis</td><td>contains? would then be for any kind of collection loojup</td></tr>
+<tr id="t1558A" class="h r"><td><a href="#t1558A">15:58</a></td><td class="nc">sdegutis</td><td>oh man, I vote justin_smith as new BDFL</td></tr>
+<tr id="t1558A" class="h"><td><a href="#t1558A">15:58</a></td><td class="nd">justin_smith</td><td>lol, you would regret that</td></tr>
+<tr id="t1558A" class="h"><td><a href="#t1558A">15:58</a></td><td class="nc">sdegutis</td><td>nevar</td></tr>
+<tr id="t1558A" class="h"><td><a href="#t1558A">15:58</a></td><td class="n0">andyf_</td><td>ToxicFrog: OK, you caught me in a second misleading suggestion in my statement, which I did not intend when I wrote it.  I actually don't have any preferred name for contains?   I've heard has-key? suggested</td></tr>
+<tr id="t1558A" class="h"><td><a href="#t1558A">15:58</a></td><td class="nn">ToxicFrog</td><td>Heh.</td></tr>
+<tr id="t1559A" class="h"><td><a href="#t1559A">15:59</a></td><td class="n0">andyf_</td><td>(I've heard it suggested before justin_smith's statement above -- I wasn't reading while typing my last line :)</td></tr>
+<tr id="t1601A"><td><a href="#t1601A">16:01</a></td><td class="nd">justin_smith</td><td>andyf_: I often have no idea whether I am remembering something, vs. making something up, vs. simply being totally wrong</td></tr>
+<tr id="t1601A" class="h"><td><a href="#t1601A">16:01</a></td><td class="n0">andyf_</td><td>justin_smith: Welcome :)</td></tr>
+<tr id="t1603A" class="h r"><td><a href="#t1603A">16:03</a></td><td class="n0">andyf_</td><td>Anyone can be BDFL of their own language, even one very much like Clojure (as long as they release it under Clojure's EPL license if they rely on its code, and as long as they call it something besides Clojure)</td></tr>
+<tr id="t1603A" class="h r"><td><a href="#t1603A">16:03</a></td><td class="n0">andyf_</td><td>For very reasonable reasons, that doesn't happen all that often.</td></tr>
+<tr id="t1603A" class="h"><td><a href="#t1603A">16:03</a></td><td class="nc">sdegutis</td><td>lol &quot;reasonable reasons&quot;</td></tr>
+<tr id="t1603A" class="h"><td><a href="#t1603A">16:03</a></td><td class="nd">justin_smith</td><td>reminds me of andylisp - which was in many ways not very reasonable</td></tr>
+<tr id="t1603A" class="h"><td><a href="#t1603A">16:03</a></td><td class="nc">sdegutis</td><td>oh English, go home, you're drunk</td></tr>
+<tr id="t1604A" class="h r"><td><a href="#t1604A">16:04</a></td><td class="nc">sdegutis</td><td>I once wrote a Lisp in C. It was not very fun. C is not very good.</td></tr>
+<tr id="t1604A" class="h"><td><a href="#t1604A">16:04</a></td><td class="n0">puredanger</td><td>I'm happy to admit that there are many things I find to be annoying or unfortunate in Clojure</td></tr>
+<tr id="t1604A" class="h"><td><a href="#t1604A">16:04</a></td><td class="nc">sdegutis</td><td>I would rewrite it but I can't think of a decent language to rewrite it in.</td></tr>
+<tr id="t1604A" class="h"><td><a href="#t1604A">16:04</a></td><td class="n0">Chauncey</td><td>Writing a scheme in haskell is a lot of fun though :)</td></tr>
+<tr id="t1604A" class="h"><td><a href="#t1604A">16:04</a></td><td class="n0">puredanger</td><td>But I have found that to be true of every lang I've ever</td></tr>
+<tr id="t1604A" class="h r"><td><a href="#t1604A">16:04</a></td><td class="n0">puredanger</td><td>used</td></tr>
+<tr id="t1605A" class="h"><td><a href="#t1605A">16:05</a></td><td class="n0">Chauncey</td><td>puredanger: yes, I feel the same way. Clojure's ups far outweigh the downs though</td></tr>
+<tr id="t1605A" class="h"><td><a href="#t1605A">16:05</a></td><td class="nc">sdegutis</td><td>Chauncey: no, the whole experience from beginning to end would be embittered with the sober realization that there are always going to be much smarter ways of writing it than you (general you) currently are</td></tr>
+<tr id="t1605A" class="h"><td><a href="#t1605A">16:05</a></td><td class="n0">puredanger</td><td>I once told Rich that Clojure was the least worst language Id ever used and he took it as the compliment it was</td></tr>
+<tr id="t1606A" class="h"><td><a href="#t1606A">16:06</a></td><td class="n0">Chauncey</td><td>sdegutis: haha, that is very true</td></tr>
+<tr id="t1606A" class="h r"><td><a href="#t1606A">16:06</a></td><td class="n0">Chauncey</td><td>puredanger: well put ;)</td></tr>
+<tr id="t1606A" class="h"><td><a href="#t1606A">16:06</a></td><td class="nc">sdegutis</td><td>I'm starting to think I may be disillusioned.</td></tr>
+<tr id="t1607A" class="h"><td><a href="#t1607A">16:07</a></td><td class="nd">justin_smith</td><td>sdegutis: you're always looking for the shortcut that will fix all your code problems</td></tr>
+<tr id="t1607A" class="h r"><td><a href="#t1607A">16:07</a></td><td class="nd">justin_smith</td><td>a decent amount of that is good - you don't get trapped with bad tools</td></tr>
+<tr id="t1607A" class="h"><td><a href="#t1607A">16:07</a></td><td class="n0">andyf_</td><td>I am reminded of Weird Al Yankovic's song &quot;Close, but No Cigar&quot;.  I still chuckle every time I listen to that song.</td></tr>
+<tr id="t1607A" class="h"><td><a href="#t1607A">16:07</a></td><td class="nc">sdegutis</td><td>justin_smith: haha you sure? I'm using a testing framework whose auto-rerun feature is so broken that even though I still use it, I have to restart the process every time I make a change</td></tr>
+<tr id="t1608A" class="h r"><td><a href="#t1608A">16:08</a></td><td class="nc">sdegutis</td><td>which reminds me</td></tr>
+<tr id="t1608A" class="h r"><td><a href="#t1608A">16:08</a></td><td class="nc">sdegutis</td><td>What are the modern testing framework choices? Have they changed at all since 2013?</td></tr>
+<tr id="t1608A" class="h r"><td><a href="#t1608A">16:08</a></td><td class="nc">sdegutis</td><td>(or have the existing choices improved significantly?)</td></tr>
+<tr id="t1608A" class="h"><td><a href="#t1608A">16:08</a></td><td class="nc">hellofunk</td><td> near beginning of Joy of Clojure, it is said that Om is inspired by ideas of Brett Victor and Alan Kay. Does anyone know more specifically what ideas?</td></tr>
+<tr id="t1608A" class="h"><td><a href="#t1608A">16:08</a></td><td class="n0">andyf_</td><td>clojure.test Midje expectations are the main ones I know about.  I've only used clojure.test</td></tr>
+<tr id="t1608A" class="h"><td><a href="#t1608A">16:08</a></td><td class="nc">sdegutis</td><td>hellofunk: there's a video of a talk by brett victor, watch that</td></tr>
+<tr id="t1609A" class="h r"><td><a href="#t1609A">16:09</a></td><td class="nc">sdegutis</td><td>andyf_: ok</td></tr>
+<tr id="t1609A" class="h"><td><a href="#t1609A">16:09</a></td><td class="n0">andyf_</td><td>random generation of test cases via test.check may be new since 2013 in Clojure</td></tr>
+<tr id="t1610A"><td><a href="#t1610A">16:10</a></td><td class="nc">hellofunk</td><td>sdegutis: i've seen that famous video but am not convinced it is the idea mentioned in the text</td></tr>
+<tr id="t1610A" class="h"><td><a href="#t1610A">16:10</a></td><td class="nd">justin_smith</td><td>sdegutis: see, your attempt to contradict my point reinforced it. It's not a criticism, I just notice this theme in your questions here.</td></tr>
+<tr id="t1610A" class="h"><td><a href="#t1610A">16:10</a></td><td class="n0">andyf_</td><td>oh, and it isn't really so much the random generation that is cool there, but the automatic shrinking to find smaller failing test cases after it finds a big one.  But that was originated in Haskell.  Definitely worth reimplementing in every language, though.</td></tr>
+<tr id="t1614A" class="h"><td><a href="#t1614A">16:14</a></td><td class="nc">sdegutis</td><td>justin_smith: right on</td></tr>
+<tr id="t1615A" class="h r"><td><a href="#t1615A">16:15</a></td><td class="nc">sdegutis</td><td>justin_smith: the main cause of that theme is probably that I'm pretty much convinced at this point that Haskell solves most problems I have with Clojure, but my job is a Clojure app so I'm kind of left in a weird situation</td></tr>
+<tr id="t1615A" class="h"><td><a href="#t1615A">16:15</a></td><td class="nd">justin_smith</td><td>cue clojure the infomercial - sdegutis fumbles with his keyboard, looks imploringly at the camera &quot;there has to be a better way!&quot;</td></tr>
+<tr id="t1615A" class="h"><td><a href="#t1615A">16:15</a></td><td class="nc">sdegutis</td><td>hahah</td></tr>
+<tr id="t1615A" class="h"><td><a href="#t1615A">16:15</a></td><td class="nd">justin_smith</td><td>haha, maybe haskell the infomercial then</td></tr>
+<tr id="t1616A" class="h"><td><a href="#t1616A">16:16</a></td><td class="nc">sdegutis</td><td>But I also have no plan to start trying to convince everyone else that Clojure sucks and that we should all be using Haskell -- that won't get me any closer to using Haskell at work.</td></tr>
+<tr id="t1616A" class="h r"><td><a href="#t1616A">16:16</a></td><td class="nc">sdegutis</td><td>So I'm just sort of.. in this weird middle place.</td></tr>
+<tr id="t1617A" class="h"><td><a href="#t1617A">16:17</a></td><td class="nd">justin_smith</td><td>sdegutis: but that would get you invited to the bitemyapp social club</td></tr>
+<tr id="t1617A" class="h"><td><a href="#t1617A">16:17</a></td><td class="nv">jtmarmon</td><td>in a tangentially related vein: does dealing with s-expressions get less annoying over time or is it always kind of a pain in the ass</td></tr>
+<tr id="t1617A" class="h"><td><a href="#t1617A">16:17</a></td><td class="nc">sdegutis</td><td>justin_smith: there's no reason to bring up He Who Shall Not Be Named</td></tr>
+<tr id="t1618A" class="h"><td><a href="#t1618A">16:18</a></td><td class="nd">justin_smith</td><td>jtmarmon: for me they just disappeared eventually (I mean of course I still interact with them, but they are not the main thing I see in the code)</td></tr>
+<tr id="t1618A" class="h"><td><a href="#t1618A">16:18</a></td><td class="n0">andyf_</td><td>bitemyapp is another nick for callen, I think, for whom the rule of 'no proselytizing Haskell except from hours X to Y' was in the #clojure IRC banner for months?</td></tr>
+<tr id="t1618A" class="h"><td><a href="#t1618A">16:18</a></td><td class="n0">j-pb</td><td>jtmarmon: the quote is &quot;once you don't see the parenthesis anymore you have attained the true enlightenement of lisp&quot;</td></tr>
+<tr id="t1618A" class="h"><td><a href="#t1618A">16:18</a></td><td class="nv">jtmarmon</td><td>i don't find them distracting in terms of reading, but in terms of fluidity of editing i still find it quite distracting</td></tr>
+<tr id="t1618A" class="h"><td><a href="#t1618A">16:18</a></td><td class="nb">brainproxy</td><td>jtmarmon: an editor w/ proper s-expressions support should take most of the pain away</td></tr>
+<tr id="t1619A" class="h"><td><a href="#t1619A">16:19</a></td><td class="nd">justin_smith</td><td>andyf_: yeah</td></tr>
+<tr id="t1619A" class="h"><td><a href="#t1619A">16:19</a></td><td class="nc">sdegutis</td><td>My only hope is to eventually demo a web app to our CTO with some convincing Haskell coolities.</td></tr>
+<tr id="t1619A" class="h"><td><a href="#t1619A">16:19</a></td><td class="nd">justin_smith</td><td>jtmarmon: paredit (or some workalike) helps a lot with that</td></tr>
+<tr id="t1619A" class="h"><td><a href="#t1619A">16:19</a></td><td class="nb">brainproxy</td><td>jtmarmon: for emacs, that means enabling paredit or smartparens</td></tr>
+<tr id="t1619A" class="h"><td><a href="#t1619A">16:19</a></td><td class="nc">sdegutis</td><td>But Haskell is way hard to learn. I haven't mastered more than just the maybe monad yet. (All puns intended.)</td></tr>
+<tr id="t1619A" class="h"><td><a href="#t1619A">16:19</a></td><td class="nb">brainproxy</td><td>or something similar</td></tr>
+<tr id="t1619A" class="h"><td><a href="#t1619A">16:19</a></td><td class="n0">j-pb</td><td>sdegutis justin_smith: clojure the infomertial would be the erlang video, but the guys are in hammocks</td></tr>
+<tr id="t1619A" class="h"><td><a href="#t1619A">16:19</a></td><td class="nv">jtmarmon</td><td>i just forced myself to switch to intellij from vim because of the clojure support</td></tr>
+<tr id="t1619A" class="h r"><td><a href="#t1619A">16:19</a></td><td class="nv">jtmarmon</td><td>so now it's doubly unnatural -_-</td></tr>
+<tr id="t1619A" class="h"><td><a href="#t1619A">16:19</a></td><td class="nc">hellofunk</td><td>jtmarmon: the parenthesis actually make editing much easier once you have an editor with something like emacs. you can move through blocks of code, shift large code segments around easily, because the parenthesis dictate the structure</td></tr>
+<tr id="t1620A" class="r"><td><a href="#t1620A">16:20</a></td><td class="nc">hellofunk</td><td>*paredit i meant, not *emacs</td></tr>
+<tr id="t1620A" class="h"><td><a href="#t1620A">16:20</a></td><td class="nv">jtmarmon</td><td>yeah cursive has great paredit support i just need to get used to it</td></tr>
+<tr id="t1620A" class="h r"><td><a href="#t1620A">16:20</a></td><td class="nv">jtmarmon</td><td>soon^(TM)</td></tr>
+<tr id="t1620A" class="h"><td><a href="#t1620A">16:20</a></td><td class="nb">brainproxy</td><td>jtmarmon: looks like the Cursive Clojure plugin for IntelliJ supports paredit-like editing: <a href="https://cursiveclojure.com/userguide/paredit.html">https://cursiveclojure.com/userguide/paredit.html</a></td></tr>
+<tr id="t1620A" class="h"><td><a href="#t1620A">16:20</a></td><td class="nv">jtmarmon</td><td>^^</td></tr>
+<tr id="t1620A" class="h"><td><a href="#t1620A">16:20</a></td><td class="nc">sdegutis</td><td>im using emacs + paredit -- it gets the job done</td></tr>
+<tr id="t1621A" class="h"><td><a href="#t1621A">16:21</a></td><td class="nb">brainproxy</td><td>okay nvm :)</td></tr>
+<tr id="t1621A" class="h"><td><a href="#t1621A">16:21</a></td><td class="nv">jtmarmon</td><td>;)</td></tr>
+<tr id="t1621A" class="h r"><td><a href="#t1621A">16:21</a></td><td class="nv">jtmarmon</td><td>it definitely feels nice being on intellij after dealing w/ firelpace</td></tr>
+<tr id="t1621A" class="h r"><td><a href="#t1621A">16:21</a></td><td class="nv">jtmarmon</td><td>fireplace just feels so haphazard</td></tr>
+<tr id="t1621A" class="h"><td><a href="#t1621A">16:21</a></td><td class="nc">hellofunk</td><td>jtmarmon: i actually use paredit 90% for code navigation, and only 10% for actual parenthesis *editing*. it's great to move through code one form at a time, cut and paste adjacent forms, etc</td></tr>
+<tr id="t1622A" class="h"><td><a href="#t1622A">16:22</a></td><td class="nb">brainproxy</td><td>does anyone keep a list of their favorite, recorded presentations on Clojure; I'll be doing one this September, would like to do a really great job, need inpsiration</td></tr>
+<tr id="t1623A" class="h"><td><a href="#t1623A">16:23</a></td><td class="nv">jtmarmon</td><td>favorite in what sense? some are just entertaining</td></tr>
+<tr id="t1623A" class="h r"><td><a href="#t1623A">16:23</a></td><td class="nv">jtmarmon</td><td>like the chickens one</td></tr>
+<tr id="t1623A" class="h"><td><a href="#t1623A">16:23</a></td><td class="nb">brainproxy</td><td>yeah, I should have been more specific</td></tr>
+<tr id="t1623A" class="h"><td><a href="#t1623A">16:23</a></td><td class="ns">thedoodPL</td><td>do you prefer cursive over la clojure?</td></tr>
+<tr id="t1623A" class="h"><td><a href="#t1623A">16:23</a></td><td class="nv">jtmarmon</td><td>thedoodPL: haven't tried la clojure. not actually sure what the differences are? how do you like la clojure?</td></tr>
+<tr id="t1623A" class="h"><td><a href="#t1623A">16:23</a></td><td class="nb">brainproxy</td><td>in this case, I'll be doing a bit of a deep dive into a topic, related to transducers</td></tr>
+<tr id="t1624A" class="h r"><td><a href="#t1624A">16:24</a></td><td class="nb">brainproxy</td><td>so it would be good to take some inspiration from presentations that do a good job in that vein</td></tr>
+<tr id="t1625A" class="h r"><td><a href="#t1625A">16:25</a></td><td class="nb">brainproxy</td><td>that is, a deep dive into Clojure code, without the slides and live-coding turning into a hot mess of ideas</td></tr>
+<tr id="t1626A" class="h"><td><a href="#t1626A">16:26</a></td><td class="nv">jtmarmon</td><td>great code focused explanation of debugging in cursive: <a href="https://www.youtube.com/watch?v=ql77RwhcCK0">https://www.youtube.com/watch?v=ql77RwhcCK0</a> | awesome walk through of generative testing by pivotal  <a href="https://www.youtube.com/watch?v=HXGpBrmR70U">https://www.youtube.com/watch?v=HXGpBrmR70U</a> | prismatic's API framework talk <a href="https://www.youtube.com/watch?v=VEDLSvSSMSk">https://www.youtube.com/watch?v=VEDLSvSSMSk</a> | not so deep divey but good: <a href="https://www.youtube.com/watch?v=vLlbEZt-3j0">https://www.youtube.com/watch?v=vLlbEZt-3j0</a> |</td></tr>
+<tr id="t1626A" class="h"><td><a href="#t1626A">16:26</a></td><td class="nb">brainproxy</td><td>jtmarmon: thank you!</td></tr>
+<tr id="t1627A" class="h"><td><a href="#t1627A">16:27</a></td><td class="nv">jtmarmon</td><td>np :) looking for another few</td></tr>
+<tr id="t1638A"><td><a href="#t1638A">16:38</a></td><td class="nc">sdegutis</td><td>hi</td></tr>
+<tr id="t1638A" class="h r"><td><a href="#t1638A">16:38</a></td><td class="nc">sdegutis</td><td>my test suite is restarting</td></tr>
+<tr id="t1638A" class="h r"><td><a href="#t1638A">16:38</a></td><td class="nc">sdegutis</td><td>figured id stop by and see whats up while all my tests run again</td></tr>
+<tr id="t1638A" class="h r"><td><a href="#t1638A">16:38</a></td><td class="nc">sdegutis</td><td>brb tests finished running</td></tr>
+<tr id="t1639A" class="h r"><td><a href="#t1639A">16:39</a></td><td class="nc">sdegutis</td><td>ok back</td></tr>
+<tr id="t1639A" class="h"><td><a href="#t1639A">16:39</a></td><td class="nd">justin_smith</td><td>sdegutis: have you tried using clojure.tools.namspace.repl/refresh in between test runs?</td></tr>
+<tr id="t1639A" class="h"><td><a href="#t1639A">16:39</a></td><td class="nc">sdegutis</td><td>so whats your favorite new Clojure feature?</td></tr>
+<tr id="t1639A" class="h r"><td><a href="#t1639A">16:39</a></td><td class="nc">sdegutis</td><td>justin_smith: I don't think Speclj has a place to inject that</td></tr>
+<tr id="t1639A" class="h"><td><a href="#t1639A">16:39</a></td><td class="nd">justin_smith</td><td>sdegutis: well, it would likely involve running the tests from a repl, but this should be possible</td></tr>
+<tr id="t1640A"><td><a href="#t1640A">16:40</a></td><td class="nc">sdegutis</td><td>ah not a bad idea</td></tr>
+<tr id="t1641A" class="h"><td><a href="#t1641A">16:41</a></td><td class="nd">justin_smith</td><td>sdegutis: my favorite innovation test wise lately was making a handler for my app under /test that would reload all relevant namespaces, run all backend tests and put the results in the page body, and run all frontend tests and put their results in the js console.</td></tr>
+<tr id="t1641A" class="h r"><td><a href="#t1641A">16:41</a></td><td class="nd">justin_smith</td><td>all triggered by page hit / browser refresh</td></tr>
+<tr id="t1641A" class="h"><td><a href="#t1641A">16:41</a></td><td class="nc">sdegutis</td><td>justin_smith: oh nice</td></tr>
+<tr id="t1641A" class="h"><td><a href="#t1641A">16:41</a></td><td class="nd">justin_smith</td><td>I need to make that into a lib</td></tr>
+<tr id="t1641A" class="h"><td><a href="#t1641A">16:41</a></td><td class="nc">sdegutis</td><td>yes plez</td></tr>
+<tr id="t1715A"><td><a href="#t1715A">17:15</a></td><td class="n8">arohner</td><td>I'm seeing `javax.net.ssl.SSLException: Received fatal alert: internal_error`. I remember java SSL generally being weak, is there like a better library I can use or something?</td></tr>
+<tr id="t1715A" class="h"><td><a href="#t1715A">17:15</a></td><td class="nd">justin_smith</td><td>arohner: weak, or just a total pain in the ass to use?</td></tr>
+<tr id="t1716A" class="h"><td><a href="#t1716A">17:16</a></td><td class="n8">arohner</td><td>true, take your pick</td></tr>
+<tr id="t1716A" class="h"><td><a href="#t1716A">17:16</a></td><td class="nd">justin_smith</td><td>arohner: I know a lot of people prefer to use nginx ssl, reverse proxying in front of their java server</td></tr>
+<tr id="t1716A" class="h"><td><a href="#t1716A">17:16</a></td><td class="n8">arohner</td><td>this is http client side</td></tr>
+<tr id="t1716A" class="h"><td><a href="#t1716A">17:16</a></td><td class="nd">justin_smith</td><td>oh, sorry</td></tr>
+<tr id="t1716A" class="h"><td><a href="#t1716A">17:16</a></td><td class="n8">arohner</td><td>requesting a page on the internet, I have no idea how their SSL is configured, but I can't connect to it</td></tr>
+<tr id="t1717A" class="h r"><td><a href="#t1717A">17:17</a></td><td class="n8">arohner</td><td>I should have been more clear</td></tr>
+<tr id="t1717A" class="h r"><td><a href="#t1717A">17:17</a></td><td class="n8">arohner</td><td>most sites work, but I don't know what is wrong with this one</td></tr>
+<tr id="t1718A" class="h"><td><a href="#t1718A">17:18</a></td><td class="nd">justin_smith</td><td>arohner: maybe try a verbose curl to the same url, see if there is anything odd in the output?</td></tr>
+<tr id="t1718A" class="h"><td><a href="#t1718A">17:18</a></td><td class="nb">cfleming</td><td>jtmarmon thedoodPL: La Clojure is semi-officially deprecated now in favour of Cursive - it's not actively developed</td></tr>
+<tr id="t1718A" class="h"><td><a href="#t1718A">17:18</a></td><td class="nv">jtmarmon</td><td>ah got it</td></tr>
+<tr id="t1718A" class="h r"><td><a href="#t1718A">17:18</a></td><td class="nv">jtmarmon</td><td>woot cursive</td></tr>
+<tr id="t1718A" class="h"><td><a href="#t1718A">17:18</a></td><td class="n8">arohner</td><td>justin_smith: good idea. interesting: curl: (35) Cannot communicate securely with peer: no common encryption algorithm(s).</td></tr>
+<tr id="t1719A" class="h r"><td><a href="#t1719A">17:19</a></td><td class="n8">arohner</td><td>I'm happy to write them off as broken</td></tr>
+<tr id="t1721A"><td><a href="#t1721A">17:21</a></td><td class="nc">sdegutis</td><td>anyone else stuck on a hard clojure problem?</td></tr>
+<tr id="t1721A" class="h r"><td><a href="#t1721A">17:21</a></td><td class="nc">sdegutis</td><td>thats why im here fo sho</td></tr>
+<tr id="t1722A" class="h"><td><a href="#t1722A">17:22</a></td><td class="nm">amalloy</td><td>cfleming: semi-officially, in that their competitor officially deprecates it, eh?</td></tr>
+<tr id="t1723A" class="h"><td><a href="#t1723A">17:23</a></td><td class="n0">andyf_</td><td>sdegutis: Wait, you mean you will write difficult Clojure code for us?  Without charging us?  I've got a to-do list here somewhere :-)</td></tr>
+<tr id="t1723A" class="h"><td><a href="#t1723A">17:23</a></td><td class="nc">sdegutis</td><td>hahahaha</td></tr>
+<tr id="t1723A" class="h r"><td><a href="#t1723A">17:23</a></td><td class="nc">sdegutis</td><td>but yes.</td></tr>
+<tr id="t1723A" class="h"><td><a href="#t1723A">17:23</a></td><td class="nr">oddcully</td><td>cfleming: grats!  but i have not lived to see the day la clojure working</td></tr>
+<tr id="t1730A"><td><a href="#t1730A">17:30</a></td><td class="n0">andyf_</td><td>sdegutis: So I'm trying to convince the Clojure maintainers to commit patches for some JIRA tickets ...</td></tr>
+<tr id="t1730A" class="h"><td><a href="#t1730A">17:30</a></td><td class="nc">sdegutis</td><td>andyf_: hahahhaha</td></tr>
+<tr id="t1731A" class="h r"><td><a href="#t1731A">17:31</a></td><td class="nc">sdegutis</td><td>andyf_: wait i dont get it</td></tr>
+<tr id="t1731A" class="h"><td><a href="#t1731A">17:31</a></td><td class="nm">amalloy</td><td>it was a good joke</td></tr>
+<tr id="t1731A" class="h"><td><a href="#t1731A">17:31</a></td><td class="n0">andyf_</td><td>I would classify that as a hard Clojure problem...</td></tr>
+<tr id="t1731A" class="h"><td><a href="#t1731A">17:31</a></td><td class="nc">sdegutis</td><td>oooh</td></tr>
+<tr id="t1731A" class="h r"><td><a href="#t1731A">17:31</a></td><td class="nc">sdegutis</td><td>andyf_: hahahahahhahahaha</td></tr>
+<tr id="t1732A" class="h r"><td><a href="#t1732A">17:32</a></td><td class="nc">sdegutis</td><td>why dont they just use github issues like normal humans?</td></tr>
+<tr id="t1732A" class="h"><td><a href="#t1732A">17:32</a></td><td class="n0">andyf_</td><td>So far, the only solution I've found is patience, which is easier if I work on other things.</td></tr>
+<tr id="t1732A" class="h r"><td><a href="#t1732A">17:32</a></td><td class="n0">andyf_</td><td>Workflow preference.</td></tr>
+<tr id="t1732A" class="h"><td><a href="#t1732A">17:32</a></td><td class="nc">sdegutis</td><td>that seems pretty counterproductive</td></tr>
+<tr id="t1733A" class="h r"><td><a href="#t1733A">17:33</a></td><td class="nc">sdegutis</td><td>also the requiring signatures from *all contributors* part</td></tr>
+<tr id="t1733A" class="h"><td><a href="#t1733A">17:33</a></td><td class="n0">andyf_</td><td>Last question on this page, come up many times before: <a href="http://dev.clojure.org/display/community/Contributing+FAQ">http://dev.clojure.org/display/community/Contributing+FAQ</a></td></tr>
+<tr id="t1733A" class="h r"><td><a href="#t1733A">17:33</a></td><td class="n0">andyf_</td><td>Whoever starts an open source project gets to pick the work flow.  I deal with it.</td></tr>
+<tr id="t1733A" class="h"><td><a href="#t1733A">17:33</a></td><td class="nc">sdegutis</td><td>&quot;To protect Clojure from future legal challenges that might discourage businesses from adopting it.&quot; - does Ruby or Rails have a similar CA?</td></tr>
+<tr id="t1733A" class="h r"><td><a href="#t1733A">17:33</a></td><td class="nc">sdegutis</td><td>serious question</td></tr>
+<tr id="t1734A" class="h r"><td><a href="#t1734A">17:34</a></td><td class="nc">sdegutis</td><td>&quot;To enable Clojure to be relicensed under a different open-source license if that would be advantageous.&quot; -- more advantageous to all of us would probably be making it easier for anyone to contribute</td></tr>
+<tr id="t1734A" class="h r"><td><a href="#t1734A">17:34</a></td><td class="nc">sdegutis</td><td>this whole thing just feels too pretentious</td></tr>
+<tr id="t1735A" class="h r"><td><a href="#t1735A">17:35</a></td><td class="nc">sdegutis</td><td>but whatever, rich's choice</td></tr>
+<tr id="t1736A" class="h"><td><a href="#t1736A">17:36</a></td><td class="nc">prose</td><td>i created a little p ython util which took the clojure logo + clojure logo and made htis image (which I think is kind of cool)</td></tr>
+<tr id="t1736A" class="h r"><td><a href="#t1736A">17:36</a></td><td class="nc">prose</td><td><a href="http://i.imgur.com/o1IxPjV.jpg">http://i.imgur.com/o1IxPjV.jpg</a></td></tr>
+<tr id="t1736A" class="h r"><td><a href="#t1736A">17:36</a></td><td class="nc">prose</td><td>here is the util itse3lf if anyone wants it</td></tr>
+<tr id="t1736A" class="h r"><td><a href="#t1736A">17:36</a></td><td class="nc">prose</td><td><a href="https://github.com/aaron-lebo/prosterize">https://github.com/aaron-lebo/prosterize</a></td></tr>
+<tr id="t1740A"><td><a href="#t1740A">17:40</a></td><td class="nd">justin_smith</td><td>sdegutis: I've definitely seen issues where older open source projects are caught in a bind because the community wants to change license or offer a modified license to a commercial user, but they legally cannot do so unless and until they chase down every historical contributor and get their sign off</td></tr>
+<tr id="t1740A" class="h r"><td><a href="#t1740A">17:40</a></td><td class="nd">justin_smith</td><td>sdegutis: so this isn't an imaginary problem</td></tr>
+<tr id="t1741A" class="h r"><td><a href="#t1741A">17:41</a></td><td class="nd">justin_smith</td><td>when contributors do an official assignment of copyright, then the core team has more freedom</td></tr>
+<tr id="t1753A"><td><a href="#t1753A">17:53</a></td><td class="nc">sdegutis</td><td>meh</td></tr>
+<tr id="t1757A" class="h"><td><a href="#t1757A">17:57</a></td><td class="nx">jfacorro</td><td>hi all, I have a very basic question ClojureScript question, maybe someone here can help me out</td></tr>
+<tr id="t1757A" class="h r"><td><a href="#t1757A">17:57</a></td><td class="nx">jfacorro</td><td>I created a new project using the mies lein template</td></tr>
+<tr id="t1757A" class="h"><td><a href="#t1757A">17:57</a></td><td class="n0">wasamasa</td><td>if not, head over to #clojurescript</td></tr>
+<tr id="t1758A" class="h"><td><a href="#t1758A">17:58</a></td><td class="nx">jfacorro</td><td>wasamasa: good idea :P</td></tr>
+<tr id="t1801A"><td><a href="#t1801A">18:01</a></td><td class="n0">andyf_</td><td>sdegutis: A few dozen projects that have contributor agreements: <a href="http://en.wikipedia.org/wiki/Contributor_License_Agreement">http://en.wikipedia.org/wiki/Contributor_License_Agreement</a></td></tr>
+<tr id="t1804A" class="h r"><td><a href="#t1804A">18:04</a></td><td class="n0">andyf_</td><td>Ones on that list I've heard of: Python, Django, Chef, FSF, OpenStack, Puppet Labs</td></tr>
+<tr id="t1806A" class="h r"><td><a href="#t1806A">18:06</a></td><td class="n0">andyf_</td><td>sdegutis: Ruby Contributor Agreement: <a href="https://github.com/SciRuby/sciruby/wiki/Contributor-Agreement">https://github.com/SciRuby/sciruby/wiki/Contributor-Agreement</a>     Google did not help me find one for Rails, if one exists.</td></tr>
+<tr id="t1808A" class="h r"><td><a href="#t1808A">18:08</a></td><td class="n0">andyf_</td><td>Whoops, that was the SciRuby project, not Ruby the language itself.  I don't see that there is on for Ruby the language implementation.</td></tr>
+<tr id="t1808A" class="h"><td><a href="#t1808A">18:08</a></td><td class="nc">sdegutis</td><td>yay</td></tr>
+<tr id="t1827A"><td><a href="#t1827A">18:27</a></td><td class="nc">davidhq</td><td><a href="http://functionalslack.com">http://functionalslack.com</a> → Functional Programming Slack Community with focus on Clojure, Elixir and Haskell</td></tr>
+<tr id="t1834A"><td><a href="#t1834A">18:34</a></td><td class="nc">sdegutis</td><td>so tru</td></tr>
+<tr id="t1901A" class="r"><td><a href="#t1901A">19:01</a></td><td class="nc">sdegutis</td><td>hey does defmulti's dispatcher-fn only work on the first param?</td></tr>
+<tr id="t1904A" class="h"><td><a href="#t1904A">19:04</a></td><td class="n6">schmir</td><td>sdegutis: no</td></tr>
+<tr id="t1904A" class="h"><td><a href="#t1904A">19:04</a></td><td class="nc">sdegutis</td><td>great</td></tr>
+<tr id="t1905A" class="h r"><td><a href="#t1905A">19:05</a></td><td class="nc">sdegutis</td><td>the docstring of defmulti is completely silent about dispatch-fn</td></tr>
+<tr id="t1906A" class="h r"><td><a href="#t1906A">19:06</a></td><td class="nc">sdegutis</td><td>i guess its /just that intuitive/</td></tr>
+<tr id="t1908A" class="h"><td><a href="#t1908A">19:08</a></td><td class="nd">justin_smith</td><td>just general enough that there are not many constraints to describe</td></tr>
+<tr id="t1909A" class="h"><td><a href="#t1909A">19:09</a></td><td class="ns">thedoodPL</td><td>are there any &quot;must read&quot; clojure books like effective java and concurrency in practice in case of java?</td></tr>
+<tr id="t1909A" class="h"><td><a href="#t1909A">19:09</a></td><td class="nm">amalloy</td><td>justin_smith: proposed new defmulti doc: &quot;the dispatch function is a function. it can do things that functions do. this includes having arguments, performing logic, and returning a single value based on those things&quot;</td></tr>
+<tr id="t1911A"><td><a href="#t1911A">19:11</a></td><td class="nd">justin_smith</td><td>heh</td></tr>
+<tr id="t1912A" class="h r"><td><a href="#t1912A">19:12</a></td><td class="nd">justin_smith</td><td>(inc amalloy)</td></tr>
+<tr id="t1912A" class="h"><td><a href="#t1912A">19:12</a></td><td class="nx">lazybot</td><td>⇒ 275</td></tr>
+<tr id="t1919A" class="h"><td><a href="#t1919A">19:19</a></td><td class="nd">hiredman</td><td>docstrings should be able to enforce a pause</td></tr>
+<tr id="t1920A" class="r"><td><a href="#t1920A">19:20</a></td><td class="nd">hiredman</td><td>(doc defmulti) =&gt; &quot;the dispatch function is a function&quot; prints, the repl pauses for 10 minutes to make sure you read and think through the implications, then the rest of the docstring prints</td></tr>
+<tr id="t1920A" class="h"><td><a href="#t1920A">19:20</a></td><td class="nl">clojurebot</td><td>&quot;([name docstring? attr-map? dispatch-fn &amp; ...]); Creates a new multimethod with the associated dispatch function. The docstring and attr-map are optional. Options are key-value pairs and may be one of: :default The default dispatch value, defaults to :default :hierarchy The value used for hierarchical dispatch (e.g. ::square is-a ::shape) Hierarchies are type-like relationships that do not depend upon type inheritance. By default Clo</td></tr>
+<tr id="t1941A"><td><a href="#t1941A">19:41</a></td><td class="nf">travisrodman</td><td>is anyone aware of a function or library in clojure that would allow the consolidation, into a single form, of a chained call of function expressions?</td></tr>
+<tr id="t1944A" class="h"><td><a href="#t1944A">19:44</a></td><td class="nm">amalloy</td><td>travisrodman: that sounds like a single form already</td></tr>
+<tr id="t1944A" class="h"><td><a href="#t1944A">19:44</a></td><td class="nf">travisrodman</td><td>i.e, (fn1 ... (fn2 ... (fn3 ...))) =&gt; (fnew ...)</td></tr>
+<tr id="t1945A" class="h"><td><a href="#t1945A">19:45</a></td><td class="nm">amalloy</td><td>okay, so far that's -&gt;&gt;</td></tr>
+<tr id="t1945A" class="h"><td><a href="#t1945A">19:45</a></td><td class="nq">lumafi</td><td>comp?</td></tr>
+<tr id="t1945A" class="h"><td><a href="#t1945A">19:45</a></td><td class="nl">clojurebot</td><td>use comp for a point free, pointless style</td></tr>
+<tr id="t1945A" class="h"><td><a href="#t1945A">19:45</a></td><td class="nf">travisrodman</td><td>amalloy: more as a macro woould expand to final code, on source code...</td></tr>
+<tr id="t1945A" class="h r"><td><a href="#t1945A">19:45</a></td><td class="nf">travisrodman</td><td>not at execution time, I am looking for something as a refactoring tool</td></tr>
+<tr id="t1946A" class="h"><td><a href="#t1946A">19:46</a></td><td class="nm">amalloy</td><td>i think cursive will do that, and clj-refactor or whatever it was used to do that in slime</td></tr>
+<tr id="t1946A" class="h"><td><a href="#t1946A">19:46</a></td><td class="nf">travisrodman</td><td>so instead of a daisy-chain of many functions, the source would be read and consolidated into a single function</td></tr>
+<tr id="t1946A" class="h r"><td><a href="#t1946A">19:46</a></td><td class="nf">travisrodman</td><td>great, thanks, I will check them out.</td></tr>
+<tr id="t1946A" class="h"><td><a href="#t1946A">19:46</a></td><td class="nm">amalloy</td><td>travisrodman: i don't understand your goal. it seems weird</td></tr>
+<tr id="t1946A" class="h r"><td><a href="#t1946A">19:46</a></td><td class="nm">amalloy</td><td>i just mean that cursive would convert (f x (g y)) into (-&gt;&gt; y (g) (f x)) for you</td></tr>
+<tr id="t1947A" class="h r"><td><a href="#t1947A">19:47</a></td><td class="nm">amalloy</td><td>&quot;consolidated into a single function&quot; doens't make sense to me in this context</td></tr>
+<tr id="t1947A" class="h"><td><a href="#t1947A">19:47</a></td><td class="nf">travisrodman</td><td>amalloy: I have code, written by someone else that has a top-level pmap that is instantiating clojail sandboxes for every thread generated by pmap.</td></tr>
+<tr id="t1948A" class="h r"><td><a href="#t1948A">19:48</a></td><td class="nf">travisrodman</td><td>amalloy: what I would like to do is invert this code-calling structure and pass the data, in it's entirety, into the sandbox to optimize the calls</td></tr>
+<tr id="t1949A" class="h r"><td><a href="#t1949A">19:49</a></td><td class="nf">travisrodman</td><td>amalloy: there are ~4 transformations to the arguments from the initial call to the final sandboxing call, and if I could consolidate the logic via function definition replacement up the call chain to the top level call</td></tr>
+<tr id="t1949A" class="h r"><td><a href="#t1949A">19:49</a></td><td class="nf">travisrodman</td><td>amalloy: i can refactor that code more easily</td></tr>
+<tr id="t1950A" class="r"><td><a href="#t1950A">19:50</a></td><td class="nf">travisrodman</td><td>amalloy: i was hoping there was a more automated tool for that instead of doing it by hand</td></tr>
+<tr id="t1951A" class="h r"><td><a href="#t1951A">19:51</a></td><td class="nf">travisrodman</td><td>amalloy: good 'ol sicp style function replacement to ease refactoring</td></tr>
+<tr id="t1951A" class="h r"><td><a href="#t1951A">19:51</a></td><td class="nf">travisrodman</td><td>amalloy: any thoughts?</td></tr>
+<tr id="t1952A" class="h"><td><a href="#t1952A">19:52</a></td><td class="nm">amalloy</td><td>no, i still don't udnerstand what you are saying. &quot;consolidate via function definition replacement&quot; is mysterious</td></tr>
+<tr id="t1952A" class="h r"><td><a href="#t1952A">19:52</a></td><td class="nm">amalloy</td><td>like give an example of a simple version of what you want, done by hand</td></tr>
+<tr id="t1952A" class="h r"><td><a href="#t1952A">19:52</a></td><td class="nm">amalloy</td><td>and then maybe what you wish this tool will do would be clear</td></tr>
+<tr id="t1953A" class="h"><td><a href="#t1953A">19:53</a></td><td class="nf">travisrodman</td><td>amalloy: yeah, hang on a second, I will mock something up...</td></tr>
+<tr id="t1953A" class="h r"><td><a href="#t1953A">19:53</a></td><td class="nf">travisrodman</td><td>kj</td></tr>
+<tr id="t1953A" class="h r"><td><a href="#t1953A">19:53</a></td><td class="nf">travisrodman</td><td>oops, sorry wrong screen... vim commands</td></tr>
+<tr id="t1953A" class="h"><td><a href="#t1953A">19:53</a></td><td class="ne">it0a</td><td>:)</td></tr>
+<tr id="t1953A" class="h"><td><a href="#t1953A">19:53</a></td><td class="nm">amalloy</td><td>kj is a pretty useless vim command!</td></tr>
+<tr id="t1953A" class="h"><td><a href="#t1953A">19:53</a></td><td class="ne">it0a</td><td>probably his escape</td></tr>
+<tr id="t1954A" class="h"><td><a href="#t1954A">19:54</a></td><td class="nf">travisrodman</td><td>it lets me know where my cursor is, when I have 6 buffers open at the same time</td></tr>
+<tr id="t1958A" class="h"><td><a href="#t1958A">19:58</a></td><td class="n7">gfredericks</td><td>it's easier than my useless emacs command, C-p C-n</td></tr>
+<tr id="t1959A" class="h"><td><a href="#t1959A">19:59</a></td><td class="nf">travisrodman</td><td>gfredericks: right...</td></tr>
+<tr id="t1959A" class="h r"><td><a href="#t1959A">19:59</a></td><td class="nf">travisrodman</td><td>amalloy: (defn add [v1 v2] (+ v1 v2))</td></tr>
+<tr id="t1959A" class="h r"><td><a href="#t1959A">19:59</a></td><td class="nf">travisrodman</td><td>(defn sub [v1 v2] (- v1 v2))</td></tr>
+<tr id="t1959A" class="h r"><td><a href="#t1959A">19:59</a></td><td class="nf">travisrodman</td><td>(defn gen [     ] (rand-int 30))</td></tr>
+<tr id="t1959A" class="h r"><td><a href="#t1959A">19:59</a></td><td class="nf">travisrodman</td><td>(add (sub 1 (gen)) (add (gen) 2)) =&gt; (+ (- 1 (rand-int 30)) (+ (rand-int 30) 2))</td></tr>
+<tr id="t1959A" class="h r"><td><a href="#t1959A">19:59</a></td><td class="nf">travisrodman</td><td>amalloy: so something like that...</td></tr>
+<tr id="t2000A" class="r"><td><a href="#t2000A">20:00</a></td><td class="nf">travisrodman</td><td>amalloy: even in writing that, i could see that one of the requirements would be to only transform functions in my local code, not say, rand-int</td></tr>
+<tr id="t2000A" class="h"><td><a href="#t2000A">20:00</a></td><td class="nm">amalloy</td><td>so you are looking for a button to inline function calls</td></tr>
+<tr id="t2000A" class="h"><td><a href="#t2000A">20:00</a></td><td class="nf">travisrodman</td><td>amalloy: the idea being, i can now refactor the top-level function as a single form</td></tr>
+<tr id="t2000A" class="h r"><td><a href="#t2000A">20:00</a></td><td class="nf">travisrodman</td><td>yeah, basically</td></tr>
+<tr id="t2001A" class="h r"><td><a href="#t2001A">20:01</a></td><td class="nf">travisrodman</td><td>i would like to be able to pass it the form, and have them 'shallowed' so to speak.</td></tr>
+<tr id="t2001A" class="h"><td><a href="#t2001A">20:01</a></td><td class="nm">amalloy</td><td>i don't think that exists. i bet bronsa or ambrosebs could write it with tools.analyzer but it is not a trivial thing to do</td></tr>
+<tr id="t2002A" class="h"><td><a href="#t2002A">20:02</a></td><td class="nf">travisrodman</td><td>right... okay... I wrote an s-expression parser, perhaps I will sick it on that...</td></tr>
+<tr id="t2003A" class="h r"><td><a href="#t2003A">20:03</a></td><td class="nf">travisrodman</td><td>i could see it being a useful refactoring tool... reducing symbol trasformations and allowing easier restructuring...</td></tr>
+<tr id="t2003A" class="h r"><td><a href="#t2003A">20:03</a></td><td class="nf">travisrodman</td><td>thanks for the info.</td></tr>
+<tr id="t2006A" class="h r"><td><a href="#t2006A">20:06</a></td><td class="nf">travisrodman</td><td>amalloy: in conjunction with slamhound, would be a pretty nice refactor setup</td></tr>
+<tr id="t2006A" class="h r"><td><a href="#t2006A">20:06</a></td><td class="nf">travisrodman</td><td>amalloy: anyway... cheers man, thanks for the response.</td></tr>
+<tr id="t2006A" class="h r"><td><a href="#t2006A">20:06</a></td><td class="nf">travisrodman</td><td>it0a: i spot another vim user ;)</td></tr>
+<tr id="t2009A" class="h"><td><a href="#t2009A">20:09</a></td><td class="ne">it0a</td><td>travisrodman: hell yeah</td></tr>
+<tr id="t2009A" class="h"><td><a href="#t2009A">20:09</a></td><td class="nf">travisrodman</td><td>it0a: sweet!!</td></tr>
+<tr id="t2010A"><td><a href="#t2010A">20:10</a></td><td class="ne">it0a</td><td>travisrodman: i use emacs/evil for clojure though :P</td></tr>
+<tr id="t2010A" class="h"><td><a href="#t2010A">20:10</a></td><td class="nf">travisrodman</td><td>it0a: its alright... I won't hold it against you... ;)</td></tr>
+<tr id="t2026A"><td><a href="#t2026A">20:26</a></td><td class="nm">yedi</td><td>so whats up with this om next thing</td></tr>
+<tr id="t2129A"><td><a href="#t2129A">21:29</a></td><td class="nv">jtmarmon</td><td>why can't you flatten a set?</td></tr>
+<tr id="t2133A"><td><a href="#t2133A">21:33</a></td><td class="n7">gfredericks</td><td>~flatten</td></tr>
+<tr id="t2133A" class="h"><td><a href="#t2133A">21:33</a></td><td class="nl">clojurebot</td><td>flatten is rarely the right answer. Suppose you need to use a list as your &quot;base type&quot;, for example. Usually you only want to flatten a single level, and in that case you're better off with concat. Or, better still, use mapcat to produce a sequence that's shaped right to begin with.</td></tr>
+<tr id="t2133A" class="h"><td><a href="#t2133A">21:33</a></td><td class="n7">gfredericks</td><td>it should also mention tree-seq for the cases where you really do want general recursion</td></tr>
+<tr id="t2138A" class="h"><td><a href="#t2138A">21:38</a></td><td class="nv">jtmarmon</td><td>gfredericks: I just went with (-&gt;&gt; data (map first) (into #{})). why is flatten rarely the right answer? because it has to realize the whole sequence/</td></tr>
+<tr id="t2138A" class="h r"><td><a href="#t2138A">21:38</a></td><td class="nv">jtmarmon</td><td>?*</td></tr>
+<tr id="t2217A"><td><a href="#t2217A">22:17</a></td><td class="nd">TEttinger</td><td>jtmarmon:</td></tr>
+<tr id="t2217A" class="h r"><td><a href="#t2217A">22:17</a></td><td class="nd">TEttinger</td><td>~flatten</td></tr>
+<tr id="t2217A" class="h"><td><a href="#t2217A">22:17</a></td><td class="nl">clojurebot</td><td>flatten is rarely the right answer. Suppose you need to use a list as your &quot;base type&quot;, for example. Usually you only want to flatten a single level, and in that case you're better off with concat. Or, better still, use mapcat to produce a sequence that's shaped right to begin with.</td></tr>
+<tr id="t2217A" class="h"><td><a href="#t2217A">22:17</a></td><td class="nd">TEttinger</td><td>the main thing is it kills nesting</td></tr>
+<tr id="t2218A" class="h"><td><a href="#t2218A">22:18</a></td><td class="nv">jtmarmon</td><td>isn't killing nesting the point of flatten?</td></tr>
+<tr id="t2218A" class="h"><td><a href="#t2218A">22:18</a></td><td class="nd">TEttinger</td><td>you often don't want to kill all nesting</td></tr>
+<tr id="t2219A" class="h"><td><a href="#t2219A">22:19</a></td><td class="nv">jtmarmon</td><td>but isn't mapcat going to do the same thing</td></tr>
+<tr id="t2219A" class="h"><td><a href="#t2219A">22:19</a></td><td class="nd">TEttinger</td><td>no</td></tr>
+<tr id="t2220A" class="r"><td><a href="#t2220A">22:20</a></td><td class="nd">TEttinger</td><td>,(let [coll [1 2 3 [10 20] 4] ] (mapcat #(vector % %) coll))</td></tr>
+<tr id="t2220A" class="h"><td><a href="#t2220A">22:20</a></td><td class="nl">clojurebot</td><td>(1 1 2 2 3 ...)</td></tr>
+<tr id="t2220A" class="h"><td><a href="#t2220A">22:20</a></td><td class="nd">TEttinger</td><td>&amp;(let [coll [1 2 3 [10 20] 4] ] (mapcat #(vector % %) coll))</td></tr>
+<tr id="t2220A" class="h r"><td><a href="#t2220A">22:20</a></td><td class="nd">TEttinger</td><td>lazybot dead!</td></tr>
+<tr id="t2220A" class="h"><td><a href="#t2220A">22:20</a></td><td class="nv">jtmarmon</td><td>RIP</td></tr>
+<tr id="t2220A" class="h r"><td><a href="#t2220A">22:20</a></td><td class="nv">jtmarmon</td><td>i see what you mean though, @TEttinger</td></tr>
+<tr id="t2220A" class="h"><td><a href="#t2220A">22:20</a></td><td class="nd">TEttinger</td><td>,(clojure.string/join &quot; &quot; (let [coll [1 2 3 [10 20] 4] ] (mapcat #(vector % %) coll)) )</td></tr>
+<tr id="t2220A" class="h"><td><a href="#t2220A">22:20</a></td><td class="nl">clojurebot</td><td>&quot;1 1 2 2 3 3 [10 20] [10 20] 4 4&quot;</td></tr>
+<tr id="t2221A" class="h"><td><a href="#t2221A">22:21</a></td><td class="nv">jtmarmon</td><td>right, got it.</td></tr>
+<tr id="t2221A" class="h r"><td><a href="#t2221A">22:21</a></td><td class="nv">jtmarmon</td><td>ty</td></tr>
+<tr id="t2221A" class="h"><td><a href="#t2221A">22:21</a></td><td class="nd">TEttinger</td><td>,(clojure.string/join &quot; &quot; (let [coll [1 2 3 [10 20] 4] ] (map #(vector % %) (flatten coll))) )</td></tr>
+<tr id="t2221A" class="h"><td><a href="#t2221A">22:21</a></td><td class="nl">clojurebot</td><td>&quot;[1 1] [2 2] [3 3] [10 10] [20 20] [4 4]&quot;</td></tr>
+<tr id="t2221A" class="h"><td><a href="#t2221A">22:21</a></td><td class="nd">TEttinger</td><td>sorry had to finish it</td></tr>
+<tr id="t2221A" class="h r"><td><a href="#t2221A">22:21</a></td><td class="nd">TEttinger</td><td>or!</td></tr>
+<tr id="t2221A" class="h"><td><a href="#t2221A">22:21</a></td><td class="nv">jtmarmon</td><td>fatal error: clojurebot has missed a heartbaet</td></tr>
+<tr id="t2221A" class="h"><td><a href="#t2221A">22:21</a></td><td class="nd">TEttinger</td><td>,(clojure.string/join &quot; &quot; (let [coll [1 2 3 [10 20] 4] ]  (flatten (map #(vector % %) coll))) )</td></tr>
+<tr id="t2221A" class="h"><td><a href="#t2221A">22:21</a></td><td class="nl">clojurebot</td><td>&quot;1 1 2 2 3 3 10 20 10 20 4 4&quot;</td></tr>
+<tr id="t2221A" class="h"><td><a href="#t2221A">22:21</a></td><td class="nv">jtmarmon</td><td>flatten is never the answer kids</td></tr>
+<tr id="t2222A" class="h r"><td><a href="#t2222A">22:22</a></td><td class="nv">jtmarmon</td><td>don't do flatten.</td></tr>
+<tr id="t2222A" class="h"><td><a href="#t2222A">22:22</a></td><td class="nd">TEttinger</td><td>hehe</td></tr>
+<tr id="t2222A" class="h r"><td><a href="#t2222A">22:22</a></td><td class="nd">TEttinger</td><td>it sometimes is!</td></tr>
+<tr id="t2222A" class="h r"><td><a href="#t2222A">22:22</a></td><td class="nd">TEttinger</td><td>golf benefits from it</td></tr>
+<tr id="t2222A" class="h r"><td><a href="#t2222A">22:22</a></td><td class="nd">TEttinger</td><td>code golf!</td></tr>
+<tr id="t2222A" class="h"><td><a href="#t2222A">22:22</a></td><td class="nv">jtmarmon</td><td>and pancakes</td></tr>
+<tr id="t2334A"><td><a href="#t2334A">23:34</a></td><td class="na">rvxi</td><td>hi</td></tr>
+<tr id="t2346A"><td><a href="#t2346A">23:46</a></td><td class="nr">escherize</td><td>hey rxvi</td></tr>
+<tr id="t2346A" class="h r"><td><a href="#t2346A">23:46</a></td><td class="nr">escherize</td><td>So I had a weekend project that I've finished</td></tr>
+<tr id="t2346A" class="h r"><td><a href="#t2346A">23:46</a></td><td class="nr">escherize</td><td>well, finished for now.. <a href="http://hiccup.space">http://hiccup.space</a></td></tr>
+<tr id="t2347A" class="h r"><td><a href="#t2347A">23:47</a></td><td class="nr">escherize</td><td>I'd love to get some feedback (it takes a while to load.)</td></tr>
+<tr id="t2351A"><td><a href="#t2351A">23:51</a></td><td class="nm">dumptruckman</td><td>hello</td></tr>
+<tr id="t2351A" class="h"><td><a href="#t2351A">23:51</a></td><td class="nu">randomcharhere</td><td>prints &lt;h1&gt;Welcome to hiccup.space&lt;/h1&gt; to the left?</td></tr>
+<tr id="t2352A" class="h r"><td><a href="#t2352A">23:52</a></td><td class="nu">randomcharhere</td><td>eeerrr right :P</td></tr>
+<tr id="t2353A" class="h"><td><a href="#t2353A">23:53</a></td><td class="nm">dumptruckman</td><td>i'm trying to comprehend how to manage state in a game</td></tr>
+<tr id="t2353A" class="h r"><td><a href="#t2353A">23:53</a></td><td class="nm">dumptruckman</td><td>it kinda seems like i'm gonna have one big super object that i pass around to all my functions and return a modified version of</td></tr>
+<tr id="t2354A" class="h r"><td><a href="#t2354A">23:54</a></td><td class="nm">dumptruckman</td><td>not object</td></tr>
+<tr id="t2354A" class="h r"><td><a href="#t2354A">23:54</a></td><td class="nm">dumptruckman</td><td>a map or w/e</td></tr>
+<tr id="t2354A" class="h r"><td><a href="#t2354A">23:54</a></td><td class="nm">dumptruckman</td><td>it feels like not the right way to do things but i can't really think of a better way</td></tr>
+<tr id="t2355A" class="h r"><td><a href="#t2355A">23:55</a></td><td class="nm">dumptruckman</td><td>that map being basically the entire game state</td></tr>
+<tr id="t2356A" class="h r"><td><a href="#t2356A">23:56</a></td><td class="nm">dumptruckman</td><td>any advice?</td></tr>
+<tr id="t2359A" class="h"><td><a href="#t2359A">23:59</a></td><td class="nu">randomcharhere</td><td>still learning clojure :P seems like no ones awake ?</td></tr>
+</tbody></table></main></body></html>

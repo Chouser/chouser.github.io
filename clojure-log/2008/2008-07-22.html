@@ -1,0 +1,331 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#clojure – 2008-07-22</title><link rel="stylesheet" href="../style.css"></head><body>
+<header class="sh"><a class="st" href="../index.html">#clojure logs</a><nav class="dn"><a href="2008-07-21.html">&larr;</a><span>2008-07-22</span><a href="2008-07-23.html">&rarr;</a></nav></header>
+<main><p class="dh">2008-07-22</p><table class="lg"><tbody>
+<tr id="t0627A"><td><a href="#t0627A">06:27</a></td><td class="nv">meredydd</td><td>Hey - did anyone end up building (jmap)? I kinda got distracted over the weekend.</td></tr>
+<tr id="t0723A" class="r"><td><a href="#t0723A">07:23</a></td><td class="nv">meredydd</td><td>hey, rhickey</td></tr>
+<tr id="t0723A" class="h"><td><a href="#t0723A">07:23</a></td><td class="nu">rhickey</td><td>hey</td></tr>
+<tr id="t0723A" class="h"><td><a href="#t0723A">07:23</a></td><td class="nv">meredydd</td><td>Had a question about (jmap)</td></tr>
+<tr id="t0723A" class="h"><td><a href="#t0723A">07:23</a></td><td class="nu">rhickey</td><td>ok</td></tr>
+<tr id="t0724A" class="h"><td><a href="#t0724A">07:24</a></td><td class="nv">meredydd</td><td>Wondering whether you'd consider a recursive version as well</td></tr>
+<tr id="t0724A" class="h r"><td><a href="#t0724A">07:24</a></td><td class="nv">meredydd</td><td>give it a tree of Clojure collections, it gives you the same collection, but with every IPersistentMap replaced (or wrapped) with a Map</td></tr>
+<tr id="t0725A" class="h r"><td><a href="#t0725A">07:25</a></td><td class="nv">meredydd</td><td>If you do it recursively, it solves the nested-Map problem I was talking about before the weekend</td></tr>
+<tr id="t0726A" class="h r"><td><a href="#t0726A">07:26</a></td><td class="nv">meredydd</td><td>So, am wondering (a) Whether you think it's a good idea, and (b) if you did, what you thought of eager vs lazy translation</td></tr>
+<tr id="t0726A" class="h"><td><a href="#t0726A">07:26</a></td><td class="nu">rhickey</td><td>If JavaMapOnPersistentMap implements both Map and IPersistentMap, is the only time you'd need this is if you were creating nested maps from literals?</td></tr>
+<tr id="t0727A" class="h r"><td><a href="#t0727A">07:27</a></td><td class="nu">rhickey</td><td>i.e. if you always want maps that implement Map, won't you always use jmap to create them initially?</td></tr>
+<tr id="t0728A" class="h"><td><a href="#t0728A">07:28</a></td><td class="nv">meredydd</td><td>Ah - the problem I'm trying to solve is the one where you have lots of Clojure code on one side, which is slinging normal Clojure collections around</td></tr>
+<tr id="t0728A" class="h r"><td><a href="#t0728A">07:28</a></td><td class="nv">meredydd</td><td>and lots of Java code on the other side, which is slinging Java-idiomaic collections around</td></tr>
+<tr id="t0728A" class="h r"><td><a href="#t0728A">07:28</a></td><td class="nv">meredydd</td><td>and you don't really want to (or, if you're using libraries, physically can't) embed knowledge about the one into the other</td></tr>
+<tr id="t0729A" class="h r"><td><a href="#t0729A">07:29</a></td><td class="nv">meredydd</td><td>so you can't have the Java code slinging IPersistentMaps rather than java.util.Maps, and you can't have the Clojure code throwing (jmap) calls around everywhere</td></tr>
+<tr id="t0730A" class="r"><td><a href="#t0730A">07:30</a></td><td class="nv">meredydd</td><td>so you have to do translation in the glue code.</td></tr>
+<tr id="t0730A" class="h"><td><a href="#t0730A">07:30</a></td><td class="nu">rhickey</td><td>then maybe it's more like jview - dynamically wrapping all values, but you'd want it on lists and vectors as well, no?</td></tr>
+<tr id="t0730A" class="h"><td><a href="#t0730A">07:30</a></td><td class="nv">meredydd</td><td>yep</td></tr>
+<tr id="t0730A" class="h r"><td><a href="#t0730A">07:30</a></td><td class="nv">meredydd</td><td>which is the plan</td></tr>
+<tr id="t0730A" class="h r"><td><a href="#t0730A">07:30</a></td><td class="nv">meredydd</td><td>auto-wrapping Clojure lists, vectors, sets and maps in Java-idiomatic versions</td></tr>
+<tr id="t0731A" class="h r"><td><a href="#t0731A">07:31</a></td><td class="nv">meredydd</td><td>(although vectors and sets should be able to implement java.util.List/Set anyway, so it's more about making sure that any maps contained within them are wrapped too. Maybe even lists too, although I haven't looked closely)</td></tr>
+<tr id="t0731A" class="h"><td><a href="#t0731A">07:31</a></td><td class="nu">rhickey</td><td>at some point they'll implement List and Set, so it's only map values that won't be Maps</td></tr>
+<tr id="t0732A" class="h"><td><a href="#t0732A">07:32</a></td><td class="nv">meredydd</td><td>Indeed. I'm prepping a patch to do List and Set implementations atm.</td></tr>
+<tr id="t0732A" class="h"><td><a href="#t0732A">07:32</a></td><td class="nu">rhickey</td><td>I wonder if you are solving a real and not a theoretical problem</td></tr>
+<tr id="t0732A" class="h r"><td><a href="#t0732A">07:32</a></td><td class="nu">rhickey</td><td>most idiomatic Java code mutates collections</td></tr>
+<tr id="t0733A" class="h"><td><a href="#t0733A">07:33</a></td><td class="nv">meredydd</td><td>Hmm. I'm fairly sure I've seen collections with read-only semantics in the wild.</td></tr>
+<tr id="t0734A" class="h r"><td><a href="#t0734A">07:34</a></td><td class="nv">meredydd</td><td>(otherwise, nobody would ever use the Collections.xxx() immutable singletons and empties in anger)</td></tr>
+<tr id="t0737A" class="h"><td><a href="#t0737A">07:37</a></td><td class="nu">rhickey</td><td>yep, but note how they use a function (i.e. immutableMap), to get the view they want</td></tr>
+<tr id="t0737A" class="h r"><td><a href="#t0737A">07:37</a></td><td class="nu">rhickey</td><td>unmodifiableMap</td></tr>
+<tr id="t0738A" class="h"><td><a href="#t0738A">07:38</a></td><td class="nv">meredydd</td><td>Oh, absolutely - I'm not trying to claim that immutable collections are the norm or the default in Java</td></tr>
+<tr id="t0738A" class="h r"><td><a href="#t0738A">07:38</a></td><td class="nv">meredydd</td><td>just that being able to pass them into Java code is likely to be useful</td></tr>
+<tr id="t0739A" class="h r"><td><a href="#t0739A">07:39</a></td><td class="nv">meredydd</td><td>In any case, I don't want to have a huge head-butting about it. I have a definite need for a subset of (jview) functionality in my current project, so I've written a quick and dirty version</td></tr>
+<tr id="t0739A" class="h r"><td><a href="#t0739A">07:39</a></td><td class="nv">meredydd</td><td>and I'll probably flesh it out to full functionality for my own use, sooner or later</td></tr>
+<tr id="t0740A"><td><a href="#t0740A">07:40</a></td><td class="nu">rhickey</td><td>but by the time you get to the use case of having idiomatic Java code that expects nested immutable collections, I think it's less real than theoretical</td></tr>
+<tr id="t0740A" class="h"><td><a href="#t0740A">07:40</a></td><td class="nv">meredydd</td><td>'tis just a question of whether you'd be interested for mainline integration, and if so what sort of shape you'd prefer it to take.</td></tr>
+<tr id="t0740A" class="h"><td><a href="#t0740A">07:40</a></td><td class="nu">rhickey</td><td>simple jmap first</td></tr>
+<tr id="t0741A" class="h"><td><a href="#t0741A">07:41</a></td><td class="nv">meredydd</td><td>okies.</td></tr>
+<tr id="t0741A" class="h"><td><a href="#t0741A">07:41</a></td><td class="nu">rhickey</td><td>(jmap amp) returns an instance of something that implements Map and IPersistentMap</td></tr>
+<tr id="t0741A" class="h"><td><a href="#t0741A">07:41</a></td><td class="nv">meredydd</td><td>okay</td></tr>
+<tr id="t0742A" class="h"><td><a href="#t0742A">07:42</a></td><td class="nu">rhickey</td><td>should probably be written in Java</td></tr>
+<tr id="t0742A" class="h"><td><a href="#t0742A">07:42</a></td><td class="nv">meredydd</td><td>Yeah - the Clojure version is the basis of the quick and dirty hack :)</td></tr>
+<tr id="t0743A" class="h"><td><a href="#t0743A">07:43</a></td><td class="nu">rhickey</td><td>also it should copy nothing, must implement emptySet, keySet and values with no copying</td></tr>
+<tr id="t0743A" class="h"><td><a href="#t0743A">07:43</a></td><td class="nv">meredydd</td><td>Uh-huh.</td></tr>
+<tr id="t0743A" class="h"><td><a href="#t0743A">07:43</a></td><td class="nu">rhickey</td><td>there may also be issues with hashCode semantics</td></tr>
+<tr id="t0744A" class="h"><td><a href="#t0744A">07:44</a></td><td class="nv">meredydd</td><td>(Oh, sorry, of course - you never saw my java.util.Map implementation patch. I've already done that part.)</td></tr>
+<tr id="t0744A" class="h r"><td><a href="#t0744A">07:44</a></td><td class="nv">meredydd</td><td>rhickey: Actually, that's something I'd left blank, pending questions about equality semantics</td></tr>
+<tr id="t0744A" class="h r"><td><a href="#t0744A">07:44</a></td><td class="nv">meredydd</td><td>I'm *assuming* you'd want it to be equal() to the IPersistentMap it was created from</td></tr>
+<tr id="t0745A" class="h r"><td><a href="#t0745A">07:45</a></td><td class="nv">meredydd</td><td>(in which case, hashCode() isn't so much of a problem)</td></tr>
+<tr id="t0746A" class="h"><td><a href="#t0746A">07:46</a></td><td class="nu">rhickey</td><td>&quot;The hash code of a map is defined to be the sum of the hashCodes of each entry in the map's entrySet view.&quot;</td></tr>
+<tr id="t0746A" class="h r"><td><a href="#t0746A">07:46</a></td><td class="nu">rhickey</td><td>ugh</td></tr>
+<tr id="t0746A" class="h"><td><a href="#t0746A">07:46</a></td><td class="nv">meredydd</td><td>Oh, bugger.</td></tr>
+<tr id="t0748A" class="h r"><td><a href="#t0748A">07:48</a></td><td class="nv">meredydd</td><td>Could we not just change the algorithm for hashcode calculation in APersistentMap to match?</td></tr>
+<tr id="t0749A" class="h r"><td><a href="#t0749A">07:49</a></td><td class="nv">meredydd</td><td>oh, hold on. It's already an addition :)</td></tr>
+<tr id="t0749A" class="h r"><td><a href="#t0749A">07:49</a></td><td class="nv">meredydd</td><td>...ignore that line. Util.hashCombine is an addition. APersistentMap does a ^=</td></tr>
+<tr id="t0750A" class="r"><td><a href="#t0750A">07:50</a></td><td class="nv">meredydd</td><td>Do you have great opposition to changing the APersistentMap calculation?</td></tr>
+<tr id="t0756A" class="h"><td><a href="#t0756A">07:56</a></td><td class="nu">rhickey</td><td>but it also dictates that it be the sum of Map.Entry hashes, which it dictates be a lame ^ of key and value hashes</td></tr>
+<tr id="t0800A"><td><a href="#t0800A">08:00</a></td><td class="nv">meredydd</td><td>ah.</td></tr>
+<tr id="t0802A" class="h r"><td><a href="#t0802A">08:02</a></td><td class="nv">meredydd</td><td>Hmm...so, it's sacrifice equals()-equality with the source map, or equals()-equality with other java.util.Map implementations.</td></tr>
+<tr id="t0803A" class="h r"><td><a href="#t0803A">08:03</a></td><td class="nv">meredydd</td><td>Can I ask something unrelated for a moment, please?</td></tr>
+<tr id="t0805A" class="h r"><td><a href="#t0805A">08:05</a></td><td class="nv">meredydd</td><td>What would you say to allowing RT.print() to print Java collections in clojure reader syntax?</td></tr>
+<tr id="t0806A" class="h r"><td><a href="#t0806A">08:06</a></td><td class="nv">meredydd</td><td>(trying to figure out whether to do that or to stop using reader syntax as my wire encoding and go to something custom)</td></tr>
+<tr id="t0815A"><td><a href="#t0815A">08:15</a></td><td class="nu">rhickey</td><td>meredydd: at some point I want to move print out of RT and make it a proper multimethod. Printing for Java classes may move to JavaBeans XML serialization, so you can get back the same type</td></tr>
+<tr id="t0816A" class="h"><td><a href="#t0816A">08:16</a></td><td class="nv">meredydd</td><td>Ooh, clever.</td></tr>
+<tr id="t0817A" class="h r"><td><a href="#t0817A">08:17</a></td><td class="nv">meredydd</td><td>Off the top of my head, would a multimethod, dispatched on class, make it quite difficult to do, eg, a catch-all for &quot;anything implementing Map&quot;</td></tr>
+<tr id="t0817A" class="h r"><td><a href="#t0817A">08:17</a></td><td class="nv">meredydd</td><td>?</td></tr>
+<tr id="t0817A" class="h"><td><a href="#t0817A">08:17</a></td><td class="nu">rhickey</td><td>yes</td></tr>
+<tr id="t0818A" class="h r"><td><a href="#t0818A">08:18</a></td><td class="nu">rhickey</td><td>of course you can get 'anything implementing map' runtime polymorphism in Java either</td></tr>
+<tr id="t0819A" class="h r"><td><a href="#t0819A">08:19</a></td><td class="nu">rhickey</td><td>still thinking about how best to leverage interfaces in multimethods</td></tr>
+<tr id="t0819A" class="h"><td><a href="#t0819A">08:19</a></td><td class="nv">meredydd</td><td>Uhh...actually, that's one thing you can do. (In fact, pretty much the only thing you can do)</td></tr>
+<tr id="t0819A" class="h r"><td><a href="#t0819A">08:19</a></td><td class="nv">meredydd</td><td>public static void print(Map m)</td></tr>
+<tr id="t0819A" class="h r"><td><a href="#t0819A">08:19</a></td><td class="nv">meredydd</td><td>public static void print(Object o)</td></tr>
+<tr id="t0819A" class="h"><td><a href="#t0819A">08:19</a></td><td class="nu">rhickey</td><td>that's compile-time overloading, not polymorphism</td></tr>
+<tr id="t0820A"><td><a href="#t0820A">08:20</a></td><td class="nv">meredydd</td><td>Oh, point. In which case, yes.</td></tr>
+<tr id="t0820A" class="h"><td><a href="#t0820A">08:20</a></td><td class="nu">hoeck</td><td>rhickey: gen-and-save-class doesn't create the package directory for the generated *.class property</td></tr>
+<tr id="t0821A" class="h"><td><a href="#t0821A">08:21</a></td><td class="nu">rhickey</td><td>hoeck: correct</td></tr>
+<tr id="t0821A" class="h r"><td><a href="#t0821A">08:21</a></td><td class="nu">rhickey</td><td>enough people seem to be asking for it that I might change that, my only concern was creating directories on typos</td></tr>
+<tr id="t0825A" class="h"><td><a href="#t0825A">08:25</a></td><td class="nu">hoeck</td><td>you mean creating huge directories by accident?</td></tr>
+<tr id="t0827A" class="h"><td><a href="#t0827A">08:27</a></td><td class="nu">rhickey</td><td>not huge, just wrong. I guess my thought was, the namespaces, and thus the corresponding directories, would be created fairly rarely If I don't create them, then it can catch typos</td></tr>
+<tr id="t0829A" class="h"><td><a href="#t0829A">08:29</a></td><td class="n8">blackdog</td><td>rhickey, did you get to record any video in Europe?</td></tr>
+<tr id="t0831A"><td><a href="#t0831A">08:31</a></td><td class="nu">rhickey</td><td>blackdog: I did get a screencast recording of the Lisp workshop, nothing from Dynamic Languages Symposium. I'm holding off on posting the Lisp Workshop as I'm giving a very similar talk to the Boston Lisp Group in September</td></tr>
+<tr id="t0832A" class="h"><td><a href="#t0832A">08:32</a></td><td class="n8">blackdog</td><td>ok, thx</td></tr>
+<tr id="t0833A" class="h"><td><a href="#t0833A">08:33</a></td><td class="nu">hoeck</td><td>rhickey: okay, what about providing a 'create-dir' flag to genclass. I was fairly confused that it didn't wrote the dirs, and i thought is was my mistake ... until i read the java docs</td></tr>
+<tr id="t0834A" class="h r"><td><a href="#t0834A">08:34</a></td><td class="nu">hoeck</td><td>or maybe just mention it in the docs that the dir has to be created by hand</td></tr>
+<tr id="t0835A" class="h"><td><a href="#t0835A">08:35</a></td><td class="nu">rhickey</td><td>hoeck: hmm... (doc gen-and-save-class)</td></tr>
+<tr id="t0836A" class="h r"><td><a href="#t0836A">08:36</a></td><td class="nu">rhickey</td><td>hoeck: I'm not opposed to the flag</td></tr>
+<tr id="t0920A"><td><a href="#t0920A">09:20</a></td><td class="ny">toyvo</td><td>Hi! Does anyone know where to look for documentation on the exact let form semantics? I'm thoroughly confused.</td></tr>
+<tr id="t0920A" class="h"><td><a href="#t0920A">09:20</a></td><td class="nu">rhickey</td><td>toyvo: <a href="http://clojure.org/special_forms">http://clojure.org/special_forms</a></td></tr>
+<tr id="t0921A" class="h"><td><a href="#t0921A">09:21</a></td><td class="ny">toyvo</td><td>Been there. However let doesn't seem to nest with def as I expect.</td></tr>
+<tr id="t0922A" class="h r"><td><a href="#t0922A">09:22</a></td><td class="ny">toyvo</td><td>(do (def y) (let [y* y] (def y 1) y*))</td></tr>
+<tr id="t0922A" class="h"><td><a href="#t0922A">09:22</a></td><td class="nu">rhickey</td><td>toyvo: def is not Scheme define, def is always global definition</td></tr>
+<tr id="t0923A" class="h"><td><a href="#t0923A">09:23</a></td><td class="ny">toyvo</td><td>rihickey: I almost got that; however, I thought let is like Scheme let*</td></tr>
+<tr id="t0923A" class="h"><td><a href="#t0923A">09:23</a></td><td class="nu">rhickey</td><td>if you say (def y 1) at any level in namespace user, you are saying - I want user/y to be 1</td></tr>
+<tr id="t0923A" class="h r"><td><a href="#t0923A">09:23</a></td><td class="nu">rhickey</td><td>let does bind sequentially</td></tr>
+<tr id="t0923A" class="h"><td><a href="#t0923A">09:23</a></td><td class="ny">toyvo</td><td>Yes, but why the expression above gives an error?</td></tr>
+<tr id="t0924A" class="h r"><td><a href="#t0924A">09:24</a></td><td class="ny">toyvo</td><td>It says y is unbound (presumably the issue is in (let [y* _y_]</td></tr>
+<tr id="t0924A" class="h r"><td><a href="#t0924A">09:24</a></td><td class="ny">toyvo</td><td>I thought (let [y* y] ..) would mean let y* stand for y in what follows</td></tr>
+<tr id="t0924A" class="h"><td><a href="#t0924A">09:24</a></td><td class="nu">rhickey</td><td>(def y) leaves y unbound, but your let tries to take its value in order to initialize y*</td></tr>
+<tr id="t0925A" class="h"><td><a href="#t0925A">09:25</a></td><td class="ny">toyvo</td><td>Exactly. But let shouldn't *take* values, or should it? Hm...</td></tr>
+<tr id="t0925A" class="h"><td><a href="#t0925A">09:25</a></td><td class="nu">rhickey</td><td>let is not an aliasing mechanism</td></tr>
+<tr id="t0925A" class="h"><td><a href="#t0925A">09:25</a></td><td class="ny">toyvo</td><td>Ok, is there an aliasing mechanism?</td></tr>
+<tr id="t0925A" class="h"><td><a href="#t0925A">09:25</a></td><td class="nu">rhickey</td><td>let binds names to the values of expressions</td></tr>
+<tr id="t0926A" class="h"><td><a href="#t0926A">09:26</a></td><td class="ny">toyvo</td><td>Evaluating the expressions?</td></tr>
+<tr id="t0926A" class="h r"><td><a href="#t0926A">09:26</a></td><td class="ny">toyvo</td><td>Oh, ok.</td></tr>
+<tr id="t0926A" class="h"><td><a href="#t0926A">09:26</a></td><td class="nu">rhickey</td><td>yes, it's not a lazy language</td></tr>
+<tr id="t0926A" class="h"><td><a href="#t0926A">09:26</a></td><td class="ny">toyvo</td><td>Right :) My fault.</td></tr>
+<tr id="t0927A" class="h r"><td><a href="#t0927A">09:27</a></td><td class="ny">toyvo</td><td>So, is there an aliasing mechanism?</td></tr>
+<tr id="t0927A" class="h"><td><a href="#t0927A">09:27</a></td><td class="nu">rhickey</td><td>there's no aliasing for vars at the moment, what are you trying to achieve?</td></tr>
+<tr id="t0927A" class="h"><td><a href="#t0927A">09:27</a></td><td class="ny">toyvo</td><td>I'm trying to get at letrec, as a macro perhaps</td></tr>
+<tr id="t0928A" class="h"><td><a href="#t0928A">09:28</a></td><td class="nu">rhickey</td><td>ah</td></tr>
+<tr id="t0928A" class="h r"><td><a href="#t0928A">09:28</a></td><td class="nu">rhickey</td><td>letrec really needs language-level support</td></tr>
+<tr id="t0929A" class="h"><td><a href="#t0929A">09:29</a></td><td class="ny">toyvo</td><td>Well a really heavy macro can do that, basically implementing a subset fo scheme, but that's going to be heaevy</td></tr>
+<tr id="t0929A" class="h r"><td><a href="#t0929A">09:29</a></td><td class="ny">toyvo</td><td>Wasn't Scheme implemented on top of CL in the good old days...</td></tr>
+<tr id="t0930A"><td><a href="#t0930A">09:30</a></td><td class="nu">rhickey</td><td>the problem is, if you ar ecoming from Scheme, you might be used to mutually recursive letrec Schemes for state machines etc, but because Clojure has no TCO, that's not a good thing to emulate</td></tr>
+<tr id="t0930A" class="h r"><td><a href="#t0930A">09:30</a></td><td class="nu">rhickey</td><td>letrec schemes</td></tr>
+<tr id="t0931A" class="h r"><td><a href="#t0931A">09:31</a></td><td class="nu">rhickey</td><td>right no, only top-level defns can be mutually recursive. If you want them to be private implementation details, you can use defn-</td></tr>
+<tr id="t0931A" class="h r"><td><a href="#t0931A">09:31</a></td><td class="nu">rhickey</td><td>right now</td></tr>
+<tr id="t0932A" class="h"><td><a href="#t0932A">09:32</a></td><td class="ny">toyvo</td><td>Yes, I know the no-TCO implications. Still, I'm kind of used to locally define functions inside other functions (it's the same in Scheme, Haskell, ML maybe)...</td></tr>
+<tr id="t0932A" class="h r"><td><a href="#t0932A">09:32</a></td><td class="ny">toyvo</td><td>Ah.. Private functions? How private are those?</td></tr>
+<tr id="t0932A" class="h"><td><a href="#t0932A">09:32</a></td><td class="nu">rhickey</td><td>you can totally define local functions, just not mutually recursive ones. just use (let [foo (fn []...)...</td></tr>
+<tr id="t0933A" class="h"><td><a href="#t0933A">09:33</a></td><td class="ny">toyvo</td><td>Yes, that's what I do when they do not recurse.</td></tr>
+<tr id="t0933A" class="h r"><td><a href="#t0933A">09:33</a></td><td class="ny">toyvo</td><td>Let me look up the docs on defn-</td></tr>
+<tr id="t0934A" class="h r"><td><a href="#t0934A">09:34</a></td><td class="ny">toyvo</td><td>As a side note - is 'array?' predicate missing? 'vector?' is there</td></tr>
+<tr id="t0934A" class="h"><td><a href="#t0934A">09:34</a></td><td class="nu">rhickey</td><td>and they can self-recurse (let [foo (fn self [] ... (self)...</td></tr>
+<tr id="t0936A" class="h r"><td><a href="#t0936A">09:36</a></td><td class="nu">rhickey</td><td>all of these blah? type predicates are kind of tedious. Maybe they made sense in Scheme where there are only 5 types, but once in a richer language with an open type set, at some point people have to deal with instance? (not directed at you, this comes up a lot)</td></tr>
+<tr id="t0937A" class="h"><td><a href="#t0937A">09:37</a></td><td class="ny">toyvo</td><td>That being said, (partial instace? clojure.lang.IPersistentList) is a bit verbose, is it not?</td></tr>
+<tr id="t0937A" class="h"><td><a href="#t0937A">09:37</a></td><td class="nk">Chouser</td><td>#(instance? IPersistentList %)</td></tr>
+<tr id="t0937A" class="h"><td><a href="#t0937A">09:37</a></td><td class="ny">toyvo</td><td>that's better :)</td></tr>
+<tr id="t0938A" class="h"><td><a href="#t0938A">09:38</a></td><td class="nk">Chouser</td><td>of course that requires an (import), but you wanted to do that anyway. :-)</td></tr>
+<tr id="t0938A" class="h"><td><a href="#t0938A">09:38</a></td><td class="ny">toyvo</td><td>But still.. What I though of, is perhaps have a (type x) function, to returns keywords. That would help a lot. For example, to write polymorphics that dispatch on type.</td></tr>
+<tr id="t0939A" class="h"><td><a href="#t0939A">09:39</a></td><td class="nu">rhickey</td><td>array? is an interesting case, as there is no common base type - &gt; (.isArray (class x))</td></tr>
+<tr id="t0939A" class="h r"><td><a href="#t0939A">09:39</a></td><td class="nu">rhickey</td><td>toyvo: why not (class x) ?</td></tr>
+<tr id="t0939A" class="h"><td><a href="#t0939A">09:39</a></td><td class="ny">toyvo</td><td>Yes, I thought about that. How about representing their 'types' with vectors of subtype? Like [:java.lang.String]</td></tr>
+<tr id="t0940A"><td><a href="#t0940A">09:40</a></td><td class="nu">rhickey</td><td>what' wrong with classes?</td></tr>
+<tr id="t0940A" class="h r"><td><a href="#t0940A">09:40</a></td><td class="nu">rhickey</td><td>what's</td></tr>
+<tr id="t0941A" class="h"><td><a href="#t0941A">09:41</a></td><td class="ny">toyvo</td><td>rhickey: hmm.. like you say - arrays; also, what are semantically clojure lists can be represented by different classes</td></tr>
+<tr id="t0941A" class="h"><td><a href="#t0941A">09:41</a></td><td class="nk">Chouser</td><td>that one comes up a lot too.</td></tr>
+<tr id="t0941A" class="h"><td><a href="#t0941A">09:41</a></td><td class="nu">rhickey</td><td>Still, there's no reason to parallel the type system with keywords IMO.</td></tr>
+<tr id="t0942A" class="h r"><td><a href="#t0942A">09:42</a></td><td class="nu">rhickey</td><td>instance? can check for interfaces</td></tr>
+<tr id="t0942A" class="h"><td><a href="#t0942A">09:42</a></td><td class="nk">Chouser</td><td>toyvo: &quot;semantically clojure lists&quot; means things that (seq) works on?</td></tr>
+<tr id="t0943A" class="h"><td><a href="#t0943A">09:43</a></td><td class="ny">toyvo</td><td>Chouser: no. Sometimes you want to differentiate between lists and vectors. That's the case I have in mind.</td></tr>
+<tr id="t0944A" class="h r"><td><a href="#t0944A">09:44</a></td><td class="ny">toyvo</td><td>Okay then - if the language stick with (instance?) checks, for consistency - why don't drop vector? predicate :)</td></tr>
+<tr id="t0944A" class="h"><td><a href="#t0944A">09:44</a></td><td class="nk">Chouser</td><td>hm.  seq? might do what you want, I guess depending on what you mean by &quot;list&quot;</td></tr>
+<tr id="t0944A" class="h"><td><a href="#t0944A">09:44</a></td><td class="ny">toyvo</td><td>list as in IPersistentList</td></tr>
+<tr id="t0944A" class="h"><td><a href="#t0944A">09:44</a></td><td class="nu">rhickey</td><td>See - once you define list then you have to keep explaining what it means</td></tr>
+<tr id="t0944A" class="h r"><td><a href="#t0944A">09:44</a></td><td class="nu">rhickey</td><td>seq?</td></tr>
+<tr id="t0944A" class="h"><td><a href="#t0944A">09:44</a></td><td class="ny">toyvo</td><td>Ah</td></tr>
+<tr id="t0945A" class="h"><td><a href="#t0945A">09:45</a></td><td class="nu">rhickey</td><td>all the predicates</td></tr>
+<tr id="t0945A" class="h r"><td><a href="#t0945A">09:45</a></td><td class="nu">rhickey</td><td>There are some useful marker interfaces too, like Sequential</td></tr>
+<tr id="t0945A" class="h"><td><a href="#t0945A">09:45</a></td><td class="ny">toyvo</td><td>Ah (seq? [1 2 3]) is false.. Nice. i didn't know that.</td></tr>
+<tr id="t0946A" class="h"><td><a href="#t0946A">09:46</a></td><td class="nu">rhickey</td><td>user=&gt; (seq? ())</td></tr>
+<tr id="t0946A" class="h r"><td><a href="#t0946A">09:46</a></td><td class="nu">rhickey</td><td>false</td></tr>
+<tr id="t0946A" class="h"><td><a href="#t0946A">09:46</a></td><td class="ny">toyvo</td><td>Why is that?</td></tr>
+<tr id="t0946A" class="h"><td><a href="#t0946A">09:46</a></td><td class="nu">rhickey</td><td>see?</td></tr>
+<tr id="t0946A" class="h r"><td><a href="#t0946A">09:46</a></td><td class="nu">rhickey</td><td>because an empty list is not a seq</td></tr>
+<tr id="t0946A" class="h"><td><a href="#t0946A">09:46</a></td><td class="ny">toyvo</td><td>Oh my</td></tr>
+<tr id="t0946A" class="h"><td><a href="#t0946A">09:46</a></td><td class="nu">rhickey</td><td>a seq always has a first</td></tr>
+<tr id="t0947A" class="h r"><td><a href="#t0947A">09:47</a></td><td class="nu">rhickey</td><td>otherwise it would be nil</td></tr>
+<tr id="t0947A" class="h r"><td><a href="#t0947A">09:47</a></td><td class="nu">rhickey</td><td>most lists are their own seqs, but not ()</td></tr>
+<tr id="t0947A" class="h"><td><a href="#t0947A">09:47</a></td><td class="ny">toyvo</td><td>I'm used to this definition: List x = Nil | Cons x (List x)</td></tr>
+<tr id="t0948A" class="h r"><td><a href="#t0948A">09:48</a></td><td class="ny">toyvo</td><td>So seq? is actually testing for Cons part</td></tr>
+<tr id="t0948A" class="h"><td><a href="#t0948A">09:48</a></td><td class="nu">rhickey</td><td>nil can represent any type, so the type constructor analogy breaks rapidly</td></tr>
+<tr id="t0949A" class="h r"><td><a href="#t0949A">09:49</a></td><td class="nu">rhickey</td><td>seq? tests for  ISeq</td></tr>
+<tr id="t0949A" class="h"><td><a href="#t0949A">09:49</a></td><td class="ny">toyvo</td><td>Wonderful Java platform :)</td></tr>
+<tr id="t0949A" class="h r"><td><a href="#t0949A">09:49</a></td><td class="ny">toyvo</td><td>OK, I'll check that.</td></tr>
+<tr id="t0950A" class="r"><td><a href="#t0950A">09:50</a></td><td class="ny">toyvo</td><td>Maybe I'll have to write about this on the Wiki, in the &quot;for Scheme programmers&quot; section</td></tr>
+<tr id="t0951A" class="h r"><td><a href="#t0951A">09:51</a></td><td class="ny">toyvo</td><td>Can I build the Javadocs for Clojure? Or are they online?</td></tr>
+<tr id="t0951A" class="h r"><td><a href="#t0951A">09:51</a></td><td class="ny">toyvo</td><td>To look up ISeq and all the rest/</td></tr>
+<tr id="t0951A" class="h"><td><a href="#t0951A">09:51</a></td><td class="nu">rhickey</td><td>This is Clojure design, and it is nice, but one can't take the presumptions of a world with one (concrete!) list type and apply them to one with a rich set of overlapping abstractions</td></tr>
+<tr id="t0951A" class="h r"><td><a href="#t0951A">09:51</a></td><td class="nu">rhickey</td><td>Chouser did a neat class diagram</td></tr>
+<tr id="t0953A" class="h r"><td><a href="#t0953A">09:53</a></td><td class="nu">rhickey</td><td><a href="http://groups.google.com/group/clojure/msg/ef51d43ea0898c81">http://groups.google.com/group/clojure/msg/ef51d43ea0898c81</a></td></tr>
+<tr id="t0953A" class="h"><td><a href="#t0953A">09:53</a></td><td class="nk">Chouser</td><td>I need to post a new one, that one's a bit out of date.</td></tr>
+<tr id="t0953A" class="h"><td><a href="#t0953A">09:53</a></td><td class="ny">toyvo</td><td>Thanks</td></tr>
+<tr id="t0953A" class="h r"><td><a href="#t0953A">09:53</a></td><td class="ny">toyvo</td><td>But still - can the javadocs be built?</td></tr>
+<tr id="t0954A" class="h"><td><a href="#t0954A">09:54</a></td><td class="nu">rhickey</td><td>toyvo: I think you can always get a mechanical JavaDoc, but I haven't manually written any yet - sorry</td></tr>
+<tr id="t0954A" class="h"><td><a href="#t0954A">09:54</a></td><td class="ny">toyvo</td><td>No problem... Hopefully it will come later. You are doing a great job anyway.</td></tr>
+<tr id="t0956A" class="h r"><td><a href="#t0956A">09:56</a></td><td class="ny">toyvo</td><td>Another q: Is there a structure preserving map? like (fmap (partial + 1) [1 2 3]) -&gt; [2 3 4]</td></tr>
+<tr id="t0956A" class="h"><td><a href="#t0956A">09:56</a></td><td class="nv">meredydd</td><td>rhickey: Okay, I think I have a patch with List and Set support</td></tr>
+<tr id="t0957A" class="h r"><td><a href="#t0957A">09:57</a></td><td class="nv">meredydd</td><td>covering APersistentVector, ASeq, and APersistentSet</td></tr>
+<tr id="t0957A" class="h r"><td><a href="#t0957A">09:57</a></td><td class="nv">meredydd</td><td>Need to test it properly, though</td></tr>
+<tr id="t1006A"><td><a href="#t1006A">10:06</a></td><td class="ny">toyvo</td><td>I modified the ANT buildfile to have a new target, docs, which builds the javadocs. Should I mail the tiny patch?</td></tr>
+<tr id="t1006A" class="h"><td><a href="#t1006A">10:06</a></td><td class="nu">rhickey</td><td>toyvo: (into (empty x) (map f x))</td></tr>
+<tr id="t1007A" class="h"><td><a href="#t1007A">10:07</a></td><td class="ny">toyvo</td><td>rhickey: yes, but that has not polimorphism. I want fmap to preserve structure (list to list, vector to vector, set to set)</td></tr>
+<tr id="t1008A" class="h r"><td><a href="#t1008A">10:08</a></td><td class="ny">toyvo</td><td>You can also view the (mechanical) javadocs here <a href="http://clojure.fajno.net/">http://clojure.fajno.net/</a></td></tr>
+<tr id="t1008A" class="h"><td><a href="#t1008A">10:08</a></td><td class="nu">rhickey</td><td>empty is polymorphic</td></tr>
+<tr id="t1008A" class="h"><td><a href="#t1008A">10:08</a></td><td class="ny">toyvo</td><td>Ah</td></tr>
+<tr id="t1008A" class="h r"><td><a href="#t1008A">10:08</a></td><td class="ny">toyvo</td><td>Nie</td></tr>
+<tr id="t1008A" class="h r"><td><a href="#t1008A">10:08</a></td><td class="ny">toyvo</td><td>Nice</td></tr>
+<tr id="t1009A" class="h"><td><a href="#t1009A">10:09</a></td><td class="nv">meredydd</td><td>rhickey: I think I have a patch for List and Set support. Also (dependently), I've modified RT.print() to work with all Lists, Sets and Maps with normal reader syntax.</td></tr>
+<tr id="t1009A" class="h"><td><a href="#t1009A">10:09</a></td><td class="nu">rhickey</td><td>meredydd: cool, can you post (List/Set patch) to the group? print I'd like to consider separately</td></tr>
+<tr id="t1010A" class="r"><td><a href="#t1010A">10:10</a></td><td class="nu">rhickey</td><td>toyvo: would it be possible to limit to just clojure.lang, asm is an implementation detail</td></tr>
+<tr id="t1011A" class="h"><td><a href="#t1011A">10:11</a></td><td class="ny">toyvo</td><td>I will try! It gave me an error before, but I'll try.</td></tr>
+<tr id="t1016A" class="h"><td><a href="#t1016A">10:16</a></td><td class="nv">meredydd</td><td>meredydd: Okay. There's a slight overlap, in that both modify RT (I've made subvec() return APersistentVector, so as to make subList() work), but it's trivial</td></tr>
+<tr id="t1016A" class="h"><td><a href="#t1016A">10:16</a></td><td class="ny">toyvo</td><td>rhickey: limited to clojure.lang, uploading.</td></tr>
+<tr id="t1100A"><td><a href="#t1100A">11:00</a></td><td class="nv">meredydd</td><td>rhickey: Posted. Feedback welcome.</td></tr>
+<tr id="t1149A"><td><a href="#t1149A">11:49</a></td><td class="nu">rhickey</td><td>meredydd: still looking at it. I kind of hate the List interface for non-indexed collections (not your fault, it's just such a bad fit)</td></tr>
+<tr id="t1150A" class="r"><td><a href="#t1150A">11:50</a></td><td class="nu">rhickey</td><td>personally, I wouldn't support it for other than vectors</td></tr>
+<tr id="t1203A" class="r"><td><a href="#t1203A">12:03</a></td><td class="nu">rhickey</td><td>meredydd: I don't think all Lists should print like [..], only RandomAccess derivees</td></tr>
+<tr id="t1242A" class="r"><td><a href="#t1242A">12:42</a></td><td class="nu">rhickey</td><td>i've made vectors implement java.util.List and sets implement java.util.Set</td></tr>
+<tr id="t1248A" class="h"><td><a href="#t1248A">12:48</a></td><td class="nw">lisppaste8</td><td>drewr pasted &quot;Function dispatch on string&quot; at <a href="http://paste.lisp.org/display/64047">http://paste.lisp.org/display/64047</a></td></tr>
+<tr id="t1249A" class="h"><td><a href="#t1249A">12:49</a></td><td class="nj">drewr</td><td>I need (symbol ~cmd) to return the function pointed to by that name.  What am I overthinking here?</td></tr>
+<tr id="t1250A"><td><a href="#t1250A">12:50</a></td><td class="nk">Chouser</td><td>cmd is a string?</td></tr>
+<tr id="t1250A" class="h"><td><a href="#t1250A">12:50</a></td><td class="nj">drewr</td><td>Yes.</td></tr>
+<tr id="t1252A" class="h r"><td><a href="#t1252A">12:52</a></td><td class="nj">drewr</td><td>(dispatch-cmd &quot;foo&quot; 1 2 3) should expand to (apply foo '(1 2 3)).  At least I think that's the way I want to do it.</td></tr>
+<tr id="t1252A" class="h"><td><a href="#t1252A">12:52</a></td><td class="nk">Chouser</td><td>I think to go from string to function you'll need eval.</td></tr>
+<tr id="t1252A" class="h r"><td><a href="#t1252A">12:52</a></td><td class="nk">Chouser</td><td>and if not, rhickey will just in here and shout at me in a moment.</td></tr>
+<tr id="t1253A" class="h r"><td><a href="#t1253A">12:53</a></td><td class="nk">Chouser</td><td>(defmacro dispatch-cmd [cmd &amp; args] `((eval (symbol ~cmd)) ~@args))</td></tr>
+<tr id="t1254A" class="h r"><td><a href="#t1254A">12:54</a></td><td class="nk">Chouser</td><td>that's dropping the args in place rather than going through apply.</td></tr>
+<tr id="t1256A" class="h"><td><a href="#t1256A">12:56</a></td><td class="nj">drewr</td><td>Yeah, that works for me.</td></tr>
+<tr id="t1256A" class="h"><td><a href="#t1256A">12:56</a></td><td class="nk">Chouser</td><td>gah, no</td></tr>
+<tr id="t1256A" class="h r"><td><a href="#t1256A">12:56</a></td><td class="nk">Chouser</td><td>(defmacro dispatch-cmd [cmd &amp; args] `(~(symbol cmd) ~@args))</td></tr>
+<tr id="t1256A" class="h r"><td><a href="#t1256A">12:56</a></td><td class="nk">Chouser</td><td>that's what you (and I!) were over-thinking.</td></tr>
+<tr id="t1257A" class="h"><td><a href="#t1257A">12:57</a></td><td class="nj">drewr</td><td>Ahhh. Yes.</td></tr>
+<tr id="t1307A"><td><a href="#t1307A">13:07</a></td><td class="nv">meredydd</td><td>rhickey: Hmm. That's two halves of the same thing.</td></tr>
+<tr id="t1307A" class="h r"><td><a href="#t1307A">13:07</a></td><td class="nv">meredydd</td><td>rhickey: There's a definite mismatch with sequences, which are most definitely ordered but a pain to index</td></tr>
+<tr id="t1308A" class="h r"><td><a href="#t1308A">13:08</a></td><td class="nv">meredydd</td><td>rhickey: OTOH, Java treats LinkedList as a List, so I reckoned it should be your call.</td></tr>
+<tr id="t1309A" class="h r"><td><a href="#t1309A">13:09</a></td><td class="nv">meredydd</td><td>rhickey: I'm also happy with only RandomAccess being printed with [...] - but can we have (...) for everything else, in that case?</td></tr>
+<tr id="t1309A" class="h r"><td><a href="#t1309A">13:09</a></td><td class="nv">meredydd</td><td>(in fact, (...) for all Iterables would be swell)</td></tr>
+<tr id="t1315A"><td><a href="#t1315A">13:15</a></td><td class="nw">lisppaste8</td><td>drewr pasted &quot;Exception not caught&quot; at <a href="http://paste.lisp.org/display/64050">http://paste.lisp.org/display/64050</a></td></tr>
+<tr id="t1316A" class="h"><td><a href="#t1316A">13:16</a></td><td class="nj">drewr</td><td>I don't understand this.  (bar) is throwing the same exception I caught just before it.  Am I missing a paren somewhere?</td></tr>
+<tr id="t1319A" class="h"><td><a href="#t1319A">13:19</a></td><td class="nv">kotarak</td><td>I suppose this exception is thrown during compilation because bar is not defined. But your code only catches exceptions at runtime.</td></tr>
+<tr id="t1320A"><td><a href="#t1320A">13:20</a></td><td class="nj">drewr</td><td>kotarak: Yes, that's probably correct.</td></tr>
+<tr id="t1321A" class="h"><td><a href="#t1321A">13:21</a></td><td class="nv">meredydd</td><td>drewr: (try (eval '(bar)) (catch Exception e &quot;darn!&quot;))</td></tr>
+<tr id="t1322A" class="h r"><td><a href="#t1322A">13:22</a></td><td class="nv">meredydd</td><td>Delay compilation till runtime, and run-time (try) will catch it</td></tr>
+<tr id="t1324A" class="h"><td><a href="#t1324A">13:24</a></td><td class="nj">drewr</td><td>meredydd: Good call. Thanks.</td></tr>
+<tr id="t1338A"><td><a href="#t1338A">13:38</a></td><td class="nu">rhickey</td><td>meredydd: as I said earlier, I might want to do a printed version of Java data types that reads as the original type, so unifying with the Clojure types would not be something I'd want to promise long-term (request for a flag coming, I'm sure :)</td></tr>
+<tr id="t1339A" class="h"><td><a href="#t1339A">13:39</a></td><td class="nv">meredydd</td><td>heheh</td></tr>
+<tr id="t1339A" class="h r"><td><a href="#t1339A">13:39</a></td><td class="nv">meredydd</td><td>Actually, for once, no (at least not from me)</td></tr>
+<tr id="t1339A" class="h r"><td><a href="#t1339A">13:39</a></td><td class="nv">meredydd</td><td>But is that a &quot;go&quot; for [...] for vectors?</td></tr>
+<tr id="t1340A"><td><a href="#t1340A">13:40</a></td><td class="nu">rhickey</td><td>not if I later want ArrayList's print representation to read an ArrayList</td></tr>
+<tr id="t1340A" class="h"><td><a href="#t1340A">13:40</a></td><td class="nv">meredydd</td><td>Okay, so that's a no then</td></tr>
+<tr id="t1340A" class="h r"><td><a href="#t1340A">13:40</a></td><td class="nv">meredydd</td><td>(or &quot;not in the immediate future&quot;)</td></tr>
+<tr id="t1342A" class="h"><td><a href="#t1342A">13:42</a></td><td class="nu">rhickey</td><td>meredydd: wouldn't you want read/print for Java types?</td></tr>
+<tr id="t1443A"><td><a href="#t1443A">14:43</a></td><td class="nl">stacktracer</td><td>is there a bug tracker for clojure?</td></tr>
+<tr id="t1443A" class="h"><td><a href="#t1443A">14:43</a></td><td class="nu">rhickey</td><td>do you have a bug?</td></tr>
+<tr id="t1444A" class="h"><td><a href="#t1444A">14:44</a></td><td class="nl">stacktracer</td><td>yes, unless I'm misunderstanding something</td></tr>
+<tr id="t1444A" class="h"><td><a href="#t1444A">14:44</a></td><td class="nu">rhickey</td><td>you can paste it</td></tr>
+<tr id="t1444A" class="h"><td><a href="#t1444A">14:44</a></td><td class="nl">stacktracer</td><td>Numbers.java, line 1311</td></tr>
+<tr id="t1444A" class="h r"><td><a href="#t1444A">14:44</a></td><td class="nl">stacktracer</td><td>sure</td></tr>
+<tr id="t1445A" class="h r"><td><a href="#t1445A">14:45</a></td><td class="nl">stacktracer</td><td>in Numbers.double_array(sizeOrSeq), the value assigned to ret[i] is truncated to an int</td></tr>
+<tr id="t1446A" class="h r"><td><a href="#t1446A">14:46</a></td><td class="nl">stacktracer</td><td>(let [a (double-array '(1.2 2.3))] (aget a 1))</td></tr>
+<tr id="t1446A" class="h r"><td><a href="#t1446A">14:46</a></td><td class="nl">stacktracer</td><td>gives:</td></tr>
+<tr id="t1446A" class="h r"><td><a href="#t1446A">14:46</a></td><td class="nl">stacktracer</td><td>2.0</td></tr>
+<tr id="t1447A" class="h r"><td><a href="#t1447A">14:47</a></td><td class="nl">stacktracer</td><td>(I expected it to give 2.3)</td></tr>
+<tr id="t1450A" class="r"><td><a href="#t1450A">14:50</a></td><td class="nl">stacktracer</td><td>similar thing with float_array at Numbers.java:1280</td></tr>
+<tr id="t1451A" class="h"><td><a href="#t1451A">14:51</a></td><td class="nu">rhickey</td><td>all fixed - thanks for the report</td></tr>
+<tr id="t1452A" class="h"><td><a href="#t1452A">14:52</a></td><td class="nl">stacktracer</td><td>awesome -- thanks</td></tr>
+<tr id="t1452A" class="h"><td><a href="#t1452A">14:52</a></td><td class="nv">kotarak</td><td>bugtracker? what for? ;)</td></tr>
+<tr id="t1456A" class="h"><td><a href="#t1456A">14:56</a></td><td class="nu">rhickey</td><td>kotarak: exactly</td></tr>
+<tr id="t1456A" class="h r"><td><a href="#t1456A">14:56</a></td><td class="nu">rhickey</td><td>outstanding bugs are just a source of stress</td></tr>
+<tr id="t1456A" class="h"><td><a href="#t1456A">14:56</a></td><td class="nv">kotarak</td><td>no pet bugs, my motto</td></tr>
+<tr id="t1629A"><td><a href="#t1629A">16:29</a></td><td class="nk">Chouser</td><td>rhickey: are you at all sympathetic to reader syntax for apply?  Something like (f @args) instead of (apply f args)?</td></tr>
+<tr id="t1630A" class="r"><td><a href="#t1630A">16:30</a></td><td class="nk">Chouser</td><td>hm, not @ of course.  or * (like python).</td></tr>
+<tr id="t1633A" class="h"><td><a href="#t1633A">16:33</a></td><td class="nu">rhickey</td><td>Chouser: probably not - the best argument for reader syntax is to remove a set of parens, which this doesn't</td></tr>
+<tr id="t1633A" class="h"><td><a href="#t1633A">16:33</a></td><td class="nk">Chouser</td><td>ok</td></tr>
+<tr id="t1637A" class="h"><td><a href="#t1637A">16:37</a></td><td class="nu">hoeck</td><td>rhickey: what about a reader macro like &amp; but not generating a list but instead a hashmap?</td></tr>
+<tr id="t1637A" class="h"><td><a href="#t1637A">16:37</a></td><td class="nh">mebaran151</td><td>what's the best way to do io in clojure</td></tr>
+<tr id="t1637A" class="h r"><td><a href="#t1637A">16:37</a></td><td class="nh">mebaran151</td><td>it seems rather unfortunate to have to call into nasty java to do reads</td></tr>
+<tr id="t1638A" class="h"><td><a href="#t1638A">16:38</a></td><td class="nu">rhickey</td><td>hoeck: looking for keyword args are you?</td></tr>
+<tr id="t1639A" class="h"><td><a href="#t1639A">16:39</a></td><td class="nu">hoeck</td><td>rhickey: yeah, kind of</td></tr>
+<tr id="t1640A"><td><a href="#t1640A">16:40</a></td><td class="nu">cemerick</td><td>oh noes, not more standard read macros! :-)</td></tr>
+<tr id="t1640A" class="h"><td><a href="#t1640A">16:40</a></td><td class="nu">rhickey</td><td>I keep thinking this should just be a destructuring variant, but haven't thought much more than that about it</td></tr>
+<tr id="t1640A" class="h"><td><a href="#t1640A">16:40</a></td><td class="nu">hoeck</td><td>just a thought, i'm doing pretty well with hashmaps</td></tr>
+<tr id="t1640A" class="h"><td><a href="#t1640A">16:40</a></td><td class="nu">cemerick</td><td>rhickey: You mentioned you were taking the reflection out of proxy at some point; has that happened, or not yet?  (I've been concentrating elsewhere of late.)</td></tr>
+<tr id="t1640A" class="h"><td><a href="#t1640A">16:40</a></td><td class="nu">rhickey</td><td>there aren't going to be any infix ops, read-macro or otherwise, this is not Arc</td></tr>
+<tr id="t1641A" class="h"><td><a href="#t1641A">16:41</a></td><td class="nu">hoeck</td><td>i often come across (defn fun [arg options] where options is a hashmap and then somewhere in the function body: (merge options *default-options*)</td></tr>
+<tr id="t1642A" class="h"><td><a href="#t1642A">16:42</a></td><td class="nu">rhickey</td><td>hoeck: it would be easy to write a defnk macro that did the boilerplate for you</td></tr>
+<tr id="t1643A" class="h r"><td><a href="#t1643A">16:43</a></td><td class="nu">rhickey</td><td>cemerick: I haven't figured out if it is possible yet</td></tr>
+<tr id="t1647A" class="h"><td><a href="#t1647A">16:47</a></td><td class="nu">hoeck</td><td>rhickey: what do you think about keyword args, good/bad/ugly??</td></tr>
+<tr id="t1648A" class="h"><td><a href="#t1648A">16:48</a></td><td class="nu">rhickey</td><td>hoeck: I like them, but they are not primitive, so not in fn</td></tr>
+<tr id="t1651A" class="r"><td><a href="#t1651A">16:51</a></td><td class="nu">rhickey</td><td>hoeck: this is an old one I whipped up, even easier now: <a href="http://groups.google.com/group/clojure/msg/51bb53ca077154f8">http://groups.google.com/group/clojure/msg/51bb53ca077154f8</a></td></tr>
+<tr id="t1652A" class="h"><td><a href="#t1652A">16:52</a></td><td class="nu">cemerick</td><td>rhickey: ok, thanks, just checking.  Would you be open to a patch that added a protected function makeNew to PersistentStructMap that passed on all of the arguments needed by PersistentStructMap's constructor, and routed all PersistentStructMap constructor calls through that makeNew function?  Something like that will be necessary in order to implement the structmap/javabean notion we've talked about a couple of times.</td></tr>
+<tr id="t1654A" class="h"><td><a href="#t1654A">16:54</a></td><td class="nu">rhickey</td><td>cemerick: refresh my memory - why is this needed?</td></tr>
+<tr id="t1654A" class="h"><td><a href="#t1654A">16:54</a></td><td class="nu">hoeck</td><td>rhickey: i'm afraid of using keywords cause they are not included in `the standard', it feels like bad style writing my own defn macros</td></tr>
+<tr id="t1655A" class="h r"><td><a href="#t1655A">16:55</a></td><td class="nu">hoeck</td><td>keywords -&gt; keyword args</td></tr>
+<tr id="t1655A" class="h"><td><a href="#t1655A">16:55</a></td><td class="nu">rhickey</td><td>hoeck: then think about a destructuring variant to support them</td></tr>
+<tr id="t1658A" class="h"><td><a href="#t1658A">16:58</a></td><td class="nu">cemerick</td><td>rhickey: I'd like to be able to define a struct that subclasses PersistentStructMap, and whose fixed keys' values are returned by suitably (and automatically) named methods on that subclass.  The patch I just suggested is necessary to allow the subclass to easily return an instance of itself as the result of assoc, etc (rather than it returning an instance of PersistentStructMap).</td></tr>
+<tr id="t1658A" class="h r"><td><a href="#t1658A">16:58</a></td><td class="nu">cemerick</td><td>That makes for a data structure impl that can cross the clojure/java divide, and be used in optimally &quot;native&quot; ways on both sides.</td></tr>
+<tr id="t1703A"><td><a href="#t1703A">17:03</a></td><td class="nu">rhickey</td><td>are the fixed fields stored as Java fields or still in an array?</td></tr>
+<tr id="t1703A" class="h"><td><a href="#t1703A">17:03</a></td><td class="nu">cemerick</td><td>The fixed fields are stored in PersistentStructMap's vals.</td></tr>
+<tr id="t1705A" class="h"><td><a href="#t1705A">17:05</a></td><td class="nu">rhickey</td><td>cemerick: I'm hesitant only because I used to have a lot of that polymorphic construction in the library and it becamse very fragile - and that was with me controlling both base and derivee. You've considered the containment option as well?</td></tr>
+<tr id="t1710A"><td><a href="#t1710A">17:10</a></td><td class="nu">cemerick</td><td>rhickey: Understood.  Yes, composition is my fallback.  The only downside of that is additional complexity in the macro and generated classes involved...but, a downside I'd obviously like to avoid. :-)</td></tr>
+<tr id="t1710A" class="h"><td><a href="#t1710A">17:10</a></td><td class="nu">rhickey</td><td>would Java clients access extended keys?</td></tr>
+<tr id="t1711A" class="h r"><td><a href="#t1711A">17:11</a></td><td class="nu">rhickey</td><td>would there be an interface corresponding to the fixed keys?</td></tr>
+<tr id="t1712A" class="h"><td><a href="#t1712A">17:12</a></td><td class="nu">cemerick</td><td>rhickey: (1) sure, via valAt (or, perhaps via a more idiomatic java method name)</td></tr>
+<tr id="t1712A" class="h r"><td><a href="#t1712A">17:12</a></td><td class="nu">cemerick</td><td>rhickey: (2) yes, each fixed key would get a java method generated for it that fetched the current value of the corresponding key</td></tr>
+<tr id="t1712A" class="h r"><td><a href="#t1712A">17:12</a></td><td class="nu">cemerick</td><td>(2) is what really makes it all worthwhile</td></tr>
+<tr id="t1713A" class="h"><td><a href="#t1713A">17:13</a></td><td class="nu">rhickey</td><td>cemerick: no, I meant an Interface corresponding to the set of fields</td></tr>
+<tr id="t1714A" class="h"><td><a href="#t1714A">17:14</a></td><td class="nu">cemerick</td><td>rhickey: Ah -- not by default -- it'd be a concrete bean.  I would provide an option to specify an interface that the keys map correspond to, though.</td></tr>
+<tr id="t1717A" class="h r"><td><a href="#t1717A">17:17</a></td><td class="nu">cemerick</td><td>rhickey: If you'd prefer, I can post a composed implementation, and we can consider a patch to PSM later.  No need to force these sorts of things on the spot.</td></tr>
+<tr id="t1721A"><td><a href="#t1721A">17:21</a></td><td class="nu">rhickey</td><td>cemerick: the PSM patch would be easy and harmless, it's the evolution/maintenance problem, for instance at some point I'd like to make most data structures Serializable. Do you add any fields in your derivee?</td></tr>
+<tr id="t1723A" class="h"><td><a href="#t1723A">17:23</a></td><td class="nu">cemerick</td><td>rhickey: No -- just what's necessary to make the fixed keys' values available via corresponding methods.  All of the model absolutely stays within clojure.</td></tr>
+<tr id="t1727A" class="h"><td><a href="#t1727A">17:27</a></td><td class="nu">rhickey</td><td>cemerick: alright, why don't you post the patch to the group - did you send me a CA yet? (haven't checked the box yet today)</td></tr>
+<tr id="t1728A" class="h"><td><a href="#t1728A">17:28</a></td><td class="nu">cemerick</td><td>rhickey: OK, will do.  No, I haven't sent in a CA.  I'll ship one to you tomorrow.</td></tr>
+<tr id="t1728A" class="h"><td><a href="#t1728A">17:28</a></td><td class="nu">rhickey</td><td>cemerick: can you email me a scan while it's on the way?</td></tr>
+<tr id="t1729A" class="h"><td><a href="#t1729A">17:29</a></td><td class="nu">cemerick</td><td>rhickey: sure, np</td></tr>
+<tr id="t1729A" class="h r"><td><a href="#t1729A">17:29</a></td><td class="nu">cemerick</td><td>rhickey: thanks, as usual :-)</td></tr>
+<tr id="t1815A"><td><a href="#t1815A">18:15</a></td><td class="nv">meredydd</td><td>rhickey: Say again? What did you mean by &quot;Wouldn't you want read/print for Java types&quot;?</td></tr>
+<tr id="t1907A"><td><a href="#t1907A">19:07</a></td><td class="nu">rhickey</td><td>meredydd: wouldn't you want the printed version of say, ArrayList, to read as an ArrayList (rather than a vector)?</td></tr>
+<tr id="t2009A"><td><a href="#t2009A">20:09</a></td><td class="nv">meredydd</td><td>rhickey: Above all, I'd like it to read as a List.</td></tr>
+<tr id="t2009A" class="h r"><td><a href="#t2009A">20:09</a></td><td class="nv">meredydd</td><td>rhickey: I'd be happy with ArrayList if it round-tripped well</td></tr>
+<tr id="t2009A" class="h"><td><a href="#t2009A">20:09</a></td><td class="nu">rhickey</td><td>List is an interface, read returns a concrete data structure</td></tr>
+<tr id="t2010A" class="r"><td><a href="#t2010A">20:10</a></td><td class="nu">rhickey</td><td>[1 2 3] is going to be a Clojure vector, not an ArrayList</td></tr>
+<tr id="t2010A" class="h"><td><a href="#t2010A">20:10</a></td><td class="nv">meredydd</td><td>Indeed; what I'm saying is that I don't care *what* it is, as long as it implements List</td></tr>
+<tr id="t2010A" class="h"><td><a href="#t2010A">20:10</a></td><td class="nu">rhickey</td><td>so printing ArrayLists as [1 2 3] won't round-tri[p</td></tr>
+<tr id="t2010A" class="h"><td><a href="#t2010A">20:10</a></td><td class="nv">meredydd</td><td>(although I can see that not exactly being an, ahem, general solution :P)</td></tr>
+<tr id="t2011A" class="h r"><td><a href="#t2011A">20:11</a></td><td class="nv">meredydd</td><td>My personal position was that, assuming as I was that there were no extra primitives going to be added to the reader,</td></tr>
+<tr id="t2012A" class="h r"><td><a href="#t2012A">20:12</a></td><td class="nv">meredydd</td><td>that I would prefer an ArrayList to come back as at least *something* implementing List</td></tr>
+<tr id="t2012A" class="h"><td><a href="#t2012A">20:12</a></td><td class="nu">rhickey</td><td>I'm sure the reader will be extended to more Java types</td></tr>
+<tr id="t2012A" class="h"><td><a href="#t2012A">20:12</a></td><td class="nv">meredydd</td><td>rather than a reader failure (which is what would have happened otherwise)</td></tr>
+<tr id="t2012A" class="h r"><td><a href="#t2012A">20:12</a></td><td class="nv">meredydd</td><td>in which case, the assumption upon which I based that feature request was flawed.</td></tr>
+<tr id="t2012A" class="h"><td><a href="#t2012A">20:12</a></td><td class="nu">rhickey</td><td>as I said, probably based on some generic mechanism like JavaBean serialization</td></tr>
+<tr id="t2013A" class="h"><td><a href="#t2013A">20:13</a></td><td class="nv">meredydd</td><td>The underlying problem is &quot;I have an object, I need to get it from here to there&quot;</td></tr>
+<tr id="t2013A" class="h r"><td><a href="#t2013A">20:13</a></td><td class="nv">meredydd</td><td>JavaBean serialisation would do the trick, verbosity notwithstanding.</td></tr>
+<tr id="t2015A" class="h r"><td><a href="#t2015A">20:15</a></td><td class="nv">meredydd</td><td>Ooh, by the way, while we're talking about the reader - there's what looks like a subtle round-tripping bug in the metadata stuff</td></tr>
+<tr id="t2016A" class="h r"><td><a href="#t2016A">20:16</a></td><td class="nv">meredydd</td><td>if you put a map into an obj's :tag</td></tr>
+<tr id="t2016A" class="h r"><td><a href="#t2016A">20:16</a></td><td class="nv">meredydd</td><td>then write it out with metadata output turned on, then read it back in, you get that map as the whole metadata rather then the tag</td></tr>
+<tr id="t2017A" class="h r"><td><a href="#t2017A">20:17</a></td><td class="nv">meredydd</td><td>(why anyone would do this, I have no idea, but it struck me looking through that code)</td></tr>
+<tr id="t2017A" class="h"><td><a href="#t2017A">20:17</a></td><td class="nu">rhickey</td><td>could you paste an example?</td></tr>
+<tr id="t2019A" class="h"><td><a href="#t2019A">20:19</a></td><td class="nv">meredydd</td><td>(def x (with-meta 'quack {:tag {:x 15}}))</td></tr>
+<tr id="t2019A" class="h r"><td><a href="#t2019A">20:19</a></td><td class="nv">meredydd</td><td>(binding [*print-meta* true] (prn x))</td></tr>
+<tr id="t2019A" class="h r"><td><a href="#t2019A">20:19</a></td><td class="nv">meredydd</td><td>--&gt; #^{:x 15} quack</td></tr>
+<tr id="t2020A"><td><a href="#t2020A">20:20</a></td><td class="nu">rhickey</td><td>ah</td></tr>
+<tr id="t2020A" class="h"><td><a href="#t2020A">20:20</a></td><td class="nv">meredydd</td><td>If I can find a more obscure or trivial bug, I shall be sure to let you know ;)</td></tr>
+<tr id="t2021A" class="h r"><td><a href="#t2021A">20:21</a></td><td class="nv">meredydd</td><td>in RT.java:</td></tr>
+<tr id="t2021A" class="h r"><td><a href="#t2021A">20:21</a></td><td class="nv">meredydd</td><td>if(meta.count() == 1 &amp;&amp; meta.containsKey(TAG_KEY))</td></tr>
+<tr id="t2021A" class="h r"><td><a href="#t2021A">20:21</a></td><td class="nv">meredydd</td><td>adding an instanceof check should do it</td></tr>
+<tr id="t2036A"><td><a href="#t2036A">20:36</a></td><td class="nu">rhickey</td><td>wow, XMLEncoder version of ArrayList is verbose!</td></tr>
+</tbody></table></main></body></html>

@@ -1,0 +1,1015 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#clojure – 2013-05-10</title><link rel="stylesheet" href="../style.css"></head><body>
+<header class="sh"><a class="st" href="../index.html">#clojure logs</a><nav class="dn"><a href="2013-05-09.html">&larr;</a><span>2013-05-10</span><a href="2013-05-11.html">&rarr;</a></nav></header>
+<main><p class="dh">2013-05-10</p><table class="lg"><tbody>
+<tr id="t0004A"><td><a href="#t0004A">00:04</a></td><td class="n0">djwonk</td><td>I want to wrap function calls to handle a SQLException. I'd like to do it without writing a macro if possible.</td></tr>
+<tr id="t0005A" class="h r"><td><a href="#t0005A">00:05</a></td><td class="n0">djwonk</td><td>`apply` gets me part of the way there, but not completely</td></tr>
+<tr id="t0006A" class="h r"><td><a href="#t0006A">00:06</a></td><td class="n0">djwonk</td><td>but since `try` is a special form, is it reasonable to think I can create a custom try that is not a macro?</td></tr>
+<tr id="t0007A" class="h"><td><a href="#t0007A">00:07</a></td><td class="nl">darrickw</td><td>djwonk: do you want to wrap the function so that you can call it later but the wrapper handles the exception?</td></tr>
+<tr id="t0008A" class="h"><td><a href="#t0008A">00:08</a></td><td class="n0">djwonk</td><td>darrickw: not sure I understand your question. I want the wrapper to contain the try/catch</td></tr>
+<tr id="t0008A" class="h r"><td><a href="#t0008A">00:08</a></td><td class="n0">djwonk</td><td>I mean… to abstract out the try/catch</td></tr>
+<tr id="t0009A" class="h r"><td><a href="#t0009A">00:09</a></td><td class="n0">djwonk</td><td>I don't think I need to wrap the original function (possibly exception-causing function) to call it later</td></tr>
+<tr id="t0009A" class="h"><td><a href="#t0009A">00:09</a></td><td class="nl">darrickw</td><td>Ok so you want to do the wrapping in place where you call the function then?</td></tr>
+<tr id="t0011A" class="r"><td><a href="#t0011A">00:11</a></td><td class="nl">darrickw</td><td>You just need a regular function to do that</td></tr>
+<tr id="t0011A" class="h"><td><a href="#t0011A">00:11</a></td><td class="n0">djwonk</td><td>darrickw: sounds about right</td></tr>
+<tr id="t0012A" class="h"><td><a href="#t0012A">00:12</a></td><td class="nl">darrickw</td><td>(defn a-wrapper [the-fn-to-wrap &amp; args] (try (apply the-fn-to-wrap args) (catch TheException ex (do-something ex))))</td></tr>
+<tr id="t0012A" class="h r"><td><a href="#t0012A">00:12</a></td><td class="nl">darrickw</td><td>something like that could do it</td></tr>
+<tr id="t0013A" class="h r"><td><a href="#t0013A">00:13</a></td><td class="nl">darrickw</td><td>then you call it like this: (a-wrapper the-fn arg1 arg2)</td></tr>
+<tr id="t0013A" class="h"><td><a href="#t0013A">00:13</a></td><td class="n0">djwonk</td><td>darrickw: thanks</td></tr>
+<tr id="t0013A" class="h r"><td><a href="#t0013A">00:13</a></td><td class="n0">djwonk</td><td>I'm running into a double apply situation with jdbc/create-table, but I can figure it out</td></tr>
+<tr id="t0019A" class="h"><td><a href="#t0019A">00:19</a></td><td class="ns">gdev</td><td>djwonk:) what database are you using?</td></tr>
+<tr id="t0055A"><td><a href="#t0055A">00:55</a></td><td class="n0">n_b</td><td>sis there a way to break out of a doseq?</td></tr>
+<tr id="t0100A"><td><a href="#t0100A">01:00</a></td><td class="ns">technomancy</td><td>n_b: doseq has a :while clause; it should stop once that is fasy</td></tr>
+<tr id="t0100A" class="h r"><td><a href="#t0100A">01:00</a></td><td class="ns">technomancy</td><td>falsy</td></tr>
+<tr id="t0101A" class="h"><td><a href="#t0101A">01:01</a></td><td class="n0">n_b</td><td>Ah, didn't see that! That's perfect, thanks technomancy</td></tr>
+<tr id="t0101A" class="h r"><td><a href="#t0101A">01:01</a></td><td class="n0">n_b</td><td>Same clauses as for, always forget</td></tr>
+<tr id="t0102A" class="h"><td><a href="#t0102A">01:02</a></td><td class="ns">technomancy</td><td>there are a lot</td></tr>
+<tr id="t0109A" class="h"><td><a href="#t0109A">01:09</a></td><td class="nm">amalloy</td><td>doseq doesn't necessarily do what you want, there, if you're iterating through multiple sequences</td></tr>
+<tr id="t0111A" class="r"><td><a href="#t0111A">01:11</a></td><td class="nm">amalloy</td><td>eg, (doseq [a (range 5) b (range 10) :while (&lt; b a)] (...)) doesn't abort the entire doseq. it stops going through b, and starts up with the next a. ##(for [a (range 5) b (range 10) :while (&lt; b a)] [a b])</td></tr>
+<tr id="t0111A" class="h"><td><a href="#t0111A">01:11</a></td><td class="nx">lazybot</td><td>⇒ ([1 0] [2 0] [2 1] [3 0] [3 1] [3 2] [4 0] [4 1] [4 2] [4 3])</td></tr>
+<tr id="t0112A" class="h"><td><a href="#t0112A">01:12</a></td><td class="nm">amalloy</td><td>unintuitive, but much more useful than the alternative. anyway, n_b, technomancy: just a thing to keep in mind</td></tr>
+<tr id="t0112A" class="h"><td><a href="#t0112A">01:12</a></td><td class="ns">technomancy</td><td>nutty</td></tr>
+<tr id="t0113A" class="h"><td><a href="#t0113A">01:13</a></td><td class="ns">gdev</td><td>the more you know ...*</td></tr>
+<tr id="t0113A" class="h"><td><a href="#t0113A">01:13</a></td><td class="n0">n_b</td><td>Ah, interesting</td></tr>
+<tr id="t0114A" class="h r"><td><a href="#t0114A">01:14</a></td><td class="n0">n_b</td><td>Fortunately I'm only going through one seq, but I'm sure I'll get bitten by that somewhere down the line and come back here to be reminded of it</td></tr>
+<tr id="t0114A" class="h r"><td><a href="#t0114A">01:14</a></td><td class="n0">n_b</td><td>better go write that down</td></tr>
+<tr id="t0117A" class="h"><td><a href="#t0117A">01:17</a></td><td class="nm">amalloy</td><td>technomancy: not actually nutty at all. if you want a &quot;global&quot; stop parameter, you can just (doseq [[x y] (take-while keep-going? (for [x xs, y ys] [x y]))] ...) or something similar, whereas if doseq/for had a global-stop built in instead, you couldn't easily get the current behavior</td></tr>
+<tr id="t0119A" class="h"><td><a href="#t0119A">01:19</a></td><td class="ns">gdev</td><td>I know I should be using jdbc library to batch update my database, but I was doing a doseq to create my update statements, I wonder if thats why the database had to parse each statement instead of pulling it straight from cache like is supposed to happen with bind variables</td></tr>
+<tr id="t0119A" class="h"><td><a href="#t0119A">01:19</a></td><td class="ns">technomancy</td><td>amalloy: I suppose so, but it'd be really easy to write code that does a lot more checks than it looks like</td></tr>
+<tr id="t0119A" class="h r"><td><a href="#t0119A">01:19</a></td><td class="ns">technomancy</td><td>though I suppose the correctness isn't affected</td></tr>
+<tr id="t0144A"><td><a href="#t0144A">01:44</a></td><td class="nm">muhoo</td><td>what's the new latest-jdbc-approved, non-deprecated method of doing a couple jdbc operations inside a transaction?</td></tr>
+<tr id="t0144A" class="h"><td><a href="#t0144A">01:44</a></td><td class="ns">gdev</td><td>nice, looks like I don't need to pull an all-nighter; company bbq canceled due to weather, will get a lot of alone time at the repl tomorrow.</td></tr>
+<tr id="t0145A" class="h"><td><a href="#t0145A">01:45</a></td><td class="nm">muhoo</td><td>i've seen examples or using transaction, but that's deprecated, and haven't gotten my brain around the new db-transaction replacement</td></tr>
+<tr id="t0145A" class="h r"><td><a href="#t0145A">01:45</a></td><td class="nm">muhoo</td><td>looking for an example somewhere</td></tr>
+<tr id="t0148A" class="h"><td><a href="#t0148A">01:48</a></td><td class="ns">gdev</td><td>muhoo:) the sql dsl that he wrote i thought was what replaced transaction</td></tr>
+<tr id="t0148A" class="h"><td><a href="#t0148A">01:48</a></td><td class="nm">muhoo</td><td>the dsl is optional, i think.</td></tr>
+<tr id="t0149A" class="h r"><td><a href="#t0149A">01:49</a></td><td class="nm">muhoo</td><td>i'm using honeysql and i like that way better. but it still uses jdbc as transport</td></tr>
+<tr id="t0149A" class="h r"><td><a href="#t0149A">01:49</a></td><td class="nm">muhoo</td><td>there's a function db-transaction*, looks like what replaced it, but the usage is kinda weird.</td></tr>
+<tr id="t0150A" class="r"><td><a href="#t0150A">01:50</a></td><td class="nm">muhoo</td><td>the macro wants bindings, but i'm not a bindings kind of guy, i like passing db handles in explicitly instead of with-foo-earmuffs stuf</td></tr>
+<tr id="t0150A" class="h r"><td><a href="#t0150A">01:50</a></td><td class="nm">muhoo</td><td>anyway, i think i got it, it just looks ugly to me.</td></tr>
+<tr id="t0152A" class="h"><td><a href="#t0152A">01:52</a></td><td class="nc">mthvedt</td><td>what can cause &quot;abstractmethoderror: null&quot;</td></tr>
+<tr id="t0152A" class="h"><td><a href="#t0152A">01:52</a></td><td class="ns">gdev</td><td>muhoo:)   can you post what you got on refheap?  I always like seeing different ways to do things</td></tr>
+<tr id="t0153A" class="h"><td><a href="#t0153A">01:53</a></td><td class="nm">muhoo</td><td>gdev: it's a one-liner: (jdbc/db-transaction* db-handle #(do (i have to) (do it this way weird)))</td></tr>
+<tr id="t0153A" class="h"><td><a href="#t0153A">01:53</a></td><td class="ns">gdev</td><td>also, honeysql gets my vote for best name of a sql dsl library</td></tr>
+<tr id="t0154A" class="h"><td><a href="#t0154A">01:54</a></td><td class="nm">muhoo</td><td>works, just feels dirty. the macro version feels dirtier, because it expects bindings like the old transaction macro used to. ain't no thing.</td></tr>
+<tr id="t0154A" class="h r"><td><a href="#t0154A">01:54</a></td><td class="nm">muhoo</td><td>and db-do-commands may be the right way</td></tr>
+<tr id="t0156A" class="h r"><td><a href="#t0156A">01:56</a></td><td class="nm">muhoo</td><td>i'm a total honeysql fanboi now. i only wish it did update! and insert! but i guess i can submit! patches! at some point</td></tr>
+<tr id="t0156A" class="h"><td><a href="#t0156A">01:56</a></td><td class="ns">gdev</td><td>muhoo:) i'm still struggling to get batch updates to act right, so it's better to feel dirty when your stuff works than to feel dumbfounded even though your code is pertty</td></tr>
+<tr id="t0159A" class="h"><td><a href="#t0159A">01:59</a></td><td class="nm">muhoo</td><td>this stuff is just weird. the jdbc library looks like it kind of grew organically</td></tr>
+<tr id="t0200A" class="r"><td><a href="#t0200A">02:00</a></td><td class="nm">muhoo</td><td>didn't devn write a tool that would search github for all instances of a function or identifier and deliver a bunch of code examples of its usage in the wild?</td></tr>
+<tr id="t0201A" class="h"><td><a href="#t0201A">02:01</a></td><td class="ns">gdev</td><td>wow a truly global usage search huh</td></tr>
+<tr id="t0202A" class="h"><td><a href="#t0202A">02:02</a></td><td class="nm">muhoo</td><td>it was a very cool idea, and he had something working IIRC</td></tr>
+<tr id="t0203A" class="h r"><td><a href="#t0203A">02:03</a></td><td class="nm">muhoo</td><td>oh, here's the docs i was looking for: <a href="https://github.com/clojure/java.jdbc/tree/master/doc/clojure/java/jdbc">https://github.com/clojure/java.jdbc/tree/master/doc/clojure/java/jdbc</a></td></tr>
+<tr id="t0204A" class="h"><td><a href="#t0204A">02:04</a></td><td class="ns">gdev</td><td>one of those says &quot;using sql&quot; is that referring to the optional dsl or the core library?</td></tr>
+<tr id="t0205A" class="h"><td><a href="#t0205A">02:05</a></td><td class="nm">muhoo</td><td>aha! (j/db-transaction [t-con db] (something t-con) (something-else t-con)) very nice</td></tr>
+<tr id="t0205A" class="h r"><td><a href="#t0205A">02:05</a></td><td class="nm">muhoo</td><td>THAT is what i was looking for.</td></tr>
+<tr id="t0206A" class="h r"><td><a href="#t0206A">02:06</a></td><td class="nm">muhoo</td><td>i think the binding is unnecessary, but whatevs</td></tr>
+<tr id="t0206A" class="h r"><td><a href="#t0206A">02:06</a></td><td class="nm">muhoo</td><td>redndant, why bind db to t-con, why not just use db?</td></tr>
+<tr id="t0207A" class="h"><td><a href="#t0207A">02:07</a></td><td class="ns">gdev</td><td>muhoo:) have you read the clojure data analysis cookbook?</td></tr>
+<tr id="t0208A" class="h"><td><a href="#t0208A">02:08</a></td><td class="nm">muhoo</td><td>no, link?</td></tr>
+<tr id="t0209A" class="h"><td><a href="#t0209A">02:09</a></td><td class="ns">gdev</td><td><a href="http://www.amazon.com/Clojure-Data-Analysis-Cookbook-Rochester/dp/178216264X">http://www.amazon.com/Clojure-Data-Analysis-Cookbook-Rochester/dp/178216264X</a></td></tr>
+<tr id="t0212A"><td><a href="#t0212A">02:12</a></td><td class="nm">muhoo</td><td>hmm. did you like it?</td></tr>
+<tr id="t0214A" class="h"><td><a href="#t0214A">02:14</a></td><td class="ns">gdev</td><td>Yeah, I like what I've read so far and I typically don't like cookbooks</td></tr>
+<tr id="t0229A" class="r"><td><a href="#t0229A">02:29</a></td><td class="ns">gdev</td><td>okay, now that my phone has some charge i can load the kindle app and see what the book says about jdbc transactions</td></tr>
+<tr id="t0242A" class="r"><td><a href="#t0242A">02:42</a></td><td class="ns">gdev</td><td>looks like the book is only concerned with reading data from the database.  makes sense I guess, it's a book about analysis not database programming.  That would probably be a book on its own</td></tr>
+<tr id="t0326A"><td><a href="#t0326A">03:26</a></td><td class="nm">muhoo</td><td>,doc empty?</td></tr>
+<tr id="t0326A" class="h"><td><a href="#t0326A">03:26</a></td><td class="nl">clojurebot</td><td>#&lt;CompilerException java.lang.RuntimeException: Can't take value of a macro: #'clojure.repl/doc, compiling:(NO_SOURCE_PATH:0:0)&gt;</td></tr>
+<tr id="t0326A" class="h"><td><a href="#t0326A">03:26</a></td><td class="nm">muhoo</td><td>,(doc empty?)</td></tr>
+<tr id="t0326A" class="h"><td><a href="#t0326A">03:26</a></td><td class="nl">clojurebot</td><td>&quot;([coll]); Returns true if coll has no items - same as (not (seq coll)). Please use the idiom (seq x) rather than (not (empty? x))&quot;</td></tr>
+<tr id="t0327A" class="h"><td><a href="#t0327A">03:27</a></td><td class="nm">muhoo</td><td>,(doc not-empty?)</td></tr>
+<tr id="t0327A" class="h"><td><a href="#t0327A">03:27</a></td><td class="nl">clojurebot</td><td>Pardon?</td></tr>
+<tr id="t0327A" class="h"><td><a href="#t0327A">03:27</a></td><td class="nm">muhoo</td><td>aha! y you not named not-empty?</td></tr>
+<tr id="t0327A" class="h r"><td><a href="#t0327A">03:27</a></td><td class="nm">muhoo</td><td>,(doc not-empty)</td></tr>
+<tr id="t0327A" class="h"><td><a href="#t0327A">03:27</a></td><td class="nl">clojurebot</td><td>&quot;([coll]); If coll is empty, returns nil, else coll&quot;</td></tr>
+<tr id="t0327A" class="h"><td><a href="#t0327A">03:27</a></td><td class="nm">muhoo</td><td>i think that's the first naming inconsistency i've found in clojure</td></tr>
+<tr id="t0329A" class="h"><td><a href="#t0329A">03:29</a></td><td class="nw">esmo_</td><td>it's not a predicate (doesn't return a boolean)</td></tr>
+<tr id="t0402A"><td><a href="#t0402A">04:02</a></td><td class="nm">muhoo</td><td>interesting. actually docstring says that not-empty isn't the same as (not (empty?)), and it says</td></tr>
+<tr id="t0402A" class="h r"><td><a href="#t0402A">04:02</a></td><td class="nm">muhoo</td><td>Please use the idiom (seq x) rather than (not (empty? x))</td></tr>
+<tr id="t0403A" class="h r"><td><a href="#t0403A">04:03</a></td><td class="nm">muhoo</td><td>so i guess, that</td></tr>
+<tr id="t0820A"><td><a href="#t0820A">08:20</a></td><td class="nl">pellis</td><td>hi all, i'm looking for a way to mount ring handlers on urls (no need for routing, just mounting handlers)</td></tr>
+<tr id="t0820A" class="h r"><td><a href="#t0820A">08:20</a></td><td class="nl">pellis</td><td>anyone bumped into how to do this?</td></tr>
+<tr id="t0821A" class="h"><td><a href="#t0821A">08:21</a></td><td class="nj">weavejester</td><td>What's the difference between routing and mounting ring handlers on urls?</td></tr>
+<tr id="t0823A" class="h"><td><a href="#t0823A">08:23</a></td><td class="nl">pellis</td><td>weavejester, well i don't want to waste cycles on a routing matcher that checks my http method, or tries a regex against it</td></tr>
+<tr id="t0824A" class="h r"><td><a href="#t0824A">08:24</a></td><td class="nl">pellis</td><td>just /v1/api goes to handlerfoo, /v2/api goes to handlerfoo-2</td></tr>
+<tr id="t0824A" class="h"><td><a href="#t0824A">08:24</a></td><td class="nj">weavejester</td><td>So you could just use a case statement</td></tr>
+<tr id="t0825A" class="h r"><td><a href="#t0825A">08:25</a></td><td class="nj">weavejester</td><td>Or, I guess in this case you want to match against a prefix?</td></tr>
+<tr id="t0825A" class="h r"><td><a href="#t0825A">08:25</a></td><td class="nj">weavejester</td><td>So...</td></tr>
+<tr id="t0825A" class="h"><td><a href="#t0825A">08:25</a></td><td class="nl">pellis</td><td>yes</td></tr>
+<tr id="t0825A" class="h r"><td><a href="#t0825A">08:25</a></td><td class="nl">pellis</td><td>i'm looking for the equivalent of rack-mount from ruby world</td></tr>
+<tr id="t0826A" class="h"><td><a href="#t0826A">08:26</a></td><td class="nj">weavejester</td><td>(cond (.startsWith (:uri request) &quot;/v1/api&quot;) (handler request) ...)</td></tr>
+<tr id="t0826A" class="h r"><td><a href="#t0826A">08:26</a></td><td class="nj">weavejester</td><td>But that's probably overkill</td></tr>
+<tr id="t0826A" class="h r"><td><a href="#t0826A">08:26</a></td><td class="nj">weavejester</td><td>You could just use Compojure. Regexs are fast enough.</td></tr>
+<tr id="t0826A" class="h"><td><a href="#t0826A">08:26</a></td><td class="nl">pellis</td><td>ok</td></tr>
+<tr id="t0827A" class="h"><td><a href="#t0827A">08:27</a></td><td class="nj">weavejester</td><td>(routes (ANY &quot;/v1/api&quot; [] handlerfoo) (ANY &quot;/v2/api&quot; [] handlerfoo-2))</td></tr>
+<tr id="t0829A" class="h"><td><a href="#t0829A">08:29</a></td><td class="nl">pellis</td><td>weavejester, is that compojure?</td></tr>
+<tr id="t0830A"><td><a href="#t0830A">08:30</a></td><td class="nj">weavejester</td><td>pellis: Yep</td></tr>
+<tr id="t0830A" class="h"><td><a href="#t0830A">08:30</a></td><td class="nl">pellis</td><td>I'm wondering how much overhead in performance will that take</td></tr>
+<tr id="t0830A" class="h"><td><a href="#t0830A">08:30</a></td><td class="nj">weavejester</td><td>pellis: Let me run some numbers for you, as I'm curious myself</td></tr>
+<tr id="t0830A" class="h"><td><a href="#t0830A">08:30</a></td><td class="no">rasputnik</td><td>hi all, i need to filter a seq of maps by testing keys - what functions should i be looking  at?</td></tr>
+<tr id="t0831A" class="h"><td><a href="#t0831A">08:31</a></td><td class="nl">pellis</td><td>i might sound to you like the naive hysteric premature optimizer - but I assure you i'm not. this specific project needs to be carefully handled with LOCs unfortunately.</td></tr>
+<tr id="t0831A" class="h"><td><a href="#t0831A">08:31</a></td><td class="no">rasputnik</td><td># it's a map of ssl keys and i want to return those with an expiry date less than a given number of days</td></tr>
+<tr id="t0832A" class="h"><td><a href="#t0832A">08:32</a></td><td class="nl">pellis</td><td>weavejester, I chose Clojure because it won over Go and Node.js, (however didn't test it against the newer Go betas and RCs that are not famously performant)</td></tr>
+<tr id="t0834A" class="h"><td><a href="#t0834A">08:34</a></td><td class="nj">pjstadig</td><td>rasputnik: something like (filter (fn [key] (&lt; (get-exp-days key) the-date)) keys)</td></tr>
+<tr id="t0834A" class="h"><td><a href="#t0834A">08:34</a></td><td class="n5">ucb</td><td>,(doc filter)</td></tr>
+<tr id="t0834A" class="h r"><td><a href="#t0834A">08:34</a></td><td class="n5">ucb</td><td>rasputnik: ^</td></tr>
+<tr id="t0834A" class="h"><td><a href="#t0834A">08:34</a></td><td class="nl">clojurebot</td><td>&quot;([pred coll]); Returns a lazy sequence of the items in coll for which (pred item) returns true. pred must be free of side-effects.&quot;</td></tr>
+<tr id="t0834A" class="h"><td><a href="#t0834A">08:34</a></td><td class="nj">pjstadig</td><td>or if you want to be fancier (filter #(&lt; (get-exp-days %) the-date) keys)</td></tr>
+<tr id="t0835A" class="h"><td><a href="#t0835A">08:35</a></td><td class="no">rasputnik</td><td>pjstadig, ucb : cheers both.</td></tr>
+<tr id="t0835A" class="h"><td><a href="#t0835A">08:35</a></td><td class="nj">weavejester</td><td>pellis: Okay, I'm just writing out a quick benchmark. Should be a few minutes.</td></tr>
+<tr id="t0836A" class="h"><td><a href="#t0836A">08:36</a></td><td class="nl">pellis</td><td>weavejester, cool!</td></tr>
+<tr id="t0851A"><td><a href="#t0851A">08:51</a></td><td class="nj">weavejester</td><td>pellis: Both approaches look to be about the same speed. There's maybe a microsecond between them, but I'd guess hotspot is doing a good job at optimising things out.</td></tr>
+<tr id="t0851A" class="h r"><td><a href="#t0851A">08:51</a></td><td class="nj">weavejester</td><td>pellis: I'll give you my REPL logs in a gist</td></tr>
+<tr id="t0851A" class="h"><td><a href="#t0851A">08:51</a></td><td class="nl">pellis</td><td>weavejester, thanks, very nice of you !</td></tr>
+<tr id="t0853A" class="h"><td><a href="#t0853A">08:53</a></td><td class="nj">weavejester</td><td>Huh, gists aren't working...</td></tr>
+<tr id="t0854A" class="h"><td><a href="#t0854A">08:54</a></td><td class="nl">pellis</td><td>yes, i think they have a security bug</td></tr>
+<tr id="t0854A" class="h r"><td><a href="#t0854A">08:54</a></td><td class="nl">pellis</td><td>i thought i'm the only one. looks like a redirect loop, and then some blurb about login/authentication errors</td></tr>
+<tr id="t0854A" class="h"><td><a href="#t0854A">08:54</a></td><td class="nj">weavejester</td><td>pellis: <a href="https://www.refheap.com/paste/14390">https://www.refheap.com/paste/14390</a></td></tr>
+<tr id="t0855A" class="h"><td><a href="#t0855A">08:55</a></td><td class="nl">pellis</td><td>might also be stale cookies</td></tr>
+<tr id="t0855A" class="h"><td><a href="#t0855A">08:55</a></td><td class="nm">redline6561</td><td>lam</td></tr>
+<tr id="t0855A" class="h r"><td><a href="#t0855A">08:55</a></td><td class="nm">redline6561</td><td>ahem, excuse me</td></tr>
+<tr id="t0856A" class="h"><td><a href="#t0856A">08:56</a></td><td class="nl">pellis</td><td>weavejester, that's very useful. i think - when you'll see a bigger difference will be with big urls</td></tr>
+<tr id="t0856A" class="h r"><td><a href="#t0856A">08:56</a></td><td class="nl">pellis</td><td>weavejester, for example /api/v1?&lt;some 1000 characters&gt;</td></tr>
+<tr id="t0856A" class="h r"><td><a href="#t0856A">08:56</a></td><td class="nl">pellis</td><td>unless regex are smart enough to not glob when it's just &quot;*&quot;</td></tr>
+<tr id="t0857A" class="h"><td><a href="#t0857A">08:57</a></td><td class="nj">weavejester</td><td>pellis: Anything after ? is the query string and not matched, but regexes are pretty optimised.</td></tr>
+<tr id="t0857A" class="h"><td><a href="#t0857A">08:57</a></td><td class="nl">pellis</td><td>well then /api/v1/foo/&lt;some 1000 chars&gt;</td></tr>
+<tr id="t0858A" class="h"><td><a href="#t0858A">08:58</a></td><td class="nj">weavejester</td><td>pellis: I suspect that you'd still see little difference. But lets try it :)</td></tr>
+<tr id="t0858A" class="h"><td><a href="#t0858A">08:58</a></td><td class="nl">pellis</td><td>weavejester, you might be surprised, most websites can be ddos'ed with just very big urls.</td></tr>
+<tr id="t0858A" class="h r"><td><a href="#t0858A">08:58</a></td><td class="nl">pellis</td><td>especially if you have double captures like v1/*foo*bar</td></tr>
+<tr id="t0859A" class="h r"><td><a href="#t0859A">08:59</a></td><td class="nl">pellis</td><td>if you're not building-in protection, then you're limited to browser's 8k characters at the url. but anyone smart enough can just not use the browser and bombard you with 50k of url string</td></tr>
+<tr id="t0900A" class="r"><td><a href="#t0900A">09:00</a></td><td class="nl">pellis</td><td>plus, i've seen such attacks live in production 3 years ago :)</td></tr>
+<tr id="t0900A" class="h"><td><a href="#t0900A">09:00</a></td><td class="nz">juhu_chapa</td><td>Hi all. Is there anything like a blocking queue in clojure?</td></tr>
+<tr id="t0901A" class="h"><td><a href="#t0901A">09:01</a></td><td class="nj">weavejester</td><td>juhu_chapa: Typically you can just use the Java blocking queues</td></tr>
+<tr id="t0903A" class="h"><td><a href="#t0903A">09:03</a></td><td class="nz">juhu_chapa</td><td>:D</td></tr>
+<tr id="t0907A" class="h"><td><a href="#t0907A">09:07</a></td><td class="ng">vijaykiran</td><td>mu4e</td></tr>
+<tr id="t0910A"><td><a href="#t0910A">09:10</a></td><td class="nj">weavejester</td><td>pellis: Looks like the URL length does affect the time. My guess is because Compojure is capturing the * part in a matching group, whereas the .startsWith can just discard it.</td></tr>
+<tr id="t0910A" class="h"><td><a href="#t0910A">09:10</a></td><td class="nl">pellis</td><td>weavejester, yes, like i suspected :)</td></tr>
+<tr id="t0911A" class="h"><td><a href="#t0911A">09:11</a></td><td class="nj">weavejester</td><td>pellis: With a URL of length 1000, it's a difference of 4us to 40us</td></tr>
+<tr id="t0911A" class="h"><td><a href="#t0911A">09:11</a></td><td class="nl">pellis</td><td>weavejester, i guess this is the conceptual difference between mount and route - O(1) vs O(n)</td></tr>
+<tr id="t0911A" class="h"><td><a href="#t0911A">09:11</a></td><td class="nj">weavejester</td><td>weavejester: I suspect that if Compojure *wasn't* capturing it the wildcard, that we wouldn't see a difference.</td></tr>
+<tr id="t0913A" class="h r"><td><a href="#t0913A">09:13</a></td><td class="nj">weavejester</td><td>pellis: Well, it doesn't have to be that way. I've been toying around with the idea of just discarding *, as if you really wanted it, you'd give it a name.</td></tr>
+<tr id="t0913A" class="h"><td><a href="#t0913A">09:13</a></td><td class="nl">pellis</td><td>weavejester, i understand</td></tr>
+<tr id="t0913A" class="h"><td><a href="#t0913A">09:13</a></td><td class="nj">weavejester</td><td>pellis: But given the implementations at the moment, yes, you're correct.</td></tr>
+<tr id="t0915A" class="h"><td><a href="#t0915A">09:15</a></td><td class="nl">pellis</td><td>ok, so I'll opt for your first suggestion - thanks for the help :)</td></tr>
+<tr id="t0954A"><td><a href="#t0954A">09:54</a></td><td class="nz">learner</td><td>Hello Gurus. A newbie question here. I have a huge lazy sequence (say 2 or 20 Million strings). Among all, I am interested in finding only one particular string position (just need a rough value). I can use loop, recur updating an atom (count). But it's slow. Since I don't need exact position, I can use Threads. But I am not sure how to. Any hints?</td></tr>
+<tr id="t0957A" class="h"><td><a href="#t0957A">09:57</a></td><td class="na">AimHere</td><td>That sounds like you want to crack open a book on algorithms</td></tr>
+<tr id="t0958A" class="h r"><td><a href="#t0958A">09:58</a></td><td class="na">AimHere</td><td>First find the most efficient known way of doing it, then worry about the details of which bits are threaded and whether to use recur or whatever later</td></tr>
+<tr id="t1000A"><td><a href="#t1000A">10:00</a></td><td class="nz">learner</td><td>AimHere: Yes, may be I should go and read algorithms. Wondering if I can find any help from the community who experienced similar problems.</td></tr>
+<tr id="t1001A" class="h"><td><a href="#t1001A">10:01</a></td><td class="nw">pppaul</td><td>learner sorted?</td></tr>
+<tr id="t1002A" class="h"><td><a href="#t1002A">10:02</a></td><td class="nz">learner</td><td>pppaul: No, not sorted. But fixed size strings</td></tr>
+<tr id="t1003A" class="h"><td><a href="#t1003A">10:03</a></td><td class="nw">pppaul</td><td>brute force + memoize :)</td></tr>
+<tr id="t1004A" class="h r"><td><a href="#t1004A">10:04</a></td><td class="nw">pppaul</td><td>you can use partition + map indexed</td></tr>
+<tr id="t1004A" class="h"><td><a href="#t1004A">10:04</a></td><td class="na">AimHere</td><td>My naive guess as to how to do it would be to check the first character of all strings - then you discard all the nonmatches and you've a considerably smaller set to sift through for the second pass, and the second character</td></tr>
+<tr id="t1004A" class="h r"><td><a href="#t1004A">10:04</a></td><td class="na">AimHere</td><td>Basically sieve it</td></tr>
+<tr id="t1005A" class="h"><td><a href="#t1005A">10:05</a></td><td class="nw">pppaul</td><td>you can put this data in a mem datomic and use it's fulltext search</td></tr>
+<tr id="t1005A" class="h r"><td><a href="#t1005A">10:05</a></td><td class="nw">pppaul</td><td>index the strings first [{:index 0 :body &quot;my string&quot;}]</td></tr>
+<tr id="t1005A" class="h"><td><a href="#t1005A">10:05</a></td><td class="nz">learner</td><td>pppaul: Yeah, brute force is the only way. And memorize may not be required because all strings are fixed size, unique. I am thinking of kicking off some 20 threads (fixed) on collection each taking one string and comparing with the String I want. If found, update atom flag. If flag=true no more new threads should be created. But not sure how to do that!</td></tr>
+<tr id="t1007A" class="h"><td><a href="#t1007A">10:07</a></td><td class="nw">pppaul</td><td>learning, make this problem constant time, or fit it into pmap, or fit it into reducers</td></tr>
+<tr id="t1007A" class="h"><td><a href="#t1007A">10:07</a></td><td class="nv">edbond_</td><td>learner, you need map-indexed</td></tr>
+<tr id="t1007A" class="h"><td><a href="#t1007A">10:07</a></td><td class="nw">pppaul</td><td>personally, i would use constant time lookup</td></tr>
+<tr id="t1007A" class="h r"><td><a href="#t1007A">10:07</a></td><td class="nw">pppaul</td><td>map-indexed + groupby</td></tr>
+<tr id="t1007A" class="h"><td><a href="#t1007A">10:07</a></td><td class="nv">edbond_</td><td>pppaul, he needs only index of that string</td></tr>
+<tr id="t1008A" class="h"><td><a href="#t1008A">10:08</a></td><td class="nw">pppaul</td><td>?</td></tr>
+<tr id="t1008A" class="h"><td><a href="#t1008A">10:08</a></td><td class="nn">AWizzArd</td><td>Anyone here who has a K10, K20 or K20x?</td></tr>
+<tr id="t1008A" class="h"><td><a href="#t1008A">10:08</a></td><td class="nv">edbond_</td><td>,(first (drop-while nil? (map-indexed (fn [i x] (if (&gt; x 10) [i x])) (range 30))))</td></tr>
+<tr id="t1008A" class="h"><td><a href="#t1008A">10:08</a></td><td class="nl">clojurebot</td><td>[11 11]</td></tr>
+<tr id="t1008A" class="h"><td><a href="#t1008A">10:08</a></td><td class="nw">pppaul</td><td>?</td></tr>
+<tr id="t1009A" class="h"><td><a href="#t1009A">10:09</a></td><td class="nv">edbond_</td><td>first is index, second is value</td></tr>
+<tr id="t1009A" class="h r"><td><a href="#t1009A">10:09</a></td><td class="nv">edbond_</td><td>change (&gt; x 10)    (= x &quot;lookup-string&quot;)</td></tr>
+<tr id="t1010A"><td><a href="#t1010A">10:10</a></td><td class="nz">learner</td><td>pppaul: edbond: AimHere: Ex:- I have a sequence something like ('abc 'cba 'aaa 'bbb 'bca 'ccc 'bac 'cab...............) I want to find the index of 'ccc which is 5. If I can find a program which gives me 4 or 6 is also fine as I don't need exact index. But I need to be sure that string exist + I need rough index. And the sequence in reality is so huge</td></tr>
+<tr id="t1010A" class="h"><td><a href="#t1010A">10:10</a></td><td class="nw">pppaul</td><td>,(first (group-by :body (map-indexed #(hash-map :index %1 :body %2) [&quot;lalal&quot; &quot;bababa&quot;])))</td></tr>
+<tr id="t1010A" class="h"><td><a href="#t1010A">10:10</a></td><td class="nl">clojurebot</td><td>[&quot;lalal&quot; [{:index 0, :body &quot;lalal&quot;}]]</td></tr>
+<tr id="t1010A" class="h"><td><a href="#t1010A">10:10</a></td><td class="na">dnolen</td><td>learner: if you have a lazy sequence and a trivial computation I'm skeptical using thread will help.</td></tr>
+<tr id="t1011A" class="h"><td><a href="#t1011A">10:11</a></td><td class="nw">pppaul</td><td>i don't think that 20 mil is a lot</td></tr>
+<tr id="t1011A" class="h"><td><a href="#t1011A">10:11</a></td><td class="na">dnolen</td><td>you could put the whole thing in memory but that will take time at it seems like ~1GB for say a vector + whatever memeory those strings take up.</td></tr>
+<tr id="t1012A" class="h"><td><a href="#t1012A">10:12</a></td><td class="nw">pppaul</td><td>i have gigs coming out my wazoo</td></tr>
+<tr id="t1012A" class="h"><td><a href="#t1012A">10:12</a></td><td class="nz">learner</td><td>dnolen: My problem is to go and do some more validations with the string I find. Once I find the string, I have some other checks to do. I was just trying give an example so that everybody understands what I need</td></tr>
+<tr id="t1012A" class="h"><td><a href="#t1012A">10:12</a></td><td class="na">dnolen</td><td>learner: when you say slow, how slow is your current solution?</td></tr>
+<tr id="t1013A" class="h r"><td><a href="#t1013A">10:13</a></td><td class="na">dnolen</td><td>learner: your explanation leaves out to many details. if you actually have an expensive computation, *maybe* pmap could help</td></tr>
+<tr id="t1013A" class="h"><td><a href="#t1013A">10:13</a></td><td class="nw">pppaul</td><td>reducers!</td></tr>
+<tr id="t1014A" class="h r"><td><a href="#t1014A">10:14</a></td><td class="nw">pppaul</td><td>i don't even know what i'm talking about anymore</td></tr>
+<tr id="t1014A" class="h r"><td><a href="#t1014A">10:14</a></td><td class="nw">pppaul</td><td>put the data in a DB and let it do the hard work</td></tr>
+<tr id="t1014A" class="h"><td><a href="#t1014A">10:14</a></td><td class="nz">learner</td><td>edbond_: Your example is perfect. But it does sequentially. It may take couple of days to complete the processing of the lazy queue I have. so looking for thread style</td></tr>
+<tr id="t1015A" class="h r"><td><a href="#t1015A">10:15</a></td><td class="nz">learner</td><td>pppaul: ha ha. Sorry If I have confused you</td></tr>
+<tr id="t1015A" class="h"><td><a href="#t1015A">10:15</a></td><td class="na">dnolen</td><td>learner: what is the source of the data? can you not partition it ahead of time?</td></tr>
+<tr id="t1015A" class="h"><td><a href="#t1015A">10:15</a></td><td class="nw">pppaul</td><td>learner, pmap has helped me, but it gets tricky if you don't want to work on the whole set</td></tr>
+<tr id="t1016A" class="h"><td><a href="#t1016A">10:16</a></td><td class="nz">learner</td><td>dnolen: if I process the lazy sequence (which has millions of strings &amp; combinations) sequentially. I guess it may take 3 or 4 days on a dev machine</td></tr>
+<tr id="t1016A" class="h"><td><a href="#t1016A">10:16</a></td><td class="nw">pppaul</td><td>learner, put this stuff in lucene or something</td></tr>
+<tr id="t1017A" class="h"><td><a href="#t1017A">10:17</a></td><td class="na">dnolen</td><td>learner: is your guess based on how slow your code is on a small data set?</td></tr>
+<tr id="t1017A" class="h"><td><a href="#t1017A">10:17</a></td><td class="nw">pppaul</td><td>learner pmap isn't going to help you</td></tr>
+<tr id="t1017A" class="h r"><td><a href="#t1017A">10:17</a></td><td class="nw">pppaul</td><td>4 days is nuts</td></tr>
+<tr id="t1018A" class="h r"><td><a href="#t1018A">10:18</a></td><td class="nw">pppaul</td><td>learner look into storm</td></tr>
+<tr id="t1018A" class="h"><td><a href="#t1018A">10:18</a></td><td class="nz">learner</td><td>dnolen: My guess is based on how big dataset is. Source is <a href="https://github.com/clojure/math.combinatorics">https://github.com/clojure/math.combinatorics</a> combinations</td></tr>
+<tr id="t1019A" class="h r"><td><a href="#t1019A">10:19</a></td><td class="nz">learner</td><td>pppaul: Yes lucene option is cool. But how can I extract out from lazy sequence and put it into lucene. Sequentially? Hmm no. Is there any way I can run fixed number of threads to do it</td></tr>
+<tr id="t1019A" class="h"><td><a href="#t1019A">10:19</a></td><td class="nw">pppaul</td><td>learner your problem hasn't been described well enough</td></tr>
+<tr id="t1019A" class="h"><td><a href="#t1019A">10:19</a></td><td class="na">dnolen</td><td>learner: are you saying you're going to use math.combinatorics?</td></tr>
+<tr id="t1020A"><td><a href="#t1020A">10:20</a></td><td class="nw">pppaul</td><td>to me, it sounded like you have your data, and it's static</td></tr>
+<tr id="t1020A" class="h r"><td><a href="#t1020A">10:20</a></td><td class="nw">pppaul</td><td>but now it sounds like you are generating your data in real time</td></tr>
+<tr id="t1020A" class="h r"><td><a href="#t1020A">10:20</a></td><td class="nw">pppaul</td><td>what the fuck are you doing?</td></tr>
+<tr id="t1020A" class="h"><td><a href="#t1020A">10:20</a></td><td class="nv">edbond_</td><td>learner, if you can load whole sequence in memory you can partition and process in parallel</td></tr>
+<tr id="t1020A" class="h"><td><a href="#t1020A">10:20</a></td><td class="na">dnolen</td><td>for 20,000,0000 strings over 4 days, this means you can only process ~58 strings per second, this seems absurd unless the processing of those 58 strings is very complex.</td></tr>
+<tr id="t1020A" class="h"><td><a href="#t1020A">10:20</a></td><td class="nz">learner</td><td>pppaul: I am doing a little research project</td></tr>
+<tr id="t1021A" class="h"><td><a href="#t1021A">10:21</a></td><td class="nw">pppaul</td><td>learner that doesn't help me understand your problem</td></tr>
+<tr id="t1022A" class="h r"><td><a href="#t1022A">10:22</a></td><td class="nw">pppaul</td><td>seriously, i don't have a clue what your problem is, cept that you believe that you need to optimize some  calculation you are doing</td></tr>
+<tr id="t1022A" class="h r"><td><a href="#t1022A">10:22</a></td><td class="nw">pppaul</td><td>that's really not enough to go on</td></tr>
+<tr id="t1022A" class="h r"><td><a href="#t1022A">10:22</a></td><td class="nw">pppaul</td><td>there are a million ways to solve such a problem, you need to be much more specific</td></tr>
+<tr id="t1023A" class="h r"><td><a href="#t1023A">10:23</a></td><td class="nw">pppaul</td><td>the less specific you are the more of our time you are wasting</td></tr>
+<tr id="t1024A" class="h"><td><a href="#t1024A">10:24</a></td><td class="na">dnolen</td><td>learner: anyways based on the small amount of information given, I assume the processing each string is expensive, perhaps pmap+partition will work for you.</td></tr>
+<tr id="t1025A" class="h"><td><a href="#t1025A">10:25</a></td><td class="nw">pppaul</td><td>it would help a lot if you could tell us if these 20million strings is your total dataset, or if this is the dataset per calculation</td></tr>
+<tr id="t1025A" class="h"><td><a href="#t1025A">10:25</a></td><td class="nz">learner</td><td>pppaul: To keep it short. I will have a fixed string (generated dynamically). For now say it is &quot;clojure&quot; and when I have the word I will know the length. I have to generate various combinations using combinatorics and run through it until I hit the word I want. Kind of Brute force. But I need to get the possible range (that's the tricky thing). Since I need only rough index of the word, I can use threads.</td></tr>
+<tr id="t1025A" class="h r"><td><a href="#t1025A">10:25</a></td><td class="nz">learner</td><td>pppaul:  I need to find out how I can do it in clojure/scala/groovy &amp; plain java</td></tr>
+<tr id="t1026A" class="h"><td><a href="#t1026A">10:26</a></td><td class="nw">pppaul</td><td>hmm</td></tr>
+<tr id="t1027A" class="h"><td><a href="#t1027A">10:27</a></td><td class="nz">learner</td><td>pppaul: I am a completely newbie and learning lot of stuff while implementing the suggestions you guys are offering</td></tr>
+<tr id="t1028A" class="h"><td><a href="#t1028A">10:28</a></td><td class="nw">pppaul</td><td>hack the combinatorics thing to put indices on it's output, then send this job out to a bunch of computers via storm</td></tr>
+<tr id="t1029A" class="h r"><td><a href="#t1029A">10:29</a></td><td class="nw">pppaul</td><td>well, i guess you don't need to hack the combinatorics thing</td></tr>
+<tr id="t1029A" class="h r"><td><a href="#t1029A">10:29</a></td><td class="nw">pppaul</td><td>you just need to have 100s of computers working on this to get it fast if you think it'll take 4 days for 1 computer to finish the calculation</td></tr>
+<tr id="t1029A" class="h"><td><a href="#t1029A">10:29</a></td><td class="nz">learner</td><td>pppaul: Are you talking about this ? <a href="https://github.com/nathanmarz/storm">https://github.com/nathanmarz/storm</a></td></tr>
+<tr id="t1029A" class="h"><td><a href="#t1029A">10:29</a></td><td class="nw">pppaul</td><td>yes</td></tr>
+<tr id="t1030A"><td><a href="#t1030A">10:30</a></td><td class="nz">learner</td><td>pppaul: Thanks. I will give a try</td></tr>
+<tr id="t1030A" class="h"><td><a href="#t1030A">10:30</a></td><td class="nw">pppaul</td><td>if you are dealing with completely lazy sequences then this should be easy</td></tr>
+<tr id="t1030A" class="h"><td><a href="#t1030A">10:30</a></td><td class="nz">learner</td><td>pppaul: It's a lazy sequence</td></tr>
+<tr id="t1031A" class="h"><td><a href="#t1031A">10:31</a></td><td class="nw">pppaul</td><td>storm should work fine, and it has a good development/testing story</td></tr>
+<tr id="t1032A" class="h r"><td><a href="#t1032A">10:32</a></td><td class="nw">pppaul</td><td>i would be very interested to see this working when you are done with it</td></tr>
+<tr id="t1037A" class="h"><td><a href="#t1037A">10:37</a></td><td class="ng">devn</td><td>muhoo: <a href="http://getclojure.org">http://getclojure.org</a> is what you were thinking of. it's getting some love today. adding the ability for users to create ratings on examples</td></tr>
+<tr id="t1040A"><td><a href="#t1040A">10:40</a></td><td class="ns">gdev</td><td>devn:) that's awesome, I was just talking to someone at work about that...*puts on aluminum helmet to keep devn out of his head*</td></tr>
+<tr id="t1040A" class="h r"><td><a href="#t1040A">10:40</a></td><td class="ns">gdev</td><td>(inc devn)</td></tr>
+<tr id="t1040A" class="h"><td><a href="#t1040A">10:40</a></td><td class="nx">lazybot</td><td>⇒ 6</td></tr>
+<tr id="t1103A"><td><a href="#t1103A">11:03</a></td><td class="n5">rbxbx</td><td>devn: heh, getclojure doesn't like it when you pass an empty string</td></tr>
+<tr id="t1103A" class="h r"><td><a href="#t1103A">11:03</a></td><td class="n5">rbxbx</td><td>looks like it's coming along nicely though :)</td></tr>
+<tr id="t1110A"><td><a href="#t1110A">11:10</a></td><td class="nh">jtoy_</td><td>is there a more idiomatic way to write this? (map (fn [x] ((meta x) :target )) data )</td></tr>
+<tr id="t1111A" class="h"><td><a href="#t1111A">11:11</a></td><td class="no">dakrone</td><td>(map (comp :target meta) data)</td></tr>
+<tr id="t1111A" class="h"><td><a href="#t1111A">11:11</a></td><td class="ny">bbloom</td><td>or (map #(-&gt; % meta :target) data)</td></tr>
+<tr id="t1112A" class="h"><td><a href="#t1112A">11:12</a></td><td class="nh">jtoy_</td><td>thanks, i havent seen comp before</td></tr>
+<tr id="t1112A" class="h"><td><a href="#t1112A">11:12</a></td><td class="nn">ToxicFrog</td><td>,(doc comp)</td></tr>
+<tr id="t1112A" class="h"><td><a href="#t1112A">11:12</a></td><td class="nl">clojurebot</td><td>&quot;([] [f] [f g] [f g h] [f1 f2 f3 &amp; fs]); Takes a set of functions and returns a fn that is the composition of those fns. The returned fn takes a variable number of args, applies the rightmost of fns to the args, the next fn (right-to-left) to the result, etc.&quot;</td></tr>
+<tr id="t1113A" class="h"><td><a href="#t1113A">11:13</a></td><td class="nh">jtoy_</td><td>is comp basically the opposite direction of -&gt; ?</td></tr>
+<tr id="t1114A" class="h"><td><a href="#t1114A">11:14</a></td><td class="ny">bbloom</td><td>jtoy_: you can think of it that way, but comp is a function, -&gt; is a macro</td></tr>
+<tr id="t1115A" class="h r"><td><a href="#t1115A">11:15</a></td><td class="ny">bbloom</td><td>jtoy_: (comp x y) is (x (y …)) and (-&gt; x y z) is (z (y x))</td></tr>
+<tr id="t1115A" class="h"><td><a href="#t1115A">11:15</a></td><td class="nd">justin_smith</td><td>with comp you would not provide the other args to the functions unless you create lambdas</td></tr>
+<tr id="t1115A" class="h r"><td><a href="#t1115A">11:15</a></td><td class="nd">justin_smith</td><td>with -&gt; you don't need to create the lambdas manually</td></tr>
+<tr id="t1116A" class="h"><td><a href="#t1116A">11:16</a></td><td class="nh">jtoy_</td><td>right , i see, ill try with comp for now</td></tr>
+<tr id="t1149A"><td><a href="#t1149A">11:49</a></td><td class="nt">matko</td><td>Question: should I be using ! in my function names for functions that alter state (through swap!, send, alter, etc)?</td></tr>
+<tr id="t1155A"><td><a href="#t1155A">11:55</a></td><td class="n6">noidi_</td><td>matko, &quot;Use the bang! only for things not safe in an STM transaction.&quot; <a href="http://dev.clojure.org/display/design/Library+Coding+Standards">http://dev.clojure.org/display/design/Library+Coding+Standards</a></td></tr>
+<tr id="t1155A" class="h"><td><a href="#t1155A">11:55</a></td><td class="nt">matko</td><td>thank you, I just found that too. so that means I should do it if I use swap!, but not any of the other ones</td></tr>
+<tr id="t1156A" class="h r"><td><a href="#t1156A">11:56</a></td><td class="nt">matko</td><td>but not for every destructive operation</td></tr>
+<tr id="t1156A" class="h r"><td><a href="#t1156A">11:56</a></td><td class="nt">matko</td><td>is there another obvious way to point out that my functions are destructive?</td></tr>
+<tr id="t1200A"><td><a href="#t1200A">12:00</a></td><td class="ny">bbloom</td><td>destructive ops aren't safe to use in STM :-P</td></tr>
+<tr id="t1200A" class="h"><td><a href="#t1200A">12:00</a></td><td class="n6">noidi_</td><td>unless they're idempotent</td></tr>
+<tr id="t1200A" class="h"><td><a href="#t1200A">12:00</a></td><td class="ny">bbloom</td><td>true</td></tr>
+<tr id="t1200A" class="h"><td><a href="#t1200A">12:00</a></td><td class="n6">noidi_</td><td>e.g. emptying a mutable collection is destructive but idempotent</td></tr>
+<tr id="t1201A" class="h"><td><a href="#t1201A">12:01</a></td><td class="nt">matko</td><td>anything wrapped in a (dosync) is safe to call from within a transaction though, right?</td></tr>
+<tr id="t1201A" class="h"><td><a href="#t1201A">12:01</a></td><td class="ny">bbloom</td><td>i don't think that idempotence is sufficent though, since a transaction can permanently fail</td></tr>
+<tr id="t1201A" class="h"><td><a href="#t1201A">12:01</a></td><td class="nt">matko</td><td>and anything send to an agent is only run on successful completion of a transaction</td></tr>
+<tr id="t1201A" class="h"><td><a href="#t1201A">12:01</a></td><td class="ny">bbloom</td><td>generally, if you have a library that is all mutable ops, then you don't really need ! on every single function</td></tr>
+<tr id="t1202A" class="h r"><td><a href="#t1202A">12:02</a></td><td class="ny">bbloom</td><td>if you have 1 destructive evil op in a sea of 100 others… then i say stick a ! on it, naming guidelines are guidelines for a reason, right?</td></tr>
+<tr id="t1204A" class="h"><td><a href="#t1204A">12:04</a></td><td class="nt">matko</td><td>right, sounds good</td></tr>
+<tr id="t1231A"><td><a href="#t1231A">12:31</a></td><td class="ns">gdev</td><td>j/ #probablywrong</td></tr>
+<tr id="t1231A" class="h r"><td><a href="#t1231A">12:31</a></td><td class="ns">gdev</td><td>derp</td></tr>
+<tr id="t1231A" class="h r"><td><a href="#t1231A">12:31</a></td><td class="ns">gdev</td><td>j/ dislexics_anonymous</td></tr>
+<tr id="t1231A" class="h r"><td><a href="#t1231A">12:31</a></td><td class="ns">gdev</td><td>doh &gt;_&lt;</td></tr>
+<tr id="t1237A" class="h"><td><a href="#t1237A">12:37</a></td><td class="nz">learner</td><td>pppaul: I will let you know after trying storm. Thanks for your continued help</td></tr>
+<tr id="t1247A"><td><a href="#t1247A">12:47</a></td><td class="nf">moquist</td><td>(class y) returns 'clojureql.core.RTable. (prn y) outputs &quot;SELECT * FROM sometable&quot;. What I want in my code is that SQL string, because I need to send it somewhere else; I can't query directly. How does 'prn get the string representation of an object?</td></tr>
+<tr id="t1248A" class="h r"><td><a href="#t1248A">12:48</a></td><td class="nf">moquist</td><td>Google has not helped me with this yet; looking at <a href="https://github.com/LauJensen/clojureql/blob/master/src/clojureql/core.clj">https://github.com/LauJensen/clojureql/blob/master/src/clojureql/core.clj</a> has also not yielded an answer so far.</td></tr>
+<tr id="t1248A" class="h"><td><a href="#t1248A">12:48</a></td><td class="nd">justin_smith</td><td>moquist: str?</td></tr>
+<tr id="t1248A" class="h"><td><a href="#t1248A">12:48</a></td><td class="nf">moquist</td><td>Sorry -- (str y) returns &quot;clojureql.core.RTable@567ae64a&quot;</td></tr>
+<tr id="t1249A" class="h"><td><a href="#t1249A">12:49</a></td><td class="nd">justin_smith</td><td>(with-output-to-string (prn y)) ?</td></tr>
+<tr id="t1249A" class="h r"><td><a href="#t1249A">12:49</a></td><td class="nd">justin_smith</td><td>that should return the string prn would have printed</td></tr>
+<tr id="t1249A" class="h r"><td><a href="#t1249A">12:49</a></td><td class="nd">justin_smith</td><td>sorry</td></tr>
+<tr id="t1249A" class="h r"><td><a href="#t1249A">12:49</a></td><td class="nd">justin_smith</td><td>with-out-str</td></tr>
+<tr id="t1249A" class="h r"><td><a href="#t1249A">12:49</a></td><td class="nd">justin_smith</td><td>,(with-out-str (prn :a))</td></tr>
+<tr id="t1249A" class="h"><td><a href="#t1249A">12:49</a></td><td class="nl">clojurebot</td><td>&quot;:a\n&quot;</td></tr>
+<tr id="t1250A"><td><a href="#t1250A">12:50</a></td><td class="nd">justin_smith</td><td>ahh!</td></tr>
+<tr id="t1250A" class="h r"><td><a href="#t1250A">12:50</a></td><td class="nd">justin_smith</td><td>,(prn-str :a)</td></tr>
+<tr id="t1250A" class="h"><td><a href="#t1250A">12:50</a></td><td class="nl">clojurebot</td><td>&quot;:a\n&quot;</td></tr>
+<tr id="t1250A" class="h"><td><a href="#t1250A">12:50</a></td><td class="nd">justin_smith</td><td>seems like a common enough usage to have its own fn</td></tr>
+<tr id="t1250A" class="h"><td><a href="#t1250A">12:50</a></td><td class="nj">weavejester</td><td>I've just been testing Clojure binary serialization libraries, and was quite impressed with deep-freeze, until I discovered it was serializing the data wrong :)</td></tr>
+<tr id="t1250A" class="h"><td><a href="#t1250A">12:50</a></td><td class="nf">moquist</td><td>justin_smith: yes! That's more like it. Thanks!</td></tr>
+<tr id="t1253A" class="h"><td><a href="#t1253A">12:53</a></td><td class="nf">Wild_Cat`</td><td>weavejester: aren't there Clojure libs for BSON or msgpack?</td></tr>
+<tr id="t1254A" class="h"><td><a href="#t1254A">12:54</a></td><td class="nj">weavejester</td><td>Wild_Cat`: I wanted something that would retain all the Clojure data structures</td></tr>
+<tr id="t1254A" class="h"><td><a href="#t1254A">12:54</a></td><td class="nd">hiredman</td><td>weavejester: fressian?</td></tr>
+<tr id="t1254A" class="h"><td><a href="#t1254A">12:54</a></td><td class="nj">weavejester</td><td>hiredman: No Clojure library for that, unless you count the stuff in the tests</td></tr>
+<tr id="t1255A" class="h"><td><a href="#t1255A">12:55</a></td><td class="nd">hiredman</td><td>weavejester: :/</td></tr>
+<tr id="t1255A" class="h"><td><a href="#t1255A">12:55</a></td><td class="na">dnolen</td><td>a good small example of using core.logic's featurec <a href="http://stackoverflow.com/questions/15821718/how-do-i-de-structure-a-map-in-core-logic">http://stackoverflow.com/questions/15821718/how-do-i-de-structure-a-map-in-core-logic</a></td></tr>
+<tr id="t1256A" class="h"><td><a href="#t1256A">12:56</a></td><td class="nj">weavejester</td><td><a href="https://www.refheap.com/paste/14401">https://www.refheap.com/paste/14401</a></td></tr>
+<tr id="t1257A" class="h r"><td><a href="#t1257A">12:57</a></td><td class="nj">weavejester</td><td>There's not much to choose between Nippy and Carbonite.</td></tr>
+<tr id="t1257A" class="h r"><td><a href="#t1257A">12:57</a></td><td class="nj">weavejester</td><td>Nippy seems to have the more straightforward API, though</td></tr>
+<tr id="t1310A"><td><a href="#t1310A">13:10</a></td><td class="nt">mpenet</td><td>+1 for Nippy, it's really a gem.</td></tr>
+<tr id="t1314A" class="h"><td><a href="#t1314A">13:14</a></td><td class="ng">devn</td><td>rbxbx: could you make an issue on the repo?</td></tr>
+<tr id="t1324A"><td><a href="#t1324A">13:24</a></td><td class="n5">rbxbx</td><td>devn: sure.</td></tr>
+<tr id="t1336A"><td><a href="#t1336A">13:36</a></td><td class="ng">devn</td><td>rbxbx: and then could you fix it and submit a PR? ;)</td></tr>
+<tr id="t1337A" class="h"><td><a href="#t1337A">13:37</a></td><td class="n5">rbxbx</td><td>devn: ... probably.</td></tr>
+<tr id="t1337A" class="h r"><td><a href="#t1337A">13:37</a></td><td class="n5">rbxbx</td><td>devn: especially if you wanted to pair :p</td></tr>
+<tr id="t1337A" class="h"><td><a href="#t1337A">13:37</a></td><td class="ng">devn</td><td>rbxbx: yeah, you got time this afternoon?</td></tr>
+<tr id="t1337A" class="h"><td><a href="#t1337A">13:37</a></td><td class="n5">rbxbx</td><td>devn: I jest. It's probably low-hanging enough that I could tackle it alone.</td></tr>
+<tr id="t1337A" class="h r"><td><a href="#t1337A">13:37</a></td><td class="n5">rbxbx</td><td>and no, not really. Maybe this evening though.</td></tr>
+<tr id="t1337A" class="h"><td><a href="#t1337A">13:37</a></td><td class="ng">devn</td><td>rbxbx: there's other stuff I could use a second pair of eyes on</td></tr>
+<tr id="t1338A" class="h"><td><a href="#t1338A">13:38</a></td><td class="n5">rbxbx</td><td>Some of us have to work on Fridays :p</td></tr>
+<tr id="t1338A" class="h"><td><a href="#t1338A">13:38</a></td><td class="ng">devn</td><td>ha! the solution as I'm sure you're aware is to simply quit your job.</td></tr>
+<tr id="t1338A" class="h"><td><a href="#t1338A">13:38</a></td><td class="n5">rbxbx</td><td>sshhh, my co-workers are in here.</td></tr>
+<tr id="t1339A" class="h"><td><a href="#t1339A">13:39</a></td><td class="n7">gfredericks</td><td>so I like &quot;C-u C-x C-e&quot;, which writes the result to the buffer. What's the most straightforward way to get that to pprint to the buffer instead?</td></tr>
+<tr id="t1340A"><td><a href="#t1340A">13:40</a></td><td class="ng">devn</td><td>rbxbx: if you're interested in helping out I'd like to rip out the hiccup templates and use laser or something instead. I have some really nice comps for the site and I want to just tell them to make me the static version and then i can just do transforms on what they hand me.</td></tr>
+<tr id="t1341A" class="h"><td><a href="#t1341A">13:41</a></td><td class="n5">rbxbx</td><td>devn: maybe. I'm a bit over-extended right now :|</td></tr>
+<tr id="t1341A" class="h"><td><a href="#t1341A">13:41</a></td><td class="ng">devn</td><td>also, it needs ratings. because if you search for comp the top result is (comp comp comp comp comp comp ...) -- not exactly the most useful or idiomatic example</td></tr>
+<tr id="t1341A" class="h"><td><a href="#t1341A">13:41</a></td><td class="n5">rbxbx</td><td>right, we'd discussed this before.</td></tr>
+<tr id="t1342A" class="h r"><td><a href="#t1342A">13:42</a></td><td class="n5">rbxbx</td><td>I looked into that... but I didn't understand nearly enough of anything :)</td></tr>
+<tr id="t1342A" class="h"><td><a href="#t1342A">13:42</a></td><td class="ng">devn</td><td>yeah i know i know, everyone is busy. either way, talk to you later, im off to go hack on that.</td></tr>
+<tr id="t1343A" class="h"><td><a href="#t1343A">13:43</a></td><td class="n5">rbxbx</td><td>devn: cheers sir :)</td></tr>
+<tr id="t1412A"><td><a href="#t1412A">14:12</a></td><td class="ng">devn</td><td>Where does the foo-1 naming pattern come from for reduce functions?</td></tr>
+<tr id="t1412A" class="h"><td><a href="#t1412A">14:12</a></td><td class="nj">ToBeReplaced</td><td>what do people do when they want (need?) try-let (or try-catch-else)?</td></tr>
+<tr id="t1416A" class="h"><td><a href="#t1416A">14:16</a></td><td class="ny">bbloom</td><td>ToBeReplaced: where &quot;else&quot; is &quot;run this only if an exception is not thrown&quot;?</td></tr>
+<tr id="t1416A" class="h r"><td><a href="#t1416A">14:16</a></td><td class="ny">bbloom</td><td>devn: what foo-1 things are you talking about?</td></tr>
+<tr id="t1416A" class="h"><td><a href="#t1416A">14:16</a></td><td class="nj">ToBeReplaced</td><td>yeah, presumably using a value from the try</td></tr>
+<tr id="t1417A" class="h"><td><a href="#t1417A">14:17</a></td><td class="ny">bbloom</td><td>ToBeReplaced: i prefer to avoid exception handling in my primary code paths. i'd wrap up functions that can fail and have them return maps or keywords or whatever that describe their result</td></tr>
+<tr id="t1417A" class="h"><td><a href="#t1417A">14:17</a></td><td class="nj">ToBeReplaced</td><td>java doesn't support it... you can hack it by storing a boolean and using the finally clause, but that's gross</td></tr>
+<tr id="t1418A" class="h"><td><a href="#t1418A">14:18</a></td><td class="ns">technomancy</td><td>I don't get it; why would you need a separate else clause?</td></tr>
+<tr id="t1418A" class="h"><td><a href="#t1418A">14:18</a></td><td class="ny">bbloom</td><td>(defn get-foo [x] (try (.getFoo x) (catch Exception e :error)))</td></tr>
+<tr id="t1419A" class="h r"><td><a href="#t1419A">14:19</a></td><td class="ny">bbloom</td><td>technomancy: <a href="http://stackoverflow.com/questions/855759/python-try-else">http://stackoverflow.com/questions/855759/python-try-else</a></td></tr>
+<tr id="t1419A" class="h"><td><a href="#t1419A">14:19</a></td><td class="nj">ToBeReplaced</td><td>yeah that link will explain better than me :)</td></tr>
+<tr id="t1420A"><td><a href="#t1420A">14:20</a></td><td class="ny">bbloom</td><td>ToBeReplaced: like i said: just avoid having exception handling logic bleed into your normal logic</td></tr>
+<tr id="t1420A" class="h"><td><a href="#t1420A">14:20</a></td><td class="ns">technomancy</td><td>huh</td></tr>
+<tr id="t1420A" class="h"><td><a href="#t1420A">14:20</a></td><td class="nj">ToBeReplaced</td><td>yeah seems like the way to go</td></tr>
+<tr id="t1420A" class="h"><td><a href="#t1420A">14:20</a></td><td class="ny">bbloom</td><td>ToBeReplaced: if you need to handle an error case at the site of the error, it's not really exceptional, is it?</td></tr>
+<tr id="t1421A" class="h r"><td><a href="#t1421A">14:21</a></td><td class="ny">bbloom</td><td>a wrapper function that returns {:status some-keyword, :result some-value} will do the trick</td></tr>
+<tr id="t1421A" class="h"><td><a href="#t1421A">14:21</a></td><td class="nj">ToBeReplaced</td><td>bbloom: that's the general perspective, yeah, so i tend to agree with you -- hence why it doesn't seem to come up often in clojure</td></tr>
+<tr id="t1422A" class="h r"><td><a href="#t1422A">14:22</a></td><td class="nj">ToBeReplaced</td><td>in python the etiquette is very much &quot;try and ask for forgiveness&quot;... there's less overhead in try-except than an if-statement if you rarely hit the exception</td></tr>
+<tr id="t1423A" class="h"><td><a href="#t1423A">14:23</a></td><td class="ny">bbloom</td><td>ToBeReplaced: well the reason they recommend that is b/c they have embraced exceptions for control flow…. ie StopIteration exceptions!</td></tr>
+<tr id="t1423A" class="h r"><td><a href="#t1423A">14:23</a></td><td class="ny">bbloom</td><td>ToBeReplaced: if you &quot;look before you leap&quot; you have a race condition</td></tr>
+<tr id="t1424A" class="h r"><td><a href="#t1424A">14:24</a></td><td class="ny">bbloom</td><td>golang has it right: if you have error cases, use status codes. if you don't know what to do: panic &amp; abort an entire process at a prompt/barrier/watever-you-want-to-call it</td></tr>
+<tr id="t1424A" class="h"><td><a href="#t1424A">14:24</a></td><td class="nj">ToBeReplaced</td><td>right</td></tr>
+<tr id="t1429A" class="h"><td><a href="#t1429A">14:29</a></td><td class="ns">technomancy</td><td>o_O</td></tr>
+<tr id="t1433A"><td><a href="#t1433A">14:33</a></td><td class="n6">Glenjamin</td><td>error codes: exceptions you can ignore</td></tr>
+<tr id="t1434A" class="h"><td><a href="#t1434A">14:34</a></td><td class="nk">tieTYT2</td><td>current thing I'm dealing with: <a href="http://stackoverflow.com/questions/16488423/reducing-a-sequence-into-a-shorter-sequence-while-calling-a-function-on-each-adj">http://stackoverflow.com/questions/16488423/reducing-a-sequence-into-a-shorter-sequence-while-calling-a-function-on-each-adj</a></td></tr>
+<tr id="t1435A" class="h"><td><a href="#t1435A">14:35</a></td><td class="nj">weavejester</td><td>What does everyone think of having a deref-able type initialized from a no-argument function?</td></tr>
+<tr id="t1435A" class="h r"><td><a href="#t1435A">14:35</a></td><td class="nj">weavejester</td><td>Kinda like a derived reference</td></tr>
+<tr id="t1436A" class="h"><td><a href="#t1436A">14:36</a></td><td class="ny">bbloom</td><td>weavejester: do you mean a thunk? like ##(doc delay) ?</td></tr>
+<tr id="t1436A" class="h"><td><a href="#t1436A">14:36</a></td><td class="nx">lazybot</td><td>⇒ &quot;Macro ([&amp; body]); Takes a body of expressions and yields a Delay object that will invoke the body only the first time it is forced (with force or deref/@), and will cache the result and return it on all subsequent force calls. See also - realized?&quot;</td></tr>
+<tr id="t1436A" class="h"><td><a href="#t1436A">14:36</a></td><td class="nf">ohpauleez</td><td>weavejester: Why not use a promise that you pass into the initializing function?</td></tr>
+<tr id="t1436A" class="h"><td><a href="#t1436A">14:36</a></td><td class="nj">weavejester</td><td>bbloom: Yes, but one that's tied to another ref, so the result isn't cached.</td></tr>
+<tr id="t1436A" class="h"><td><a href="#t1436A">14:36</a></td><td class="nf">ohpauleez</td><td>ah</td></tr>
+<tr id="t1437A" class="h"><td><a href="#t1437A">14:37</a></td><td class="ny">bbloom</td><td>oh, like a pointer to a pointer?</td></tr>
+<tr id="t1437A" class="h"><td><a href="#t1437A">14:37</a></td><td class="n6">Glenjamin</td><td>allowing you to use @foo instead of (bar) ?</td></tr>
+<tr id="t1437A" class="h"><td><a href="#t1437A">14:37</a></td><td class="nf">matthavener</td><td>tieTYT2: how is that different from a reduce?</td></tr>
+<tr id="t1437A" class="h"><td><a href="#t1437A">14:37</a></td><td class="nj">weavejester</td><td>Glenjamin: Right</td></tr>
+<tr id="t1437A" class="h"><td><a href="#t1437A">14:37</a></td><td class="n6">Glenjamin</td><td>why not just call the function? :p</td></tr>
+<tr id="t1437A" class="h"><td><a href="#t1437A">14:37</a></td><td class="nj">weavejester</td><td>I'm not convinced it's a hugely good idea, but here's my use-case</td></tr>
+<tr id="t1438A" class="h r"><td><a href="#t1438A">14:38</a></td><td class="nj">weavejester</td><td>I have a world data structure that represents the state of a game world</td></tr>
+<tr id="t1438A" class="h"><td><a href="#t1438A">14:38</a></td><td class="ny">bbloom</td><td>,@(clojure.lang.Delay. (fn [] :done))</td></tr>
+<tr id="t1438A" class="h"><td><a href="#t1438A">14:38</a></td><td class="nf">matthavener</td><td>tieTYT2: (reduce mystery-fun (first coll) (rest coll))</td></tr>
+<tr id="t1438A" class="h"><td><a href="#t1438A">14:38</a></td><td class="nk">tieTYT2</td><td>matthavener: apparently it is, I'm using reduce</td></tr>
+<tr id="t1438A" class="h"><td><a href="#t1438A">14:38</a></td><td class="nl">clojurebot</td><td>:done</td></tr>
+<tr id="t1438A" class="h"><td><a href="#t1438A">14:38</a></td><td class="nj">weavejester</td><td>And I have an scene data structure that represents what the user can see</td></tr>
+<tr id="t1439A" class="h r"><td><a href="#t1439A">14:39</a></td><td class="nj">weavejester</td><td>So I connect the world to the scene with a watch. When the world changes, the scene alters as well.</td></tr>
+<tr id="t1439A" class="h"><td><a href="#t1439A">14:39</a></td><td class="nf">matthavener</td><td>tieTYT2: and if you only want the 'last' of the retval of 'mystery-fun' just wrap it in a function that calls (last) on the retval</td></tr>
+<tr id="t1439A" class="h"><td><a href="#t1439A">14:39</a></td><td class="n7">trptcolin</td><td>is it expected in cljs that if you extend a protocol to js/Object, a fresh (js-obj) will have key/value pairs? i guess i expected the data for protocol implementations to live elsewhere.</td></tr>
+<tr id="t1439A" class="h"><td><a href="#t1439A">14:39</a></td><td class="nk">tieTYT2</td><td>matthavener: since mystery-fun returns a sequence, won't the result of the reduce be a sequence of sequences of sequences...?</td></tr>
+<tr id="t1439A" class="h"><td><a href="#t1439A">14:39</a></td><td class="nf">matthavener</td><td>tieTYT2: sure, but like i said, you can wrap mystery-fun in a 'last' if you only care about the last</td></tr>
+<tr id="t1440A"><td><a href="#t1440A">14:40</a></td><td class="nj">weavejester</td><td>So I can handle this with a set of world-&gt;scene functions</td></tr>
+<tr id="t1440A" class="h"><td><a href="#t1440A">14:40</a></td><td class="nk">tieTYT2</td><td>matthavener: how do I keep the butlast of it?</td></tr>
+<tr id="t1440A" class="h"><td><a href="#t1440A">14:40</a></td><td class="nj">weavejester</td><td>Or I could populate the scene with references to the world, and deref-all the scene</td></tr>
+<tr id="t1440A" class="h r"><td><a href="#t1440A">14:40</a></td><td class="nj">weavejester</td><td>Kinda a push/pull approach</td></tr>
+<tr id="t1440A" class="h"><td><a href="#t1440A">14:40</a></td><td class="nf">matthavener</td><td>tieTYT2: i'm not sure what you mean by that, specifically &quot;keep the 'butlast' of what you've got so far&quot;</td></tr>
+<tr id="t1440A" class="h"><td><a href="#t1440A">14:40</a></td><td class="na">dnolen</td><td>trptcolin: you don't want to extend to js/Object, extend-type object</td></tr>
+<tr id="t1440A" class="h"><td><a href="#t1440A">14:40</a></td><td class="nf">matthavener</td><td>tieTYT2: what do you mean by &quot;what you've got so far&quot; ?</td></tr>
+<tr id="t1441A" class="h"><td><a href="#t1441A">14:41</a></td><td class="ny">bbloom</td><td>weavejester: yeah, this is a hard category of problems that i've been thinking about a lot: how to synchronize two views of the same data</td></tr>
+<tr id="t1441A" class="h"><td><a href="#t1441A">14:41</a></td><td class="n7">trptcolin</td><td>dnolen: awesome, thanks</td></tr>
+<tr id="t1441A" class="h"><td><a href="#t1441A">14:41</a></td><td class="nj">weavejester</td><td>bbloom: I'm glad I'm not the only one thinking about this :)</td></tr>
+<tr id="t1441A" class="h"><td><a href="#t1441A">14:41</a></td><td class="nk">tieTYT2</td><td>ok let's say calling (mystery-fun o1 o2) returns [o1 o2].  What I want to do next is compare [o1 (mystery-fun o2 o3)] and flatten that</td></tr>
+<tr id="t1441A" class="h"><td><a href="#t1441A">14:41</a></td><td class="n5">patchwork</td><td>bbloom:  You have both views depend on the same data source?</td></tr>
+<tr id="t1442A" class="h"><td><a href="#t1442A">14:42</a></td><td class="nk">tieTYT2</td><td>see how the o1 is still in the result?  that what I mean by keeping what you've got so far</td></tr>
+<tr id="t1442A" class="h"><td><a href="#t1442A">14:42</a></td><td class="ny">bbloom</td><td>patchwork: more accurately, i have a document translation</td></tr>
+<tr id="t1442A" class="h"><td><a href="#t1442A">14:42</a></td><td class="n5">patchwork</td><td>the two views don't need to know about each other, updates flow from the data source</td></tr>
+<tr id="t1442A" class="h"><td><a href="#t1442A">14:42</a></td><td class="nf">matthavener</td><td>tieTYT2: i think i see, you can just make your reduction a tuple</td></tr>
+<tr id="t1442A" class="h"><td><a href="#t1442A">14:42</a></td><td class="nf">ohpauleez</td><td>weavejester: Is is possible (or advantageous) for the &quot;scene&quot; to be a function that takes the world and produces a slice?</td></tr>
+<tr id="t1442A" class="h"><td><a href="#t1442A">14:42</a></td><td class="ny">bbloom</td><td>patchwork: it's one way: you have some source value &amp; it is transformed to some view of it and chagnes to the source value need to be reflected efficently in the view</td></tr>
+<tr id="t1442A" class="h"><td><a href="#t1442A">14:42</a></td><td class="nf">ohpauleez</td><td>rather than a data structure of the slice</td></tr>
+<tr id="t1442A" class="h"><td><a href="#t1442A">14:42</a></td><td class="na">dnolen</td><td>trptcolin: generally true for all the real JS languages natives</td></tr>
+<tr id="t1443A" class="h"><td><a href="#t1443A">14:43</a></td><td class="n7">trptcolin</td><td>gotcha, i was extrapolating to assume that just now :)</td></tr>
+<tr id="t1443A" class="h"><td><a href="#t1443A">14:43</a></td><td class="nk">tieTYT2</td><td>matthavener: and the first part is a sequence that grows?</td></tr>
+<tr id="t1443A" class="h"><td><a href="#t1443A">14:43</a></td><td class="nj">weavejester</td><td>ohpauleez: Maybe… at the moment it's an atom, which seems like it's a little more transparent I guess.</td></tr>
+<tr id="t1443A" class="h r"><td><a href="#t1443A">14:43</a></td><td class="nj">weavejester</td><td>Plus the UI isn't necessarily dependent on the world.</td></tr>
+<tr id="t1443A" class="h"><td><a href="#t1443A">14:43</a></td><td class="nf">ohpauleez</td><td>and then the watcher can deliver a future, that you can deref when you need to use the &quot;scene&quot; slice</td></tr>
+<tr id="t1444A" class="h"><td><a href="#t1444A">14:44</a></td><td class="nj">weavejester</td><td>I'm experimenting with a Leiningen-like profiles approach</td></tr>
+<tr id="t1445A" class="h"><td><a href="#t1445A">14:45</a></td><td class="nf">matthavener</td><td>tieTYT2: <a href="https://www.refheap.com/paste/14402">https://www.refheap.com/paste/14402</a></td></tr>
+<tr id="t1445A" class="h"><td><a href="#t1445A">14:45</a></td><td class="nj">weavejester</td><td>But… Hum… I'd like to deal with data rather than function composition.</td></tr>
+<tr id="t1445A" class="h"><td><a href="#t1445A">14:45</a></td><td class="nf">ohpauleez</td><td>at the end of the day you're dealing with data</td></tr>
+<tr id="t1445A" class="h r"><td><a href="#t1445A">14:45</a></td><td class="nf">ohpauleez</td><td>the slice you get back is data</td></tr>
+<tr id="t1446A" class="h"><td><a href="#t1446A">14:46</a></td><td class="nj">weavejester</td><td>Or do I? I could have a bunch of middleware-like functions I compose that generate the final app data structure.</td></tr>
+<tr id="t1446A" class="h"><td><a href="#t1446A">14:46</a></td><td class="nf">ohpauleez</td><td>right</td></tr>
+<tr id="t1446A" class="h r"><td><a href="#t1446A">14:46</a></td><td class="nf">ohpauleez</td><td>yes</td></tr>
+<tr id="t1446A" class="h r"><td><a href="#t1446A">14:46</a></td><td class="nf">ohpauleez</td><td>and so you start modeling it as core game data, and ways to derive your various game states</td></tr>
+<tr id="t1446A" class="h r"><td><a href="#t1446A">14:46</a></td><td class="nf">ohpauleez</td><td>and build it intoa  dataflow</td></tr>
+<tr id="t1447A" class="h"><td><a href="#t1447A">14:47</a></td><td class="nk">tieTYT2</td><td>matthavener: hm, what if r is a sequence with a count of 1?</td></tr>
+<tr id="t1448A" class="h"><td><a href="#t1448A">14:48</a></td><td class="nf">matthavener</td><td>tieTYT2: then (rest r) is empty</td></tr>
+<tr id="t1448A" class="h"><td><a href="#t1448A">14:48</a></td><td class="nk">tieTYT2</td><td>matthavener: also, you're not doing anything with sofar.  Is that intentional?</td></tr>
+<tr id="t1448A" class="h"><td><a href="#t1448A">14:48</a></td><td class="nj">weavejester</td><td>I might have to change the way I handle events...</td></tr>
+<tr id="t1448A" class="h"><td><a href="#t1448A">14:48</a></td><td class="nk">tieTYT2</td><td>you're passing the first element into mystery-fun, not the last</td></tr>
+<tr id="t1448A" class="h"><td><a href="#t1448A">14:48</a></td><td class="nf">matthavener</td><td>i guess? i'm only trying to implement what you're describing</td></tr>
+<tr id="t1449A" class="h r"><td><a href="#t1449A">14:49</a></td><td class="nf">matthavener</td><td>yeah i suppose you should replace 'rest' with 'butlast' and 'first' with 'last'</td></tr>
+<tr id="t1450A"><td><a href="#t1450A">14:50</a></td><td class="nj">weavejester</td><td>At the moment I have: {:type :button, :on-click (fn [event] …}}</td></tr>
+<tr id="t1450A" class="h r"><td><a href="#t1450A">14:50</a></td><td class="nj">weavejester</td><td>But maybe it should be: {:type :button, :state :clicked}</td></tr>
+<tr id="t1451A" class="h r"><td><a href="#t1451A">14:51</a></td><td class="nj">weavejester</td><td>Maybe my problem is the way I'm mixing event handlers in with my data structure.</td></tr>
+<tr id="t1451A" class="h"><td><a href="#t1451A">14:51</a></td><td class="nf">ohpauleez</td><td>weavejester: In a system of flows, C2-event or pub/sub fits well (in my experience).  So yes, i'd make that change</td></tr>
+<tr id="t1451A" class="h"><td><a href="#t1451A">14:51</a></td><td class="ny">bbloom</td><td>weavejester: i've been trying to come up with something clojure-y for UI handling for months. it's hard :-) hopefully i'll have something cool to show soon… we'll see</td></tr>
+<tr id="t1451A" class="h"><td><a href="#t1451A">14:51</a></td><td class="nf">ohpauleez</td><td>then let anyone who wants to know about the &quot;click&quot; subscribe and do something</td></tr>
+<tr id="t1451A" class="h r"><td><a href="#t1451A">14:51</a></td><td class="nf">ohpauleez</td><td>passing more data back into the bus, or down through the flow</td></tr>
+<tr id="t1451A" class="h"><td><a href="#t1451A">14:51</a></td><td class="nj">weavejester</td><td>bbloom: It is hard! I think I've changed it twice already :)</td></tr>
+<tr id="t1452A" class="h"><td><a href="#t1452A">14:52</a></td><td class="nr">kephale</td><td>weaverjester: if you don't mind my asking, are you talking about a 3D rendered world?</td></tr>
+<tr id="t1452A" class="h"><td><a href="#t1452A">14:52</a></td><td class="nj">weavejester</td><td>I tried maintaining an event bus and a data structure, but it didn't really worlk well.</td></tr>
+<tr id="t1452A" class="h"><td><a href="#t1452A">14:52</a></td><td class="nr">kephale</td><td>weavejester*</td></tr>
+<tr id="t1452A" class="h"><td><a href="#t1452A">14:52</a></td><td class="nj">weavejester</td><td>kephale: Yep.</td></tr>
+<tr id="t1453A" class="h r"><td><a href="#t1453A">14:53</a></td><td class="nj">weavejester</td><td>kephale: I basically have a (run-app (atom …)) function that's at the core of this framework/game I'm building.</td></tr>
+<tr id="t1453A" class="h"><td><a href="#t1453A">14:53</a></td><td class="nr">kephale</td><td>weavejester: ok, is yours open source? i'm at alpha/beta with my 3d simulator which has a modified penumbra under the hood</td></tr>
+<tr id="t1454A" class="h"><td><a href="#t1454A">14:54</a></td><td class="nj">weavejester</td><td>kephale: No, but I'll probably open-source bits of it later. It's using jMonkeyEngine.</td></tr>
+<tr id="t1454A" class="h"><td><a href="#t1454A">14:54</a></td><td class="nf">ohpauleez</td><td>weavejester: What was the issue you ran into with the bus?</td></tr>
+<tr id="t1455A" class="h"><td><a href="#t1455A">14:55</a></td><td class="nr">kephale</td><td>weavejester: ok cool, i'll look for you later to chat more. I thought about jMonkey but didn't like sticking to their API. currently i have a ODE + penumbra working pretty well together</td></tr>
+<tr id="t1455A" class="h r"><td><a href="#t1455A">14:55</a></td><td class="nr">kephale</td><td>including some of the UI handling</td></tr>
+<tr id="t1456A" class="h r"><td><a href="#t1456A">14:56</a></td><td class="nr">kephale</td><td>gotta run for now… &quot;brevis&quot; on github</td></tr>
+<tr id="t1456A" class="h"><td><a href="#t1456A">14:56</a></td><td class="nd">hiredman</td><td>bbloom: have you played with pedestals model (not sure what to call it) at all? I guess event sourcing?</td></tr>
+<tr id="t1456A" class="h"><td><a href="#t1456A">14:56</a></td><td class="nr">kephale</td><td>ciao</td></tr>
+<tr id="t1457A" class="h"><td><a href="#t1457A">14:57</a></td><td class="ny">bbloom</td><td>hiredman: pedestal kinda stops short at the view layer</td></tr>
+<tr id="t1457A" class="h"><td><a href="#t1457A">14:57</a></td><td class="nd">hiredman</td><td>bbloom: sure</td></tr>
+<tr id="t1457A" class="h"><td><a href="#t1457A">14:57</a></td><td class="ny">bbloom</td><td>hiredman: i haven't studied it too deeply, but it just feels a little heavyweight</td></tr>
+<tr id="t1458A" class="h r"><td><a href="#t1458A">14:58</a></td><td class="ny">bbloom</td><td>hiredman: i need to study it a bit more, but i'm coming at it from a pretty different angle</td></tr>
+<tr id="t1458A" class="h"><td><a href="#t1458A">14:58</a></td><td class="nj">weavejester</td><td>ohpauleez: I was getting a problem reconciling the the event bus with my data structure. Like… say I have a FPS counter. I have to have something that subscribes to the event bus to catch each :tick event, but also I need to pass it the atom representing the application.</td></tr>
+<tr id="t1458A" class="h r"><td><a href="#t1458A">14:58</a></td><td class="nj">weavejester</td><td>ohpauleez: It felt like I was dealing with two systems, when I really wanted one.</td></tr>
+<tr id="t1458A" class="h"><td><a href="#t1458A">14:58</a></td><td class="ns">gdev</td><td>bbloom:) the documentation explains that it was developed to handle hard problems that other lighter frameworks dont do well</td></tr>
+<tr id="t1458A" class="h"><td><a href="#t1458A">14:58</a></td><td class="nj">weavejester</td><td>I'm beginning to think I don't actually need events...</td></tr>
+<tr id="t1459A" class="h"><td><a href="#t1459A">14:59</a></td><td class="nd">hiredman</td><td>bbloom: I write a little thing in it, and I ended like the sort of event transforming stuff, but not the rendering.cljs bits</td></tr>
+<tr id="t1459A" class="h r"><td><a href="#t1459A">14:59</a></td><td class="nd">hiredman</td><td>wrote a</td></tr>
+<tr id="t1459A" class="h r"><td><a href="#t1459A">14:59</a></td><td class="nd">hiredman</td><td>ended up liking</td></tr>
+<tr id="t1459A" class="h r"><td><a href="#t1459A">14:59</a></td><td class="nd">hiredman</td><td>:/</td></tr>
+<tr id="t1459A" class="h"><td><a href="#t1459A">14:59</a></td><td class="ny">bbloom</td><td>hugod: ok there is a fip 0.3.0 release now</td></tr>
+<tr id="t1459A" class="h r"><td><a href="#t1459A">14:59</a></td><td class="ny">bbloom</td><td>technomancy: should i backup my gpg key? heh</td></tr>
+<tr id="t1459A" class="h"><td><a href="#t1459A">14:59</a></td><td class="ns">gdev</td><td>mentioning Pedestal in the IRC triggers an alarm at Relevance so someone who knows more about it should be in here in 5..4..3..2...outOfBoundsException</td></tr>
+<tr id="t1500A"><td><a href="#t1500A">15:00</a></td><td class="nf">ohpauleez</td><td>haha</td></tr>
+<tr id="t1500A" class="h"><td><a href="#t1500A">15:00</a></td><td class="nj">weavejester</td><td>Just encode events in the state. Like instead of having a :tick event, have a counter that we watch for changes.</td></tr>
+<tr id="t1500A" class="h"><td><a href="#t1500A">15:00</a></td><td class="ny">bbloom</td><td>gdev: i dunno what those &quot;harder problems&quot; are. i think even pretty basic UIs are pretty damn hard with the nightmare that is html/css/js for apps instead of for docs</td></tr>
+<tr id="t1501A" class="h"><td><a href="#t1501A">15:01</a></td><td class="ns">technomancy</td><td>bbloom: yeah, but not in a network-attached location</td></tr>
+<tr id="t1501A" class="h"><td><a href="#t1501A">15:01</a></td><td class="ny">bbloom</td><td>technomancy: i don't think i have any non-network attached locations… at least not any that wouldn't be destroyed in the same fire that destroys my laptop :-P</td></tr>
+<tr id="t1501A" class="h"><td><a href="#t1501A">15:01</a></td><td class="ns">gdev</td><td>bbloom:) don't shoot the peanut gallery ;)</td></tr>
+<tr id="t1501A" class="h"><td><a href="#t1501A">15:01</a></td><td class="ns">technomancy</td><td>bury an SD card in your back yard =)</td></tr>
+<tr id="t1501A" class="h"><td><a href="#t1501A">15:01</a></td><td class="n5">hugod</td><td>bbloom: thanks! hope the gpg experience wasn't too painful</td></tr>
+<tr id="t1501A" class="h"><td><a href="#t1501A">15:01</a></td><td class="ny">bbloom</td><td>technomancy: i live in NYC… what's a back yard?</td></tr>
+<tr id="t1502A" class="h r"><td><a href="#t1502A">15:02</a></td><td class="ny">bbloom</td><td>hugod: the docs were surprisingly helpful. good job technomancy &amp; team!</td></tr>
+<tr id="t1502A" class="h"><td><a href="#t1502A">15:02</a></td><td class="ns">technomancy</td><td>bbloom: hmm... do you have community gardens over there? =)</td></tr>
+<tr id="t1502A" class="h"><td><a href="#t1502A">15:02</a></td><td class="ny">bbloom</td><td>hiredman: the rendering bit of course is gonna suck no matter what b/c it's html &amp; css :-P</td></tr>
+<tr id="t1502A" class="h"><td><a href="#t1502A">15:02</a></td><td class="nd">hiredman</td><td>weavejester: pedestal seems to go the other way, you do everything has events and transforms of events, and behind the scenes it tracks the state that events ultimately alter or are a result of</td></tr>
+<tr id="t1502A" class="h"><td><a href="#t1502A">15:02</a></td><td class="ns">gdev</td><td>bbloom:) it's like a park but it's attached to your house and has less hobos and dead hookers buried in it</td></tr>
+<tr id="t1503A" class="h"><td><a href="#t1503A">15:03</a></td><td class="nw">rkneufeld</td><td>gdev: sorry, I was out for coffee ;)</td></tr>
+<tr id="t1503A" class="h"><td><a href="#t1503A">15:03</a></td><td class="ny">bbloom</td><td>technomancy: what happens if i lose my key? i just can't publish new software?</td></tr>
+<tr id="t1503A" class="h r"><td><a href="#t1503A">15:03</a></td><td class="ny">bbloom</td><td>technomancy: (i know what happens if it is stollen)</td></tr>
+<tr id="t1503A" class="h r"><td><a href="#t1503A">15:03</a></td><td class="ny">bbloom</td><td>technomancy: or do i just have to make a new key &amp; people need to trust whoever that asshole future brandon claims to be</td></tr>
+<tr id="t1504A" class="h"><td><a href="#t1504A">15:04</a></td><td class="nf">ohpauleez</td><td>hiredman weavejester: I'm of that same school of thought.  I'd embed fragments of state within the events.  Build the entire state from the whole stream of events (which may produce new events), and take a view on the final state withe by slicing or by subscription</td></tr>
+<tr id="t1504A" class="h"><td><a href="#t1504A">15:04</a></td><td class="ny">bbloom</td><td>hiredman: what did you like about the event transforming bits?</td></tr>
+<tr id="t1504A" class="h r"><td><a href="#t1504A">15:04</a></td><td class="ny">bbloom</td><td>hiredman: you didn't find that to be a bit onerous ?</td></tr>
+<tr id="t1505A" class="h r"><td><a href="#t1505A">15:05</a></td><td class="ny">bbloom</td><td>technomancy: also, should i check in pom.xml and/or pom.xml.asc ?</td></tr>
+<tr id="t1505A" class="h"><td><a href="#t1505A">15:05</a></td><td class="nj">weavejester</td><td>hiredman ohpauleez: I think I definitely want to go one way or the other. My current implementation is suffering from being a bit of both.</td></tr>
+<tr id="t1505A" class="h"><td><a href="#t1505A">15:05</a></td><td class="nf">tomoj</td><td>when I found the square root example, I stopped looking at pedestal for the day</td></tr>
+<tr id="t1505A" class="h"><td><a href="#t1505A">15:05</a></td><td class="nf">ohpauleez</td><td>yes, it's hard to do both - it's like double book keeping</td></tr>
+<tr id="t1505A" class="h"><td><a href="#t1505A">15:05</a></td><td class="nf">tomoj</td><td>but maybe it's only onerous for trivial apps?</td></tr>
+<tr id="t1506A" class="h"><td><a href="#t1506A">15:06</a></td><td class="nd">hiredman</td><td>bbloom: it was onerous, but I liked that it is a small set of primitives</td></tr>
+<tr id="t1506A" class="h"><td><a href="#t1506A">15:06</a></td><td class="ny">bbloom</td><td>hiredman: yeah, i'm just not convinced that it's sane to expose those primitives to users...</td></tr>
+<tr id="t1506A" class="h r"><td><a href="#t1506A">15:06</a></td><td class="ny">bbloom</td><td>tomoj: i'm looking at the sqrt example now… wutdafaq?</td></tr>
+<tr id="t1506A" class="h"><td><a href="#t1506A">15:06</a></td><td class="nf">ohpauleez</td><td>bbloom: Why not?</td></tr>
+<tr id="t1506A" class="h"><td><a href="#t1506A">15:06</a></td><td class="nf">tomoj</td><td>you should be sure to look at the new one</td></tr>
+<tr id="t1507A" class="h r"><td><a href="#t1507A">15:07</a></td><td class="nf">tomoj</td><td><a href="https://github.com/pedestal/pedestal/blob/master/app/test/clj/io/pedestal/test/app.clj#L476">https://github.com/pedestal/pedestal/blob/master/app/test/clj/io/pedestal/test/app.clj#L476</a></td></tr>
+<tr id="t1507A" class="h r"><td><a href="#t1507A">15:07</a></td><td class="nf">tomoj</td><td>the version 1 models are even wackier</td></tr>
+<tr id="t1507A" class="h"><td><a href="#t1507A">15:07</a></td><td class="ny">bbloom</td><td>ohpauleez: because it means hand coding a complex static topology that implies your information hierarchy</td></tr>
+<tr id="t1508A" class="h"><td><a href="#t1508A">15:08</a></td><td class="nf">tomoj</td><td>my guess was that the plan was to do something like core-async and compile out to those primitives from a more accessible representation</td></tr>
+<tr id="t1508A" class="h"><td><a href="#t1508A">15:08</a></td><td class="ny">bbloom</td><td>i don't think it is reasonable to assume that your view state will every be large enough to justify virtualizing it</td></tr>
+<tr id="t1508A" class="h"><td><a href="#t1508A">15:08</a></td><td class="nf">ohpauleez</td><td>I agree that means hand coding the static topology, but how does it imply the information hierarchy</td></tr>
+<tr id="t1508A" class="h"><td><a href="#t1508A">15:08</a></td><td class="ny">bbloom</td><td>sure, you can have a list view that would have 1000000 items in it, you'd want to virtualize that. but that's the exeception, not the rule. &amp; you can only show a few hundred bits of information at once if any human has a hope of reading it</td></tr>
+<tr id="t1509A" class="h r"><td><a href="#t1509A">15:09</a></td><td class="ny">bbloom</td><td>with that in mind, i think it makes sense to reify the view state into a single tree value, rather than some transient virtual tree thing</td></tr>
+<tr id="t1509A" class="h"><td><a href="#t1509A">15:09</a></td><td class="nf">tomoj</td><td>:(</td></tr>
+<tr id="t1510A"><td><a href="#t1510A">15:10</a></td><td class="ny">bbloom</td><td>ohpauleez: the virtual tree is (most often, not not necessarily) isomorphic to your view hierarchy</td></tr>
+<tr id="t1510A" class="h r"><td><a href="#t1510A">15:10</a></td><td class="ny">bbloom</td><td>allow me to be clear: i have not studied pedestal in detail, so i'm somewhat talking out of my ass from what i recall from the clojure/west presentation</td></tr>
+<tr id="t1511A" class="h r"><td><a href="#t1511A">15:11</a></td><td class="ny">bbloom</td><td>i expect i will get some first hand experience with it soon, but my initial reaction was &quot;why would i want a VIRTUAL tree?&quot;</td></tr>
+<tr id="t1511A" class="h"><td><a href="#t1511A">15:11</a></td><td class="nj">weavejester</td><td>I think I'm going to represent my game as a function that transforms frame_n -&gt; frame_n+1</td></tr>
+<tr id="t1511A" class="h"><td><a href="#t1511A">15:11</a></td><td class="nf">tomoj</td><td>either way, it's a tree of places, right?</td></tr>
+<tr id="t1511A" class="h"><td><a href="#t1511A">15:11</a></td><td class="nf">ohpauleez</td><td>weavejester: I think that's smart</td></tr>
+<tr id="t1511A" class="h"><td><a href="#t1511A">15:11</a></td><td class="nf">tomoj</td><td>(or a place with a tree in it, I'd argue these are isomorphic..)</td></tr>
+<tr id="t1511A" class="h"><td><a href="#t1511A">15:11</a></td><td class="ny">bbloom</td><td>weavejester: conceptually, that's what you want. the trick is doing that efficiently :-)</td></tr>
+<tr id="t1512A" class="h"><td><a href="#t1512A">15:12</a></td><td class="nf">tomoj</td><td>I for one would not like to write a function frame_n -&gt; frame_n+1</td></tr>
+<tr id="t1512A" class="h"><td><a href="#t1512A">15:12</a></td><td class="nj">weavejester</td><td>That's kinda what I'm doing anyway, just with an atom instead.</td></tr>
+<tr id="t1512A" class="h"><td><a href="#t1512A">15:12</a></td><td class="ny">bbloom</td><td>tomoj: you don't WRITE that function. you generate it from a description of the behavior of the world :-)</td></tr>
+<tr id="t1512A" class="h"><td><a href="#t1512A">15:12</a></td><td class="nj">weavejester</td><td>I have a bunch of aggressively cached functions in the background that map a data structure into a 3D world.</td></tr>
+<tr id="t1512A" class="h"><td><a href="#t1512A">15:12</a></td><td class="nf">tomoj</td><td>yeah, right :)</td></tr>
+<tr id="t1513A" class="h"><td><a href="#t1513A">15:13</a></td><td class="nb">noncom</td><td>weavejester: that will surely be _the way_ when we have quantum computers and it will be the most natural thing to do - change state at once!</td></tr>
+<tr id="t1513A" class="h"><td><a href="#t1513A">15:13</a></td><td class="nj">weavejester</td><td>Well, the function frame_n -&gt; frame_n+1 would be the result of composing a bunch of smaller functions.</td></tr>
+<tr id="t1513A" class="h r"><td><a href="#t1513A">15:13</a></td><td class="nj">weavejester</td><td>Although composed functions are a little opaque.</td></tr>
+<tr id="t1513A" class="h"><td><a href="#t1513A">15:13</a></td><td class="ny">Pupnik-</td><td>the thing that unsettles me with that weavejester is you have to pass around some sort or gigantic data structure</td></tr>
+<tr id="t1514A" class="h"><td><a href="#t1514A">15:14</a></td><td class="nf">tomoj</td><td>frame_n -&gt; frame_n+1 still seems sorta weird to me, where is the information about the length of time that passed between frames, and who uses that info, how?</td></tr>
+<tr id="t1514A" class="h"><td><a href="#t1514A">15:14</a></td><td class="nj">weavejester</td><td>Pupnik-: So?</td></tr>
+<tr id="t1514A" class="h"><td><a href="#t1514A">15:14</a></td><td class="ny">bbloom</td><td>weavejester: you compose a data structure &amp; your next-frame function is an abstract machine which accepts current-frame and program-to-transform-frame</td></tr>
+<tr id="t1515A" class="h"><td><a href="#t1515A">15:15</a></td><td class="nj">weavejester</td><td>tomoj: Well, I guess to be more accurate it would be frame_n+1(with no change) -&gt; frame_n+1(with change)</td></tr>
+<tr id="t1516A" class="h r"><td><a href="#t1516A">15:16</a></td><td class="nj">weavejester</td><td>tomoj: You start out with a frame that contains the time, what keys were pressed, etc, then use that information to update the system… although… time between frames would be difficult to incorporate into that.</td></tr>
+<tr id="t1516A" class="h"><td><a href="#t1516A">15:16</a></td><td class="nb">noncom</td><td>so its like state_n+1 = state_n + delta. what is delta?</td></tr>
+<tr id="t1516A" class="h"><td><a href="#t1516A">15:16</a></td><td class="nf">tomoj</td><td>ah right, so basically like requestAnimationFrame, the current time is being passed in to each next-frame call</td></tr>
+<tr id="t1517A" class="h"><td><a href="#t1517A">15:17</a></td><td class="nj">weavejester</td><td>Currently I have a tick event, like: {:type :tick, :tbf 0.0215}</td></tr>
+<tr id="t1517A" class="h r"><td><a href="#t1517A">15:17</a></td><td class="nj">weavejester</td><td>Where tbf is the time between frames, so I can use it to calculate position from velocity and so forth.</td></tr>
+<tr id="t1517A" class="h"><td><a href="#t1517A">15:17</a></td><td class="nf">tomoj</td><td>eventually I guess any answer will boil down to that, but I want to completely eliminate it from the part of the code I usually look at</td></tr>
+<tr id="t1518A" class="h r"><td><a href="#t1518A">15:18</a></td><td class="nf">tomoj</td><td>just because of the nightmares I've had working with (bad, so this may be unfair) code that deals with that info</td></tr>
+<tr id="t1519A" class="h"><td><a href="#t1519A">15:19</a></td><td class="ny">bbloom</td><td><a href="http://blogs.msdn.com/b/shawnhar/archive/2007/07/25/understanding-gametime.aspx">http://blogs.msdn.com/b/shawnhar/archive/2007/07/25/understanding-gametime.aspx</a></td></tr>
+<tr id="t1519A" class="h r"><td><a href="#t1519A">15:19</a></td><td class="ny">bbloom</td><td>^^ really good info about game time steps</td></tr>
+<tr id="t1519A" class="h"><td><a href="#t1519A">15:19</a></td><td class="nf">tomoj</td><td>I guess a whole lot of the nightmare was the unrestricted mutation involved</td></tr>
+<tr id="t1520A"><td><a href="#t1520A">15:20</a></td><td class="nj">weavejester</td><td>Maintaining a fixed game step time sounds difficult.</td></tr>
+<tr id="t1521A" class="h r"><td><a href="#t1521A">15:21</a></td><td class="nj">weavejester</td><td>And often you want to change position in time with your draw steps</td></tr>
+<tr id="t1521A" class="h r"><td><a href="#t1521A">15:21</a></td><td class="nj">weavejester</td><td>Okay, so if option 1 is to go fully functional, option 2 is to go fully event based. I'm not sure exactly what that would look like, though.</td></tr>
+<tr id="t1522A" class="h"><td><a href="#t1522A">15:22</a></td><td class="nf">tomoj</td><td>so what's option 1? I've been trying to discover it :P</td></tr>
+<tr id="t1523A" class="h"><td><a href="#t1523A">15:23</a></td><td class="ni">Foxboron</td><td>So, i got some time on my hands. Is there any Clojure projects wich could use a clojure newb for bug hunting?</td></tr>
+<tr id="t1523A" class="h"><td><a href="#t1523A">15:23</a></td><td class="nj">weavejester</td><td>tomoj: I guess at each game tick, deliver some static datastructure about the current game state, and use it to generate a new data structure.</td></tr>
+<tr id="t1524A" class="h"><td><a href="#t1524A">15:24</a></td><td class="nf">tomoj</td><td>hmm</td></tr>
+<tr id="t1524A" class="h r"><td><a href="#t1524A">15:24</a></td><td class="nf">tomoj</td><td>I was thinking the atom there that you swap! every tick makes it not 'fully functional'</td></tr>
+<tr id="t1524A" class="h r"><td><a href="#t1524A">15:24</a></td><td class="nf">tomoj</td><td>but it's basically the same as an iterate seq?</td></tr>
+<tr id="t1525A" class="h"><td><a href="#t1525A">15:25</a></td><td class="nb">noncom</td><td>i have a question: i have a function that accepts {:keys [key-1 key-2.....]}. and i want to execute a separate action for each key, if it is not nil. so i do a bunch of lines like `(if key-1 (action-1 ...))` and for each key. is there any way to automate it?</td></tr>
+<tr id="t1525A" class="h"><td><a href="#t1525A">15:25</a></td><td class="nj">weavejester</td><td>tomoj: Oh yeah, it's not fully functional at the moment. I'd do away with the atom if I went with this approach.</td></tr>
+<tr id="t1525A" class="h"><td><a href="#t1525A">15:25</a></td><td class="nf">tomoj</td><td>no, it's not an iterate seq because information about user events etc magically shows up</td></tr>
+<tr id="t1525A" class="h"><td><a href="#t1525A">15:25</a></td><td class="nb">noncom</td><td>its an io monad?</td></tr>
+<tr id="t1526A" class="h"><td><a href="#t1526A">15:26</a></td><td class="nj">weavejester</td><td>tomoj: Yeah, the user events magically showing up is concerning me.</td></tr>
+<tr id="t1526A" class="h r"><td><a href="#t1526A">15:26</a></td><td class="nj">weavejester</td><td>tomoj: Do I need two data structures? (fn [previous-frame events] …)</td></tr>
+<tr id="t1526A" class="h r"><td><a href="#t1526A">15:26</a></td><td class="nj">weavejester</td><td>Or is that just another way of thinking about an event bus</td></tr>
+<tr id="t1527A" class="h"><td><a href="#t1527A">15:27</a></td><td class="nb">noncom</td><td>weavejester: what are you trying to acheive after all?</td></tr>
+<tr id="t1527A" class="h"><td><a href="#t1527A">15:27</a></td><td class="nj">weavejester</td><td>noncom: I don't know anymore :)</td></tr>
+<tr id="t1527A" class="h r"><td><a href="#t1527A">15:27</a></td><td class="nj">weavejester</td><td>noncom: I guess to get a good way of representing a 3D application with data.</td></tr>
+<tr id="t1527A" class="h r"><td><a href="#t1527A">15:27</a></td><td class="nj">weavejester</td><td>noncom: So a data-driven 3D app.</td></tr>
+<tr id="t1528A" class="h"><td><a href="#t1528A">15:28</a></td><td class="nb">noncom</td><td>yeah i read that in the jmonkey thread</td></tr>
+<tr id="t1529A" class="h r"><td><a href="#t1529A">15:29</a></td><td class="nb">noncom</td><td>weavejester: so wahts the problem with making it data-driven? you want to eliminate state and mutations???\</td></tr>
+<tr id="t1529A" class="h"><td><a href="#t1529A">15:29</a></td><td class="nf">tomoj</td><td>(reduce next-frame initial-frame input-events) ?</td></tr>
+<tr id="t1529A" class="h"><td><a href="#t1529A">15:29</a></td><td class="nj">weavejester</td><td>Currently it's an atom, but I'm mixing in :on-click events and stuff, which is probably bad. My model resembles a HTML DOM, in that it's data that can be mutated, and you can attach :on-blah events to elements.</td></tr>
+<tr id="t1530A" class="r"><td><a href="#t1530A">15:30</a></td><td class="nj">weavejester</td><td>tomoj: Hum...</td></tr>
+<tr id="t1530A" class="h r"><td><a href="#t1530A">15:30</a></td><td class="nj">weavejester</td><td>tomoj: Interesting.</td></tr>
+<tr id="t1530A" class="h"><td><a href="#t1530A">15:30</a></td><td class="nf">tomoj</td><td>just extrapolating from your suggestion</td></tr>
+<tr id="t1530A" class="h"><td><a href="#t1530A">15:30</a></td><td class="nj">weavejester</td><td>noncom: I don't want to eliminate state and mutation - just constrain them.</td></tr>
+<tr id="t1530A" class="h"><td><a href="#t1530A">15:30</a></td><td class="nf">tomoj</td><td>I don't know what you're trying to achieve either :)</td></tr>
+<tr id="t1531A" class="h"><td><a href="#t1531A">15:31</a></td><td class="nj">weavejester</td><td>Fundamentally in any functional language, you want to reduce mutation to a minimum.</td></tr>
+<tr id="t1531A" class="h r"><td><a href="#t1531A">15:31</a></td><td class="nj">weavejester</td><td>Ideally, you have one function that hides all the mutation, and everything else is functional.</td></tr>
+<tr id="t1532A" class="h r"><td><a href="#t1532A">15:32</a></td><td class="nj">weavejester</td><td>So I guess that's my goal</td></tr>
+<tr id="t1533A" class="h"><td><a href="#t1533A">15:33</a></td><td class="nf">tomoj</td><td>so you have input and output?</td></tr>
+<tr id="t1533A" class="h r"><td><a href="#t1533A">15:33</a></td><td class="nf">tomoj</td><td>or just output?</td></tr>
+<tr id="t1533A" class="h"><td><a href="#t1533A">15:33</a></td><td class="nj">weavejester</td><td>tomoj: Input and output</td></tr>
+<tr id="t1533A" class="h r"><td><a href="#t1533A">15:33</a></td><td class="nj">weavejester</td><td>Which I guess is the root of the problem</td></tr>
+<tr id="t1533A" class="h r"><td><a href="#t1533A">15:33</a></td><td class="nj">weavejester</td><td>As I have input -&gt; events</td></tr>
+<tr id="t1533A" class="h r"><td><a href="#t1533A">15:33</a></td><td class="nj">weavejester</td><td>output -&gt; atom</td></tr>
+<tr id="t1534A" class="h r"><td><a href="#t1534A">15:34</a></td><td class="nj">weavejester</td><td>I'm dealing with input using an event bus, and then swapping an atom for output.</td></tr>
+<tr id="t1534A" class="h r"><td><a href="#t1534A">15:34</a></td><td class="nj">weavejester</td><td>I need to go one route or the other, I think.</td></tr>
+<tr id="t1535A" class="h"><td><a href="#t1535A">15:35</a></td><td class="nb">noncom</td><td>weavejester: i don't really see a problem here</td></tr>
+<tr id="t1535A" class="h"><td><a href="#t1535A">15:35</a></td><td class="nf">tomoj</td><td>there's basically two operations, obtain and render?</td></tr>
+<tr id="t1535A" class="h r"><td><a href="#t1535A">15:35</a></td><td class="nf">tomoj</td><td>@ and whatever that thing rich was talking about is called</td></tr>
+<tr id="t1536A" class="h r"><td><a href="#t1536A">15:36</a></td><td class="nf">tomoj</td><td>maybe conj! if that got broken out of transients</td></tr>
+<tr id="t1536A" class="h"><td><a href="#t1536A">15:36</a></td><td class="nj">weavejester</td><td>noncom: What do you mean?</td></tr>
+<tr id="t1537A" class="h"><td><a href="#t1537A">15:37</a></td><td class="nb">noncom</td><td>weavejester: are you trying to realize how to acheive that theoretically or how to code it in clojure?</td></tr>
+<tr id="t1537A" class="h"><td><a href="#t1537A">15:37</a></td><td class="nj">weavejester</td><td>noncom: Coding it in Clojure</td></tr>
+<tr id="t1537A" class="h"><td><a href="#t1537A">15:37</a></td><td class="nb">noncom</td><td>oh, i see then</td></tr>
+<tr id="t1537A" class="h r"><td><a href="#t1537A">15:37</a></td><td class="nb">noncom</td><td>i thought you were more after finding some theoretical basis for that</td></tr>
+<tr id="t1538A" class="h"><td><a href="#t1538A">15:38</a></td><td class="nf">tomoj</td><td>bbloom: is a non-virtual tree just a map?</td></tr>
+<tr id="t1538A" class="h"><td><a href="#t1538A">15:38</a></td><td class="ny">Pupnik-</td><td>weavejester, you have some good options for gamedev with clojure, like libgdx or slick2d</td></tr>
+<tr id="t1539A" class="h"><td><a href="#t1539A">15:39</a></td><td class="nj">weavejester</td><td>Pupnik- I'm already using jMonkeyEngine behind the scenes. The internals aren't the issue so much.</td></tr>
+<tr id="t1539A" class="h"><td><a href="#t1539A">15:39</a></td><td class="ny">Pupnik-</td><td>there just seemed to be a lot of fuss over frame time which is almost always provided by a lib if you use one</td></tr>
+<tr id="t1540A"><td><a href="#t1540A">15:40</a></td><td class="nj">weavejester</td><td>Pupnik-: Oh, I can get the time frame easily. I'm just trying to find the right way to model it.</td></tr>
+<tr id="t1540A" class="h r"><td><a href="#t1540A">15:40</a></td><td class="nj">weavejester</td><td>Is it a series of asynchronous events?</td></tr>
+<tr id="t1540A" class="h r"><td><a href="#t1540A">15:40</a></td><td class="nj">weavejester</td><td>Or a functional transformation of frames?</td></tr>
+<tr id="t1540A" class="h"><td><a href="#t1540A">15:40</a></td><td class="nb">noncom</td><td>this is a matter of POV</td></tr>
+<tr id="t1541A" class="h"><td><a href="#t1541A">15:41</a></td><td class="ny">bbloom</td><td>tomoj: yeah, a map of maps of maps</td></tr>
+<tr id="t1541A" class="h"><td><a href="#t1541A">15:41</a></td><td class="n0">n_b</td><td>On testing, the clojure.test is the community preferred option, right?</td></tr>
+<tr id="t1542A" class="h"><td><a href="#t1542A">15:42</a></td><td class="nb">noncom</td><td>weavejester: is the only problem you have left is how to handle user input more functionally? is everything else (if there is no user input) already fully functional?</td></tr>
+<tr id="t1543A" class="h"><td><a href="#t1543A">15:43</a></td><td class="nj">weavejester</td><td>noncom: I guess the issue is the amount of references I'm currently passing around...</td></tr>
+<tr id="t1543A" class="h"><td><a href="#t1543A">15:43</a></td><td class="n5">ucb</td><td>n_b: clojure.test is the standard, but there are others like midje which are interesting to explore</td></tr>
+<tr id="t1544A" class="h"><td><a href="#t1544A">15:44</a></td><td class="nj">weavejester</td><td>Okay, simple example: you click a box and it turns red.</td></tr>
+<tr id="t1544A" class="h"><td><a href="#t1544A">15:44</a></td><td class="nf">tomoj</td><td>hey, great, I already have a red box</td></tr>
+<tr id="t1544A" class="h"><td><a href="#t1544A">15:44</a></td><td class="nj">weavejester</td><td>So if the box mutates, maybe you put it in a ref. Does that mean all objects in your scene are refs?</td></tr>
+<tr id="t1544A" class="h"><td><a href="#t1544A">15:44</a></td><td class="nf">tomoj</td><td>but no user input yet</td></tr>
+<tr id="t1544A" class="h"><td><a href="#t1544A">15:44</a></td><td class="n0">n_b</td><td>ucb: I've seen people complaining about midje in here before, and while I don't know specifics I thought it was worth asking about before I go about open sourcing some stuff</td></tr>
+<tr id="t1545A" class="h"><td><a href="#t1545A">15:45</a></td><td class="ny">Pupnik-</td><td>weavejester, you don't need mutation to turn your box red</td></tr>
+<tr id="t1545A" class="h"><td><a href="#t1545A">15:45</a></td><td class="nj">weavejester</td><td>Do I have an event like: {:type :click :object (ref my-box)}</td></tr>
+<tr id="t1545A" class="h r"><td><a href="#t1545A">15:45</a></td><td class="nj">weavejester</td><td>Pupnik-: Can you elaborate?</td></tr>
+<tr id="t1546A" class="h"><td><a href="#t1546A">15:46</a></td><td class="n5">ucb</td><td>n_b: I've used (and still use) midje with no complaints; but YMMV, it all depends on what you want and need really :)</td></tr>
+<tr id="t1546A" class="h"><td><a href="#t1546A">15:46</a></td><td class="nb">noncom</td><td>weavejester: so, you *do not* have your world fully functionaly developing on each frame, you rely on pure state where possible?</td></tr>
+<tr id="t1547A" class="h"><td><a href="#t1547A">15:47</a></td><td class="ny">Pupnik-</td><td>its state is part of the 'game state' that is re-generated each frame through the (new-state) function</td></tr>
+<tr id="t1547A" class="h"><td><a href="#t1547A">15:47</a></td><td class="nj">weavejester</td><td>noncom: Currently the world is a ref, and the current application state is a ref.</td></tr>
+<tr id="t1548A" class="h r"><td><a href="#t1548A">15:48</a></td><td class="nj">weavejester</td><td>Pupnik-: Right, so alternatively, I could represent the box like: {:shape :box, :state :clicked}</td></tr>
+<tr id="t1548A" class="h r"><td><a href="#t1548A">15:48</a></td><td class="nj">weavejester</td><td>And then have a function that iterates through the world looking for clicked boxes and turning them red.</td></tr>
+<tr id="t1548A" class="h"><td><a href="#t1548A">15:48</a></td><td class="ny">Pupnik-</td><td>well, ultimately you will need to tell your renderer what to do</td></tr>
+<tr id="t1549A" class="h"><td><a href="#t1549A">15:49</a></td><td class="nj">weavejester</td><td>However… that sounds expensive.</td></tr>
+<tr id="t1549A" class="h"><td><a href="#t1549A">15:49</a></td><td class="ny">Pupnik-</td><td>but your clojure code can be immutable</td></tr>
+<tr id="t1549A" class="h r"><td><a href="#t1549A">15:49</a></td><td class="ny">Pupnik-</td><td>watch some videos about clojure data structures :)</td></tr>
+<tr id="t1549A" class="h r"><td><a href="#t1549A">15:49</a></td><td class="ny">Pupnik-</td><td>of course, maybe it will be too much at 60fps</td></tr>
+<tr id="t1549A" class="h r"><td><a href="#t1549A">15:49</a></td><td class="ny">Pupnik-</td><td>I havent tried making a game yet, but i will soon</td></tr>
+<tr id="t1549A" class="h"><td><a href="#t1549A">15:49</a></td><td class="na">dnolen</td><td>weavejester: why not just thread the world state through the game? I liked ztellman's early experiments along those lines with penumbra</td></tr>
+<tr id="t1549A" class="h"><td><a href="#t1549A">15:49</a></td><td class="nj">weavejester</td><td>Pupnik-: I am acquainted with Clojure data structures :)</td></tr>
+<tr id="t1550A"><td><a href="#t1550A">15:50</a></td><td class="ny">Pupnik-</td><td>it shouldn't be too bad, its jmonkey that will do the rendering</td></tr>
+<tr id="t1551A" class="h"><td><a href="#t1551A">15:51</a></td><td class="nj">weavejester</td><td>dnolen: Hm...</td></tr>
+<tr id="t1551A" class="h r"><td><a href="#t1551A">15:51</a></td><td class="nj">weavejester</td><td>I guess I need to clear my mind on this.</td></tr>
+<tr id="t1552A" class="h r"><td><a href="#t1552A">15:52</a></td><td class="nj">weavejester</td><td>Thanks everyone for listening to me ramble</td></tr>
+<tr id="t1552A" class="h r"><td><a href="#t1552A">15:52</a></td><td class="nj">weavejester</td><td>You've made me understand I'm really confused, and don't have a clear plan</td></tr>
+<tr id="t1552A" class="h"><td><a href="#t1552A">15:52</a></td><td class="na">dnolen</td><td>user events can go into a queue and you can assoc them onto the world state before calling into the main handler</td></tr>
+<tr id="t1552A" class="h"><td><a href="#t1552A">15:52</a></td><td class="nj">weavejester</td><td>So… the first step to enlightenment is complete.</td></tr>
+<tr id="t1553A" class="h"><td><a href="#t1553A">15:53</a></td><td class="nb">noncom</td><td>:D</td></tr>
+<tr id="t1553A" class="h"><td><a href="#t1553A">15:53</a></td><td class="nj">weavejester</td><td>dnolen: Yeah, I was thinking about that. But doesn't that, I don't know, taint the world a little...</td></tr>
+<tr id="t1553A" class="h"><td><a href="#t1553A">15:53</a></td><td class="nx">dobladez</td><td>Emacs question: to show eldoc messages, emacs expands and shrinks the &quot;echo area&quot;, which is quite annoying. Anybody knows how to fix that?</td></tr>
+<tr id="t1554A" class="h"><td><a href="#t1554A">15:54</a></td><td class="nb">noncom</td><td>weavejester: there is a need for a clear view i think</td></tr>
+<tr id="t1554A" class="h"><td><a href="#t1554A">15:54</a></td><td class="na">dnolen</td><td>weavejester: <a href="http://github.com/mjg123/pacman/blob/gh-pages/src/pacman/core.cljs#L321">http://github.com/mjg123/pacman/blob/gh-pages/src/pacman/core.cljs#L321</a></td></tr>
+<tr id="t1554A" class="h"><td><a href="#t1554A">15:54</a></td><td class="nx">dobladez</td><td>I tried customizing option 'Eldoc Echo Area Use Multiline', but it doesn't seem to make a difference</td></tr>
+<tr id="t1554A" class="h"><td><a href="#t1554A">15:54</a></td><td class="ny">Pupnik-</td><td>you can't keep the world state compeltely pure, it will always need to read things like frame time</td></tr>
+<tr id="t1555A" class="h r"><td><a href="#t1555A">15:55</a></td><td class="ny">Pupnik-</td><td>well, not always maybe your game doesnt care about that</td></tr>
+<tr id="t1555A" class="h r"><td><a href="#t1555A">15:55</a></td><td class="ny">Pupnik-</td><td>but usually</td></tr>
+<tr id="t1555A" class="h"><td><a href="#t1555A">15:55</a></td><td class="nf">tomoj</td><td>huh?</td></tr>
+<tr id="t1555A" class="h r"><td><a href="#t1555A">15:55</a></td><td class="nf">tomoj</td><td>&quot;world state&quot; and &quot;frame time&quot; seem very disconnected, semantically, to me</td></tr>
+<tr id="t1555A" class="h"><td><a href="#t1555A">15:55</a></td><td class="ny">Pupnik-</td><td>if you need to run a physics simulation, you need frame time</td></tr>
+<tr id="t1556A" class="h"><td><a href="#t1556A">15:56</a></td><td class="nf">tomoj</td><td>if you describe the equations of the system being simulated, does the frame time play a role?</td></tr>
+<tr id="t1557A" class="h"><td><a href="#t1557A">15:57</a></td><td class="nj">weavejester</td><td>I currently want to keep the app (i.e. what the user sees) separate from the world (i.e. what the server simulates)</td></tr>
+<tr id="t1557A" class="h r"><td><a href="#t1557A">15:57</a></td><td class="nj">weavejester</td><td>The app contains the UI, the 3D scene, the HUD, and so forth.</td></tr>
+<tr id="t1557A" class="h r"><td><a href="#t1557A">15:57</a></td><td class="nj">weavejester</td><td>An event might trigger a change in the world, or a change in the app.</td></tr>
+<tr id="t1558A" class="h"><td><a href="#t1558A">15:58</a></td><td class="nf">tomoj</td><td>oh right, frame time clearly has nothing to do with the world in your case, since you might have multiple views of the same world running at different framerates?</td></tr>
+<tr id="t1558A" class="h r"><td><a href="#t1558A">15:58</a></td><td class="nf">tomoj</td><td>or just not in sync frame-by-frame with eachother anyway</td></tr>
+<tr id="t1558A" class="h"><td><a href="#t1558A">15:58</a></td><td class="ny">Pupnik-</td><td>tomoj, it will be server tick rate in this case</td></tr>
+<tr id="t1558A" class="h"><td><a href="#t1558A">15:58</a></td><td class="nf">tomoj</td><td>yeah, right</td></tr>
+<tr id="t1558A" class="h"><td><a href="#t1558A">15:58</a></td><td class="ny">Pupnik-</td><td>since the server will run the simulation</td></tr>
+<tr id="t1558A" class="h"><td><a href="#t1558A">15:58</a></td><td class="nf">tomoj</td><td>but still, does it show up in the equations? if not, I don't want to write it in my code :)</td></tr>
+<tr id="t1558A" class="h"><td><a href="#t1558A">15:58</a></td><td class="nj">weavejester</td><td>tomoj: Yes. The world is potentially external (although there will be a local copy), the app is internal.</td></tr>
+<tr id="t1558A" class="h"><td><a href="#t1558A">15:58</a></td><td class="nf">pandeiro</td><td>is there an easy way to use long-polling with jetty?</td></tr>
+<tr id="t1559A" class="h"><td><a href="#t1559A">15:59</a></td><td class="ny">Pupnik-</td><td>unless you use a fixed time-step (which will cause the entire simulation to slow down if you can't hit your target), you need frame time or very strange things happen</td></tr>
+<tr id="t1600A"><td><a href="#t1600A">16:00</a></td><td class="nj">weavejester</td><td>Currently an event will trigger a function, which can update the app or update the world, or both.</td></tr>
+<tr id="t1600A" class="h r"><td><a href="#t1600A">16:00</a></td><td class="nj">weavejester</td><td>But currently I'm taking a HTML DOM-like approach, and assigning event handles by adding :on-click attributes to the app.</td></tr>
+<tr id="t1601A" class="h r"><td><a href="#t1601A">16:01</a></td><td class="nj">weavejester</td><td>Which is leading to a circular dependency.</td></tr>
+<tr id="t1601A" class="h"><td><a href="#t1601A">16:01</a></td><td class="n1">ztellman</td><td>weavejester: I wrote this ages ago about writing a &quot;functional&quot; game: <a href="http://ideolalia.com/creating-a-simple-game-in-clojure/index.html">http://ideolalia.com/creating-a-simple-game-in-clojure/index.html</a></td></tr>
+<tr id="t1601A" class="h"><td><a href="#t1601A">16:01</a></td><td class="nf">tomoj</td><td>you need frame time somewhere, but I want it in the background, not in my world data/logic</td></tr>
+<tr id="t1601A" class="h"><td><a href="#t1601A">16:01</a></td><td class="n1">ztellman</td><td>basically callbacks are pure functions on the world state, except for the display callback, which only performs side-effects</td></tr>
+<tr id="t1602A" class="h"><td><a href="#t1602A">16:02</a></td><td class="nb">noncom</td><td>i think that user input is not something separate from the world. user input is an object of the world which has some interactions with other objects. however, it is not transperent for any object of the world - them can't see inside it. that is how i see it - it simply is an object of the world. and it's behavior inside the world is no different from other objects.</td></tr>
+<tr id="t1603A" class="h"><td><a href="#t1603A">16:03</a></td><td class="nj">weavejester</td><td>ztellman: I've separated out internal state (like whether a UI window is displayed) from external state (like where the player is in the world)</td></tr>
+<tr id="t1603A" class="h"><td><a href="#t1603A">16:03</a></td><td class="nf">tomoj</td><td>asteroids is a great example</td></tr>
+<tr id="t1603A" class="h"><td><a href="#t1603A">16:03</a></td><td class="nj">weavejester</td><td>ztellman: Currently both are refs an event handler can update.</td></tr>
+<tr id="t1603A" class="h"><td><a href="#t1603A">16:03</a></td><td class="nf">tomoj</td><td>source link is dead, new one <a href="https://github.com/ztellman/penumbra/blob/master/test/example/game/asteroids.clj">https://github.com/ztellman/penumbra/blob/master/test/example/game/asteroids.clj</a></td></tr>
+<tr id="t1603A" class="h"><td><a href="#t1603A">16:03</a></td><td class="n1">ztellman</td><td>weavejester: any reason to not have them just be entries in the same block of state?</td></tr>
+<tr id="t1603A" class="h r"><td><a href="#t1603A">16:03</a></td><td class="n1">ztellman</td><td>tomoj: I'll fix that, thanks</td></tr>
+<tr id="t1604A" class="h"><td><a href="#t1604A">16:04</a></td><td class="nf">tomoj</td><td>I do not envy the people why find github links with &quot;master&quot; in their only promising search result - irc logs</td></tr>
+<tr id="t1604A" class="h r"><td><a href="#t1604A">16:04</a></td><td class="nf">tomoj</td><td>who.</td></tr>
+<tr id="t1605A" class="h r"><td><a href="#t1605A">16:05</a></td><td class="nf">tomoj</td><td>almost feels like it should be a redirect..</td></tr>
+<tr id="t1605A" class="h r"><td><a href="#t1605A">16:05</a></td><td class="nf">tomoj</td><td>with a 'copy link to master' button with a red exclamation point and a tooltip..</td></tr>
+<tr id="t1605A" class="h"><td><a href="#t1605A">16:05</a></td><td class="nj">weavejester</td><td>ztellman: Well, the world can be updated over the network. I guess I could buffer network events per frame, but… that seems to be doing the job of a ref and dosync.</td></tr>
+<tr id="t1606A" class="h"><td><a href="#t1606A">16:06</a></td><td class="n1">ztellman</td><td>weavejester: ah, ok, all my callbacks were in response to in-process events</td></tr>
+<tr id="t1606A" class="h r"><td><a href="#t1606A">16:06</a></td><td class="n1">ztellman</td><td>makes sense to differentiate</td></tr>
+<tr id="t1606A" class="h"><td><a href="#t1606A">16:06</a></td><td class="n7">gfredericks</td><td>how can I run clojure.test tests without leiningen?</td></tr>
+<tr id="t1607A" class="h"><td><a href="#t1607A">16:07</a></td><td class="nj">weavejester</td><td>ztellman: Clojure's refs provide a nice way of taking a per-frame snapshot of a changing data structure.</td></tr>
+<tr id="t1607A" class="h"><td><a href="#t1607A">16:07</a></td><td class="nf">tomoj</td><td>bbloom: did you coin 'virtual' in the context of pedestal?</td></tr>
+<tr id="t1607A" class="h"><td><a href="#t1607A">16:07</a></td><td class="ny">bbloom</td><td>tomoj: i'm speaking from memory. i think they called it a logical tree</td></tr>
+<tr id="t1608A" class="h"><td><a href="#t1608A">16:08</a></td><td class="n1">ztellman</td><td>weavejester: yeah, if you look at the post I linked to, there were multiple concurrent processes updating the blob of state</td></tr>
+<tr id="t1608A" class="h r"><td><a href="#t1608A">16:08</a></td><td class="n1">ztellman</td><td>checking for collisions, checking if the exhaust should be emitted, etc</td></tr>
+<tr id="t1608A" class="h r"><td><a href="#t1608A">16:08</a></td><td class="n1">ztellman</td><td>all interacting with an atom</td></tr>
+<tr id="t1608A" class="h"><td><a href="#t1608A">16:08</a></td><td class="nc">mikerod</td><td>Is this expected behavior of `flatten`?</td></tr>
+<tr id="t1609A" class="h"><td><a href="#t1609A">16:09</a></td><td class="nf">tomoj</td><td>suppose you break the state up into a bunch of little atoms/refs</td></tr>
+<tr id="t1609A" class="h"><td><a href="#t1609A">16:09</a></td><td class="nc">mikerod</td><td>,(flatten (java.util.Collections/unmodifiableList [1]))</td></tr>
+<tr id="t1609A" class="h"><td><a href="#t1609A">16:09</a></td><td class="nl">clojurebot</td><td>()</td></tr>
+<tr id="t1609A" class="h"><td><a href="#t1609A">16:09</a></td><td class="nc">mikerod</td><td>(flatten (seq (java.util.Collections/unmodifiableList [1])))</td></tr>
+<tr id="t1609A" class="h"><td><a href="#t1609A">16:09</a></td><td class="nj">weavejester</td><td>ztellman: Maybe I'm looking at the wrong thing… what do your callbacks look like?</td></tr>
+<tr id="t1609A" class="h"><td><a href="#t1609A">16:09</a></td><td class="nc">mikerod</td><td>,(flatten (seq (java.util.Collections/unmodifiableList [1])))</td></tr>
+<tr id="t1609A" class="h"><td><a href="#t1609A">16:09</a></td><td class="nl">clojurebot</td><td>(1)</td></tr>
+<tr id="t1609A" class="h"><td><a href="#t1609A">16:09</a></td><td class="n1">ztellman</td><td>the callbacks are registered at <a href="https://github.com/ztellman/penumbra/blob/master/test/example/game/asteroids.clj#L384">https://github.com/ztellman/penumbra/blob/master/test/example/game/asteroids.clj#L384</a></td></tr>
+<tr id="t1610A"><td><a href="#t1610A">16:10</a></td><td class="n5">ucb</td><td>gfredericks: you mean in a repl?</td></tr>
+<tr id="t1611A" class="h"><td><a href="#t1611A">16:11</a></td><td class="nf">tomoj</td><td>instead of (assoc state :foo (foo' foo)) you have (swap! state/foo foo') say</td></tr>
+<tr id="t1611A" class="h r"><td><a href="#t1611A">16:11</a></td><td class="nf">tomoj</td><td>what did you lose?</td></tr>
+<tr id="t1611A" class="h"><td><a href="#t1611A">16:11</a></td><td class="nj">weavejester</td><td>ztellman: Is the world state internal to the app? So the callbacks never see it directly?</td></tr>
+<tr id="t1611A" class="h"><td><a href="#t1611A">16:11</a></td><td class="n7">gfredericks</td><td>ucb: sure</td></tr>
+<tr id="t1611A" class="h r"><td><a href="#t1611A">16:11</a></td><td class="n7">gfredericks</td><td>ucb: I'm debugging why my tests hang and thought I would rule out or implicate leiningen</td></tr>
+<tr id="t1612A" class="h"><td><a href="#t1612A">16:12</a></td><td class="n1">ztellman</td><td>weavejester: notice that each of the callbacks have a 'state' parameter</td></tr>
+<tr id="t1612A" class="h"><td><a href="#t1612A">16:12</a></td><td class="n5">ucb</td><td>gfredericks: there's (run-tests...)</td></tr>
+<tr id="t1612A" class="h"><td><a href="#t1612A">16:12</a></td><td class="n1">ztellman</td><td>and they return a modified state</td></tr>
+<tr id="t1612A" class="h"><td><a href="#t1612A">16:12</a></td><td class="n5">ucb</td><td>,(doc run-tests)</td></tr>
+<tr id="t1612A" class="h"><td><a href="#t1612A">16:12</a></td><td class="nl">clojurebot</td><td>Excuse me?</td></tr>
+<tr id="t1612A" class="h"><td><a href="#t1612A">16:12</a></td><td class="n5">ucb</td><td>bleh</td></tr>
+<tr id="t1612A" class="h"><td><a href="#t1612A">16:12</a></td><td class="nc">mikerod</td><td>,(= (flatten (seq (java.util.Collections/unmodifiableList [1]))) (flatten (java.util.Collections/unmodifiableList [1])))</td></tr>
+<tr id="t1612A" class="h"><td><a href="#t1612A">16:12</a></td><td class="nl">clojurebot</td><td>false</td></tr>
+<tr id="t1612A" class="h"><td><a href="#t1612A">16:12</a></td><td class="ns">technomancy</td><td>bbloom: I don't think losing your key needs to be handled differently from having it compromised</td></tr>
+<tr id="t1612A" class="h"><td><a href="#t1612A">16:12</a></td><td class="nj">weavejester</td><td>ztellman: The {:dim *dim*} - is that the initial state?</td></tr>
+<tr id="t1612A" class="h r"><td><a href="#t1612A">16:12</a></td><td class="nj">weavejester</td><td>ztellman: So (app/start callbacks initial-state) ?</td></tr>
+<tr id="t1613A" class="h"><td><a href="#t1613A">16:13</a></td><td class="ns">technomancy</td><td>basically before it's lost you generate a revocation cert; if it's lost/compromised you publish that with the date it was lost</td></tr>
+<tr id="t1613A" class="h"><td><a href="#t1613A">16:13</a></td><td class="ny">bbloom</td><td>technomancy: which assumes i don't lose the revocation cert....</td></tr>
+<tr id="t1613A" class="h"><td><a href="#t1613A">16:13</a></td><td class="ns">technomancy</td><td>heh, yep. some people recommend printing it out and filing it.</td></tr>
+<tr id="t1614A" class="h r"><td><a href="#t1614A">16:14</a></td><td class="ns">technomancy</td><td>this is why we give keys an expiry date =)</td></tr>
+<tr id="t1614A" class="h"><td><a href="#t1614A">16:14</a></td><td class="ny">bbloom</td><td>technomancy: i think i'm just gonna assume my key is safe-enough w/ my full drive encryption &amp; not really worry all that much if i lose it.</td></tr>
+<tr id="t1614A" class="h"><td><a href="#t1614A">16:14</a></td><td class="ns">technomancy</td><td>to limit the damage that can be done if it's compromised and can't be revoked</td></tr>
+<tr id="t1614A" class="h"><td><a href="#t1614A">16:14</a></td><td class="ny">bbloom</td><td>technomancy: i know security people hate when smart folks say stuff like that :-)</td></tr>
+<tr id="t1615A" class="h r"><td><a href="#t1615A">16:15</a></td><td class="ny">bbloom</td><td>can i add a comment to my key w/ a link to these IRC logs, so that anyone who is trying to decide whether or not to trust me can make a judgement call? :-)</td></tr>
+<tr id="t1615A" class="h"><td><a href="#t1615A">16:15</a></td><td class="nf">tomoj</td><td>it's basically a manual state monad, right? so what is lost if you just use state?</td></tr>
+<tr id="t1615A" class="h"><td><a href="#t1615A">16:15</a></td><td class="ns">technomancy</td><td>bbloom: it's a big step up from not doing any signing =)</td></tr>
+<tr id="t1615A" class="h"><td><a href="#t1615A">16:15</a></td><td class="nf">tomoj</td><td>(fn [state] (foo (update-state state) (update-state state))) becomes difficult?</td></tr>
+<tr id="t1615A" class="h"><td><a href="#t1615A">16:15</a></td><td class="ns">technomancy</td><td>bbloom: checking a pom or pom .asc in usually isn't a great idea. using signed git tags is though.</td></tr>
+<tr id="t1616A" class="h"><td><a href="#t1616A">16:16</a></td><td class="ny">bbloom</td><td>technomancy: signed git tags?</td></tr>
+<tr id="t1616A" class="h"><td><a href="#t1616A">16:16</a></td><td class="nf">tomoj</td><td>..I guess everything becomes difficult?</td></tr>
+<tr id="t1616A" class="h"><td><a href="#t1616A">16:16</a></td><td class="ns">technomancy</td><td>bbloom: just use the -s arg to git tag</td></tr>
+<tr id="t1616A" class="h"><td><a href="#t1616A">16:16</a></td><td class="ny">bbloom</td><td>technomancy: release management is a PITA….. stupid software… heh</td></tr>
+<tr id="t1616A" class="h"><td><a href="#t1616A">16:16</a></td><td class="nj">weavejester</td><td>tomoj: Updating a state via a return value doesn't seem particularly tricky.</td></tr>
+<tr id="t1617A" class="h"><td><a href="#t1617A">16:17</a></td><td class="ns">technomancy</td><td>bbloom: brb; screw this going back to rubygems, etc =)</td></tr>
+<tr id="t1617A" class="h"><td><a href="#t1617A">16:17</a></td><td class="ny">bbloom</td><td>technomancy: ha</td></tr>
+<tr id="t1617A" class="h r"><td><a href="#t1617A">16:17</a></td><td class="ny">bbloom</td><td>technomancy: i mean, lein has to wait for the JVM to start, soooo who cares if rake takes 45 seconds to initialize?</td></tr>
+<tr id="t1617A" class="h"><td><a href="#t1617A">16:17</a></td><td class="n1">ztellman</td><td>weavejester: sorry, stepped away for a second. Yes, that's correct.</td></tr>
+<tr id="t1618A" class="h"><td><a href="#t1618A">16:18</a></td><td class="np">linuxos</td><td>clojure uses just long for storing integers. even for small counters?</td></tr>
+<tr id="t1618A" class="h"><td><a href="#t1618A">16:18</a></td><td class="nf">tomoj</td><td>well I'm imagining if you move the state ops down into all the leaves where you update a state map during an epoch. then everything is tricky, right? cus you're just in normal-java-variable land</td></tr>
+<tr id="t1619A" class="h r"><td><a href="#t1619A">16:19</a></td><td class="nf">tomoj</td><td>so with a state map and (fn [state] state'), inside an epoch you're in sane-functional-land? but if you look at the program across many epochs, do you have to start using mutation-land reasoning again?</td></tr>
+<tr id="t1620A"><td><a href="#t1620A">16:20</a></td><td class="ny">Pupnik-</td><td>its the time slice approach</td></tr>
+<tr id="t1621A" class="h r"><td><a href="#t1621A">16:21</a></td><td class="ny">Pupnik-</td><td>the progress of time is represetned by a series of immutable states</td></tr>
+<tr id="t1621A" class="h"><td><a href="#t1621A">16:21</a></td><td class="nl">clojurebot</td><td>c'est bon!</td></tr>
+<tr id="t1621A" class="h"><td><a href="#t1621A">16:21</a></td><td class="n0">chessguy</td><td>salutations and other such pleasantries</td></tr>
+<tr id="t1621A" class="h"><td><a href="#t1621A">16:21</a></td><td class="nj">weavejester</td><td>Pupnik-: Well, really, that's always the case</td></tr>
+<tr id="t1622A" class="h"><td><a href="#t1622A">16:22</a></td><td class="ny">Pupnik-</td><td>weavejester, except normally those states are modified in place and you lose access to the old ones</td></tr>
+<tr id="t1622A" class="h r"><td><a href="#t1622A">16:22</a></td><td class="ny">Pupnik-</td><td>if you wanted to know a players velocity was 5 seconds ago</td></tr>
+<tr id="t1622A" class="h r"><td><a href="#t1622A">16:22</a></td><td class="ny">Pupnik-</td><td>you cant check</td></tr>
+<tr id="t1622A" class="h"><td><a href="#t1622A">16:22</a></td><td class="nj">weavejester</td><td>ztellman: It seems that by changing the state through a callback, you lose some of the control a ref would give you.</td></tr>
+<tr id="t1623A" class="h r"><td><a href="#t1623A">16:23</a></td><td class="nj">weavejester</td><td>Pupnik-: Yeah, that's the main difference</td></tr>
+<tr id="t1623A" class="h"><td><a href="#t1623A">16:23</a></td><td class="nf">tomoj</td><td>Pupnik-: how do you gain that ability?</td></tr>
+<tr id="t1623A" class="h r"><td><a href="#t1623A">16:23</a></td><td class="nf">tomoj</td><td>if you just have an atom with the current state, you don't have that ability, do you?</td></tr>
+<tr id="t1623A" class="h"><td><a href="#t1623A">16:23</a></td><td class="n1">ztellman</td><td>weavejester: by only using callbacks, it gives the game loop more control over when these things happen</td></tr>
+<tr id="t1623A" class="h"><td><a href="#t1623A">16:23</a></td><td class="ny">Pupnik-</td><td>no</td></tr>
+<tr id="t1623A" class="h"><td><a href="#t1623A">16:23</a></td><td class="n1">ztellman</td><td>which I found to be useful</td></tr>
+<tr id="t1624A" class="h"><td><a href="#t1624A">16:24</a></td><td class="ny">Pupnik-</td><td>or at least, i dont think so</td></tr>
+<tr id="t1624A" class="h"><td><a href="#t1624A">16:24</a></td><td class="n1">ztellman</td><td>that may or may not prove true for you</td></tr>
+<tr id="t1624A" class="h"><td><a href="#t1624A">16:24</a></td><td class="ny">Pupnik-</td><td>i know much more about how games work than about clojure</td></tr>
+<tr id="t1626A" class="h"><td><a href="#t1626A">16:26</a></td><td class="nf">tomoj</td><td>I guess pedestal addresses this by making the current state a view of an append-only collection?</td></tr>
+<tr id="t1626A" class="h"><td><a href="#t1626A">16:26</a></td><td class="np">linuxos</td><td>clojure is dealing with longs as default .. is this to make it simple with no conversion back and forth despite greater memory consumption?</td></tr>
+<tr id="t1626A" class="h"><td><a href="#t1626A">16:26</a></td><td class="nf">tomoj</td><td>(also datomic..)</td></tr>
+<tr id="t1628A" class="h"><td><a href="#t1628A">16:28</a></td><td class="np">linuxos</td><td>&quot;Clojure 1.3 constructs a new Long around</td></tr>
+<tr id="t1628A" class="h r"><td><a href="#t1628A">16:28</a></td><td class="np">linuxos</td><td>an int instead, because rich has decided he prefers longs and doubles</td></tr>
+<tr id="t1628A" class="h r"><td><a href="#t1628A">16:28</a></td><td class="np">linuxos</td><td>to ints and floats.</td></tr>
+<tr id="t1628A" class="h r"><td><a href="#t1628A">16:28</a></td><td class="np">linuxos</td><td>&quot;</td></tr>
+<tr id="t1629A" class="h"><td><a href="#t1629A">16:29</a></td><td class="nj">weavejester</td><td>brb food</td></tr>
+<tr id="t1630A"><td><a href="#t1630A">16:30</a></td><td class="nf">tomoj</td><td>if you have (fn [state] state') that could just be a vector of all the states, except you probably don't want to keep them _all_ around in memory. in pedestal you have to turn recording on and the app itself has no access to the past?</td></tr>
+<tr id="t1630A" class="h r"><td><a href="#t1630A">16:30</a></td><td class="nf">tomoj</td><td>..other than whatever it actively remembers in the state</td></tr>
+<tr id="t1632A" class="h r"><td><a href="#t1632A">16:32</a></td><td class="nf">tomoj</td><td>we have one nice solution already for deciding what needs to be remembered and automatically remembering it for those who need it - GC</td></tr>
+<tr id="t1644A"><td><a href="#t1644A">16:44</a></td><td class="nh">jtoy_</td><td>anyone know of a simpel library that will do cross validtion for me in clojure?</td></tr>
+<tr id="t1648A" class="h"><td><a href="#t1648A">16:48</a></td><td class="nf">tomoj</td><td>jtoy_: I don't, but it shouldn't be too hard - if you have a (fn evaluate [train validation]), you can just do something maybe like this: <a href="https://www.refheap.com/paste/69451ef5033f9ec6c7743bb5b">https://www.refheap.com/paste/69451ef5033f9ec6c7743bb5b</a></td></tr>
+<tr id="t1648A" class="h r"><td><a href="#t1648A">16:48</a></td><td class="nf">tomoj</td><td>for k-fold</td></tr>
+<tr id="t1648A" class="h"><td><a href="#t1648A">16:48</a></td><td class="nk">augustl</td><td>thinking of moving from lein-ring and war files to self contained jetty. Does lein-ring support that, or do I have to make my own &quot;lein run&quot; namespace where I start jetty myself etc?</td></tr>
+<tr id="t1649A" class="h"><td><a href="#t1649A">16:49</a></td><td class="nf">tomoj</td><td>well you'd want to compute n from k</td></tr>
+<tr id="t1651A"><td><a href="#t1651A">16:51</a></td><td class="ns">technomancy</td><td>augustl: it's easiest just to add ring-jetty-adapter and a 5-line -main defn</td></tr>
+<tr id="t1655A" class="h"><td><a href="#t1655A">16:55</a></td><td class="nk">augustl</td><td>technomancy: I'll miss the auto reloading :)</td></tr>
+<tr id="t1655A" class="h r"><td><a href="#t1655A">16:55</a></td><td class="nk">augustl</td><td>probably easy to pull that in manually too, I guess</td></tr>
+<tr id="t1655A" class="h"><td><a href="#t1655A">16:55</a></td><td class="ns">technomancy</td><td>augustl: nrepl</td></tr>
+<tr id="t1656A" class="h"><td><a href="#t1656A">16:56</a></td><td class="nh">jtoy_</td><td>tomoj: ok, I can try that, i've never written my own cross-fold library as I dont know 100% of the steps, but should be farily easy</td></tr>
+<tr id="t1656A" class="h"><td><a href="#t1656A">16:56</a></td><td class="nk">augustl</td><td>technomancy: ah good, another reason for our one remaining IntelliJ dev to switch ;)</td></tr>
+<tr id="t1659A" class="h"><td><a href="#t1659A">16:59</a></td><td class="nf">tomoj</td><td>jtoy_: oh wait, looks like incanter has it</td></tr>
+<tr id="t1659A" class="h r"><td><a href="#t1659A">16:59</a></td><td class="nf">tomoj</td><td>&quot;simple&quot;? not sure</td></tr>
+<tr id="t1703A"><td><a href="#t1703A">17:03</a></td><td class="nv">owengalenjones</td><td>anyone ever see this <a href="https://www.refheap.com/paste/14406">https://www.refheap.com/paste/14406</a></td></tr>
+<tr id="t1704A" class="h"><td><a href="#t1704A">17:04</a></td><td class="nh">jtoy_</td><td>tomoj: if I understand properly, the whole algorithm is just cut into k slices, train on k-1 and test against k and do that for all combinations and then average the results?</td></tr>
+<tr id="t1704A" class="h"><td><a href="#t1704A">17:04</a></td><td class="nf">tomoj</td><td>yeah</td></tr>
+<tr id="t1704A" class="h"><td><a href="#t1704A">17:04</a></td><td class="n5">ucb</td><td>owengalenjones: I don't think :1 is a valid keyword</td></tr>
+<tr id="t1705A" class="h"><td><a href="#t1705A">17:05</a></td><td class="nv">owengalenjones</td><td>ucb: (keyword? :1) =&gt; true :)</td></tr>
+<tr id="t1706A" class="h"><td><a href="#t1706A">17:06</a></td><td class="n5">ucb</td><td>owengalenjones: ugh :)</td></tr>
+<tr id="t1706A" class="h r"><td><a href="#t1706A">17:06</a></td><td class="n5">ucb</td><td>I honestly thought it wasn't a valid keyword :)</td></tr>
+<tr id="t1706A" class="h"><td><a href="#t1706A">17:06</a></td><td class="n8">arohner</td><td>,(keyword &quot;foo &quot;bar&quot;)</td></tr>
+<tr id="t1706A" class="h"><td><a href="#t1706A">17:06</a></td><td class="nl">clojurebot</td><td>#&lt;RuntimeException java.lang.RuntimeException: EOF while reading string&gt;</td></tr>
+<tr id="t1706A" class="h"><td><a href="#t1706A">17:06</a></td><td class="n8">arohner</td><td>,(keyword &quot;foo bar&quot;)</td></tr>
+<tr id="t1706A" class="h"><td><a href="#t1706A">17:06</a></td><td class="nl">clojurebot</td><td>:foo bar</td></tr>
+<tr id="t1706A" class="h"><td><a href="#t1706A">17:06</a></td><td class="nv">owengalenjones</td><td>O_o</td></tr>
+<tr id="t1707A" class="h"><td><a href="#t1707A">17:07</a></td><td class="n8">arohner</td><td>,(keyword &quot;:foo&quot;)</td></tr>
+<tr id="t1707A" class="h"><td><a href="#t1707A">17:07</a></td><td class="nl">clojurebot</td><td>::foo</td></tr>
+<tr id="t1708A" class="h"><td><a href="#t1708A">17:08</a></td><td class="n7">gfredericks</td><td>ucb: you've really exposed my tendency to not put the smallest amount of effort into figuring things out for myself</td></tr>
+<tr id="t1708A" class="h"><td><a href="#t1708A">17:08</a></td><td class="n5">ucb</td><td>gfredericks: I'm a sinner as well :)</td></tr>
+<tr id="t1717A"><td><a href="#t1717A">17:17</a></td><td class="nd">kathy1</td><td>Holaaa</td></tr>
+<tr id="t1719A" class="h"><td><a href="#t1719A">17:19</a></td><td class="nh">jtoy_</td><td>tomoj: evaluate in your example just means call my function?</td></tr>
+<tr id="t1741A"><td><a href="#t1741A">17:41</a></td><td class="n8">satch5150</td><td>hi all, I am trying to figure out how to use cli from tools.clj; it all seems pretty staight forward, except I do not know how to use :parse-fn patterns; could someone point me to some appropriate documentation for that ?</td></tr>
+<tr id="t1822A"><td><a href="#t1822A">18:22</a></td><td class="nf">tomoj</td><td>jtoy_: right</td></tr>
+<tr id="t1822A" class="h r"><td><a href="#t1822A">18:22</a></td><td class="nf">tomoj</td><td>which returns your metric on the validation data after training</td></tr>
+<tr id="t1834A"><td><a href="#t1834A">18:34</a></td><td class="n5">Apage43</td><td>man, going back and forth between emacs and vim recently, as I can get stuff done a bit faster w/ clojure in emacs, but still like vim for C and friends</td></tr>
+<tr id="t1835A" class="h r"><td><a href="#t1835A">18:35</a></td><td class="n5">Apage43</td><td>in emacs when I'm whacking out one of these intricate incantations I feel like one wrong move could annihilate an entire civilization. I've already deleted files by fat-fingering a couple of them.</td></tr>
+<tr id="t1836A" class="h r"><td><a href="#t1836A">18:36</a></td><td class="n5">Apage43</td><td>in vim the worst I'll do is delete some of the file I'm working on, which is easy enough to undo</td></tr>
+<tr id="t1838A" class="h"><td><a href="#t1838A">18:38</a></td><td class="nf">ohpauleez</td><td>Apage43: Why not use fireplace in vim?</td></tr>
+<tr id="t1839A" class="h"><td><a href="#t1839A">18:39</a></td><td class="nf">tomoj</td><td>does pedestal's :continue violate the epochal time model?</td></tr>
+<tr id="t1839A" class="h"><td><a href="#t1839A">18:39</a></td><td class="n5">Apage43</td><td>I do. It's fantastic as far as those things go, and I like it better when I'm working on some things.</td></tr>
+<tr id="t1839A" class="h"><td><a href="#t1839A">18:39</a></td><td class="nf">ohpauleez</td><td>fireplace + paredit + surround makes for a pretty competent setup</td></tr>
+<tr id="t1839A" class="h r"><td><a href="#t1839A">18:39</a></td><td class="nf">ohpauleez</td><td>ahh cool</td></tr>
+<tr id="t1839A" class="h"><td><a href="#t1839A">18:39</a></td><td class="nf">tomoj</td><td>or it just makes the epochs sub-transaction?</td></tr>
+<tr id="t1839A" class="h"><td><a href="#t1839A">18:39</a></td><td class="n5">Apage43</td><td>what it doesn't handle very well is when I am evaling expressions that might get stuck in a loop and I need to kill them</td></tr>
+<tr id="t1840A"><td><a href="#t1840A">18:40</a></td><td class="nf">ohpauleez</td><td>Apage43: It'll timeout and drop it</td></tr>
+<tr id="t1840A" class="h r"><td><a href="#t1840A">18:40</a></td><td class="nf">ohpauleez</td><td>but you'll have to restart the jvm - as you would in emacs too</td></tr>
+<tr id="t1840A" class="h"><td><a href="#t1840A">18:40</a></td><td class="n5">Apage43</td><td>it does that and frees up my vim session yeah, but my nrepl sessions typically is still hung</td></tr>
+<tr id="t1840A" class="h"><td><a href="#t1840A">18:40</a></td><td class="nd">hiredman</td><td>tomoj: continue is just a loop</td></tr>
+<tr id="t1840A" class="h"><td><a href="#t1840A">18:40</a></td><td class="nf">ohpauleez</td><td>right, I guess I always have my repl instance running in another tmux pane or window</td></tr>
+<tr id="t1841A" class="h"><td><a href="#t1841A">18:41</a></td><td class="n5">Apage43</td><td>nrepl.el C-c c-c will actually .stop the thread</td></tr>
+<tr id="t1841A" class="h r"><td><a href="#t1841A">18:41</a></td><td class="n5">Apage43</td><td>which even works some of the time</td></tr>
+<tr id="t1841A" class="h"><td><a href="#t1841A">18:41</a></td><td class="nf">ohpauleez</td><td>ahh gotcha</td></tr>
+<tr id="t1841A" class="h"><td><a href="#t1841A">18:41</a></td><td class="n5">Apage43</td><td>same as what Ctrl-C does in lein repl/reply</td></tr>
+<tr id="t1841A" class="h"><td><a href="#t1841A">18:41</a></td><td class="nf">tomoj</td><td>hiredman: oh, yes, I was thinking each transaction was doing multiple messages despite having just read that each message gets a transaction</td></tr>
+<tr id="t1841A" class="h"><td><a href="#t1841A">18:41</a></td><td class="n5">Apage43</td><td>of course emacs still barfs all over the place if I accidentally eval something that prints too much</td></tr>
+<tr id="t1843A" class="h"><td><a href="#t1843A">18:43</a></td><td class="nf">tomoj</td><td>hmm &quot;It returns a sequence of messages which will be processed within the same transaction.&quot; what?</td></tr>
+<tr id="t1844A" class="h"><td><a href="#t1844A">18:44</a></td><td class="ng">arrdem</td><td>Apage43: really? I've seen the colors and formatting go bad, but I've never seen emacs actually break</td></tr>
+<tr id="t1845A" class="h"><td><a href="#t1845A">18:45</a></td><td class="nf">tomoj</td><td>I've sometimes felt like I wanted something like :continue in datomic</td></tr>
+<tr id="t1846A" class="h"><td><a href="#t1846A">18:46</a></td><td class="n5">Apage43</td><td>arrdem: I tend to have bad luck if I throw a (println) in a fast loop. It doesn't crash, it just moves -very slowly- while I try to kill the evaluation</td></tr>
+<tr id="t1846A" class="h r"><td><a href="#t1846A">18:46</a></td><td class="n5">Apage43</td><td>and sometimes it's just faster to kill emacs and bring it all back up</td></tr>
+<tr id="t1846A" class="h"><td><a href="#t1846A">18:46</a></td><td class="np">linuxos</td><td>can i get a long unsigned in clojure?</td></tr>
+<tr id="t1846A" class="h"><td><a href="#t1846A">18:46</a></td><td class="nf">tomoj</td><td>for like installing a bunch of schema tx-datas which maybe depend on each other but still being able to fail the entire thing (i.e. one transaction) if something goes wrong in a later tx-data</td></tr>
+<tr id="t1847A" class="h r"><td><a href="#t1847A">18:47</a></td><td class="nf">tomoj</td><td>but I suspect there is a very good reason datomic doesn't allow this..</td></tr>
+<tr id="t1847A" class="h"><td><a href="#t1847A">18:47</a></td><td class="ny">bbloom</td><td>linuxos: you can't get an unsigned anything in java</td></tr>
+<tr id="t1847A" class="h"><td><a href="#t1847A">18:47</a></td><td class="n5">Apage43</td><td>most of this isn't an issue for the majority of the time. I only tend to eval expressions that are freezing and printing way too much if I'm debugging :P</td></tr>
+<tr id="t1847A" class="h"><td><a href="#t1847A">18:47</a></td><td class="ng">arrdem</td><td>Apage43: is there a better logging lib than good ol' println?</td></tr>
+<tr id="t1847A" class="h"><td><a href="#t1847A">18:47</a></td><td class="nd">hiredman</td><td>tomoj: you can think of the queue being (ref []) and processing the queue as being something like (dosync (loop [] (when (seq @queue) (do (do-stuff-with-qeueu-contents) (recur)))</td></tr>
+<tr id="t1848A" class="h"><td><a href="#t1848A">18:48</a></td><td class="n5">Apage43</td><td>probably</td></tr>
+<tr id="t1848A" class="h"><td><a href="#t1848A">18:48</a></td><td class="nd">hiredman</td><td>and what happens is there is a watch on the queue ref, so if put something in it runs the processing transaction there</td></tr>
+<tr id="t1848A" class="h"><td><a href="#t1848A">18:48</a></td><td class="n5">Apage43</td><td>I'd specifically like something that will just not print if the receiving end can't take it. like .offer on a queue or something.</td></tr>
+<tr id="t1849A" class="h"><td><a href="#t1849A">18:49</a></td><td class="nd">hiredman</td><td>and with the processing transaction you can alter the intransaction value of the queue ref, which results in more messages that are processing in the transaction</td></tr>
+<tr id="t1849A" class="h"><td><a href="#t1849A">18:49</a></td><td class="nf">tomoj</td><td>ok, yeah</td></tr>
+<tr id="t1849A" class="h"><td><a href="#t1849A">18:49</a></td><td class="nd">hiredman</td><td>(I haven't looked at how it is actually implemented, some kind of atom thing)</td></tr>
+<tr id="t1849A" class="h"><td><a href="#t1849A">18:49</a></td><td class="nf">tomoj</td><td>datomic does not allow any intransaction stuff</td></tr>
+<tr id="t1849A" class="h"><td><a href="#t1849A">18:49</a></td><td class="ng">arrdem</td><td>Apage43: looks like timbre and clojure/tools.logging are the options</td></tr>
+<tr id="t1850A" class="r"><td><a href="#t1850A">18:50</a></td><td class="ng">arrdem</td><td>and they're both pretty srs bizness logging</td></tr>
+<tr id="t1850A" class="h"><td><a href="#t1850A">18:50</a></td><td class="nd">hiredman</td><td>well, you can have transaction functions</td></tr>
+<tr id="t1850A" class="h"><td><a href="#t1850A">18:50</a></td><td class="nf">tomoj</td><td>right but they only get the pre-transaction db as input</td></tr>
+<tr id="t1850A" class="h r"><td><a href="#t1850A">18:50</a></td><td class="nf">tomoj</td><td>so that there can be no causality between datoms within a transaction</td></tr>
+<tr id="t1852A" class="h r"><td><a href="#t1852A">18:52</a></td><td class="nf">tomoj</td><td>though you can make a txfn that takes an entire tx-data and runs it with datomic.api/with, then use that to decide what to expand to, if you're OK with some overhead</td></tr>
+<tr id="t1853A" class="h r"><td><a href="#t1853A">18:53</a></td><td class="nf">tomoj</td><td>app.clj and dataflow.clj seem delightfully simple in any case</td></tr>
+<tr id="t1853A" class="h"><td><a href="#t1853A">18:53</a></td><td class="nh">shriphani</td><td>hi. I am looking for good data visualization libraries in clojure. I've found incanter so far. Are there any others that are particularly recommended?</td></tr>
+<tr id="t1857A" class="h"><td><a href="#t1857A">18:57</a></td><td class="nf">tomoj</td><td>hiredman: so under normal circumstances when the queue watcher fires, the queue is always going just have the one message in it?</td></tr>
+<tr id="t1858A" class="h"><td><a href="#t1858A">18:58</a></td><td class="nd">hiredman</td><td>tomoj: yeah, and you could add some kind of fanciness to ensure that sort of thing</td></tr>
+<tr id="t1914A"><td><a href="#t1914A">19:14</a></td><td class="nq">lynaghk`</td><td>Does anyone know if ruby has something akin to &quot;pr-str&quot;?</td></tr>
+<tr id="t1915A" class="h"><td><a href="#t1915A">19:15</a></td><td class="n7">gfredericks</td><td>lynaghk`: #inspect I think is it</td></tr>
+<tr id="t1916A" class="h r"><td><a href="#t1916A">19:16</a></td><td class="n7">gfredericks</td><td>$findfn pos? [-1 2 -3 4 -5] [[2 4] [-1 -3 -5]]</td></tr>
+<tr id="t1916A" class="h"><td><a href="#t1916A">19:16</a></td><td class="nq">lynaghk`</td><td>gfredericks: ohh, awesome. thanks!</td></tr>
+<tr id="t1916A" class="h"><td><a href="#t1916A">19:16</a></td><td class="nx">lazybot</td><td>[]</td></tr>
+<tr id="t1920A"><td><a href="#t1920A">19:20</a></td><td class="nl">hyPiRion</td><td>,((juxt filter remove) pos? [-1 2 -3 4 -5])</td></tr>
+<tr id="t1920A" class="h"><td><a href="#t1920A">19:20</a></td><td class="nl">clojurebot</td><td>[(2 4) (-1 -3 -5)]</td></tr>
+<tr id="t1920A" class="h"><td><a href="#t1920A">19:20</a></td><td class="nl">hyPiRion</td><td>~amalloy</td></tr>
+<tr id="t1920A" class="h"><td><a href="#t1920A">19:20</a></td><td class="nl">clojurebot</td><td>amalloy is &lt;amalloy&gt; just use juxt, it'll be great</td></tr>
+<tr id="t1921A" class="h"><td><a href="#t1921A">19:21</a></td><td class="n7">gfredericks</td><td>turned out I wanted group-by anyways</td></tr>
+<tr id="t1921A" class="h r"><td><a href="#t1921A">19:21</a></td><td class="n7">gfredericks</td><td>but prior to that I did recall the olde Amalloy Adage</td></tr>
+<tr id="t1922A" class="h"><td><a href="#t1922A">19:22</a></td><td class="ne">irctc305</td><td>I have a map that I want to concat to a list of maps -&gt; (concat [{:a 2}] {:b 3 :h 5} [{:c 4}])</td></tr>
+<tr id="t1922A" class="h r"><td><a href="#t1922A">19:22</a></td><td class="ne">irctc305</td><td>However the above adds the map as a map entry ({:a 2} [:b 3] [:h 5] {:c 4})</td></tr>
+<tr id="t1923A" class="h r"><td><a href="#t1923A">19:23</a></td><td class="ne">irctc305</td><td>How can I just add a map to a list of maps at the start and end ?</td></tr>
+<tr id="t1924A" class="h"><td><a href="#t1924A">19:24</a></td><td class="n7">gfredericks</td><td>(concat [some-map] a-list-of-maps [some-other-map])?</td></tr>
+<tr id="t1925A" class="h"><td><a href="#t1925A">19:25</a></td><td class="nd">hiredman</td><td>(concat [{:a 2}] {:b 3 :h 5} [{:c 4}]); one of these three args is not like the others</td></tr>
+<tr id="t1925A" class="h"><td><a href="#t1925A">19:25</a></td><td class="n7">gfredericks</td><td>one of these args just doesn't belong</td></tr>
+<tr id="t1926A" class="h"><td><a href="#t1926A">19:26</a></td><td class="nr">benkay</td><td>hey y'all, a question about loading data from the filesystem:</td></tr>
+<tr id="t1927A" class="h r"><td><a href="#t1927A">19:27</a></td><td class="nr">benkay</td><td>I just wrote a public key to disk using (spit &quot;testpub.pem&quot; (clj-crypto/public-key keypair)), but when I (clj-crypto/as-public-key (slurp &quot;testpub.pem&quot;)) the crypto lib blows up not knowing how to convert the string back into a public key</td></tr>
+<tr id="t1927A" class="h"><td><a href="#t1927A">19:27</a></td><td class="ne">irctc305</td><td>thanks for the pointer, just enclosing the second arg as a vector solves it ! now all args are of the same type</td></tr>
+<tr id="t1928A" class="h"><td><a href="#t1928A">19:28</a></td><td class="nr">benkay</td><td>is there an obvious thing i'm missing about what i'm trying to do here?</td></tr>
+<tr id="t1929A" class="h"><td><a href="#t1929A">19:29</a></td><td class="nd">hiredman</td><td>never heard of clj-crypto</td></tr>
+<tr id="t1929A" class="h"><td><a href="#t1929A">19:29</a></td><td class="nr">benkay</td><td>bouncycastle wrapper</td></tr>
+<tr id="t1929A" class="h"><td><a href="#t1929A">19:29</a></td><td class="nd">hiredman</td><td>but my guess is you are doing character io using bytes</td></tr>
+<tr id="t1929A" class="h r"><td><a href="#t1929A">19:29</a></td><td class="nd">hiredman</td><td>spit is not the way to go for reliable io</td></tr>
+<tr id="t1929A" class="h"><td><a href="#t1929A">19:29</a></td><td class="nr">benkay</td><td>would that look like nonsense when I open the file?</td></tr>
+<tr id="t1929A" class="h"><td><a href="#t1929A">19:29</a></td><td class="nd">hiredman</td><td>have you actually looked at the contents your .pem?</td></tr>
+<tr id="t1929A" class="h"><td><a href="#t1929A">19:29</a></td><td class="nr">benkay</td><td>oh yeah, it's just a string.</td></tr>
+<tr id="t1930A" class="r"><td><a href="#t1930A">19:30</a></td><td class="nr">benkay</td><td>&lt;RSAPublicKeyImpl ...</td></tr>
+<tr id="t1930A" class="h"><td><a href="#t1930A">19:30</a></td><td class="nd">hiredman</td><td>just a string?</td></tr>
+<tr id="t1930A" class="h r"><td><a href="#t1930A">19:30</a></td><td class="nd">hiredman</td><td>ah</td></tr>
+<tr id="t1930A" class="h"><td><a href="#t1930A">19:30</a></td><td class="n7">gfredericks</td><td>not a very good public key</td></tr>
+<tr id="t1930A" class="h"><td><a href="#t1930A">19:30</a></td><td class="nd">hiredman</td><td>you haven't even gotten to io yet</td></tr>
+<tr id="t1930A" class="h r"><td><a href="#t1930A">19:30</a></td><td class="nd">hiredman</td><td>(clj-crypto/public-key keypair) is just returning a key object</td></tr>
+<tr id="t1930A" class="h r"><td><a href="#t1930A">19:30</a></td><td class="nd">hiredman</td><td>you'll need to do some more work to get actual bytes</td></tr>
+<tr id="t1930A" class="h r"><td><a href="#t1930A">19:30</a></td><td class="nd">hiredman</td><td>spit is just calling toString on the object</td></tr>
+<tr id="t1931A" class="h"><td><a href="#t1931A">19:31</a></td><td class="nr">benkay</td><td>sounds like you're suggesting writing the bytes to disk and then reading them back off?</td></tr>
+<tr id="t1932A" class="h"><td><a href="#t1932A">19:32</a></td><td class="n7">gfredericks</td><td>yeah for crypto stuff you'll want to use bytes not strings</td></tr>
+<tr id="t1932A" class="h"><td><a href="#t1932A">19:32</a></td><td class="nr">benkay</td><td>thanks gfredericks, hiredman</td></tr>
+<tr id="t1933A" class="h r"><td><a href="#t1933A">19:33</a></td><td class="nr">benkay</td><td>is there something like spit that writes bytes?</td></tr>
+<tr id="t1933A" class="h"><td><a href="#t1933A">19:33</a></td><td class="nd">hiredman</td><td>forget spit</td></tr>
+<tr id="t1934A" class="h r"><td><a href="#t1934A">19:34</a></td><td class="nd">hiredman</td><td>go look at the code for clj-crypto or the java docs for bouncy castle</td></tr>
+<tr id="t1934A" class="h r"><td><a href="#t1934A">19:34</a></td><td class="nd">hiredman</td><td>figure out what it is that clj-crypto returns</td></tr>
+<tr id="t1934A" class="h r"><td><a href="#t1934A">19:34</a></td><td class="nd">hiredman</td><td>figure out how to turn that in to bytes</td></tr>
+<tr id="t1935A" class="h r"><td><a href="#t1935A">19:35</a></td><td class="nd">hiredman</td><td>by the time you are done I imagine you will be ready to ditch clj-crypto because you will be comfortable using bc directly</td></tr>
+<tr id="t1936A" class="h r"><td><a href="#t1936A">19:36</a></td><td class="nd">hiredman</td><td>you will most likely need the javax.crypto java docs too</td></tr>
+<tr id="t1936A" class="h r"><td><a href="#t1936A">19:36</a></td><td class="nd">hiredman</td><td><a href="http://docs.oracle.com/javase/6/docs/api/java/security/interfaces/RSAPublicKey.html">http://docs.oracle.com/javase/6/docs/api/java/security/interfaces/RSAPublicKey.html</a></td></tr>
+<tr id="t1939A" class="h"><td><a href="#t1939A">19:39</a></td><td class="n5">Apage43</td><td>if you have some type of Key, .getEncoded is on the Key interface (for java.security.Key) which gets you bytes</td></tr>
+<tr id="t1942A"><td><a href="#t1942A">19:42</a></td><td class="nm">amalloy</td><td>(inc hyPiRion)</td></tr>
+<tr id="t1942A" class="h"><td><a href="#t1942A">19:42</a></td><td class="nx">lazybot</td><td>⇒ 14</td></tr>
+<tr id="t1948A" class="h"><td><a href="#t1948A">19:48</a></td><td class="nh">shriphani</td><td>hi I have a question about enlive. How do I do [:div.class_name] only class_name has a space in it...</td></tr>
+<tr id="t1949A" class="h"><td><a href="#t1949A">19:49</a></td><td class="nr">benkay</td><td>thanks Apage43!</td></tr>
+<tr id="t2003A"><td><a href="#t2003A">20:03</a></td><td class="nj">weavejester</td><td>May I ask what everyone uses for note-taking? I usually use emacs and a text or markdown file…</td></tr>
+<tr id="t2004A" class="h"><td><a href="#t2004A">20:04</a></td><td class="nk">tieTYT2</td><td>google drive?</td></tr>
+<tr id="t2004A" class="h"><td><a href="#t2004A">20:04</a></td><td class="ns">technomancy</td><td>weavejester: org-mode</td></tr>
+<tr id="t2004A" class="h"><td><a href="#t2004A">20:04</a></td><td class="nk">tieTYT2</td><td>or a program on my cell phone called AK notepad</td></tr>
+<tr id="t2004A" class="h"><td><a href="#t2004A">20:04</a></td><td class="nj">weavejester</td><td>technomancy: I was hoping someone would say that :)</td></tr>
+<tr id="t2005A" class="h"><td><a href="#t2005A">20:05</a></td><td class="ns">technomancy</td><td>weavejester: I basically use org like outline-mode though</td></tr>
+<tr id="t2005A" class="h"><td><a href="#t2005A">20:05</a></td><td class="nj">weavejester</td><td>technomancy: I know org-mode can be used for todos and time-keeping, but does it have anything for note-taking over a text file?</td></tr>
+<tr id="t2005A" class="h"><td><a href="#t2005A">20:05</a></td><td class="nd">hiredman</td><td>weavejester: what do you want for note-taking?</td></tr>
+<tr id="t2005A" class="h"><td><a href="#t2005A">20:05</a></td><td class="ns">technomancy</td><td>weavejester: the ability to collapse outlines is the main thing I use it for</td></tr>
+<tr id="t2005A" class="h"><td><a href="#t2005A">20:05</a></td><td class="nd">hiredman</td><td>what are the component features of note-taking for you</td></tr>
+<tr id="t2006A" class="h r"><td><a href="#t2006A">20:06</a></td><td class="nd">hiredman</td><td>org-mode tables are like be able to embed little spreadsheets, but the formulas can be in elisp</td></tr>
+<tr id="t2006A" class="h"><td><a href="#t2006A">20:06</a></td><td class="nj">weavejester</td><td>hiredman: Something to act as an external memory while I'm trying to solve a problem that's too large for me to hold all possible paths in my head reliably.</td></tr>
+<tr id="t2007A" class="h"><td><a href="#t2007A">20:07</a></td><td class="nd">hiredman</td><td>weavejester: yeah, but you asked for features over a text file, org-mode has 1e100 features</td></tr>
+<tr id="t2008A" class="h"><td><a href="#t2008A">20:08</a></td><td class="ns">technomancy</td><td>literally the largest lisp file on my hard drive</td></tr>
+<tr id="t2008A" class="h r"><td><a href="#t2008A">20:08</a></td><td class="ns">technomancy</td><td>probably the largest non-autogenerated lisp file on github</td></tr>
+<tr id="t2008A" class="h"><td><a href="#t2008A">20:08</a></td><td class="nd">hiredman</td><td>you can do org-capture which pops up a little buffer you type in to, then saves each little note as a bullet point in a larger file of todos</td></tr>
+<tr id="t2008A" class="h"><td><a href="#t2008A">20:08</a></td><td class="nk">tieTYT2</td><td>i really liked haskell's pattern matching.  Clojure was created after haskell but I believe RH was aware of it.  Anyone know the decision to leave it out of clojure?</td></tr>
+<tr id="t2008A" class="h"><td><a href="#t2008A">20:08</a></td><td class="nj">weavejester</td><td>hiredman: Well, I don't really know what features I'd want, without know which ones there are...</td></tr>
+<tr id="t2008A" class="h"><td><a href="#t2008A">20:08</a></td><td class="ny">bbloom</td><td>i just use a text file in vim</td></tr>
+<tr id="t2008A" class="h r"><td><a href="#t2008A">20:08</a></td><td class="ny">bbloom</td><td>i have a directory called notes &amp; there are about 20+ files in there</td></tr>
+<tr id="t2008A" class="h"><td><a href="#t2008A">20:08</a></td><td class="nd">hiredman</td><td>org-mode lets you create a list of times with various todo status and sort the lists based on the todo status</td></tr>
+<tr id="t2008A" class="h"><td><a href="#t2008A">20:08</a></td><td class="ns">technomancy</td><td>tieTYT2: the official story is that pattern matching is closed, while predicate dispatch is open.</td></tr>
+<tr id="t2009A" class="h"><td><a href="#t2009A">20:09</a></td><td class="ny">bbloom</td><td>i mostly never read them lol</td></tr>
+<tr id="t2009A" class="h"><td><a href="#t2009A">20:09</a></td><td class="ns">technomancy</td><td>tieTYT2: I don't really buy that though</td></tr>
+<tr id="t2009A" class="h"><td><a href="#t2009A">20:09</a></td><td class="nj">weavejester</td><td>tieTYT: There's core.match, so pattern matching is only left out of the core language</td></tr>
+<tr id="t2009A" class="h"><td><a href="#t2009A">20:09</a></td><td class="ni">scottj</td><td>weavejester: btw, org-mode was originally for note-taking. the other things came later.</td></tr>
+<tr id="t2009A" class="h"><td><a href="#t2009A">20:09</a></td><td class="ns">technomancy</td><td>core.match has issues =\</td></tr>
+<tr id="t2009A" class="h"><td><a href="#t2009A">20:09</a></td><td class="nd">hiredman</td><td>org-mode will renumber your lists for you if you put an element in the middle of a numbered list</td></tr>
+<tr id="t2009A" class="h"><td><a href="#t2009A">20:09</a></td><td class="nk">tieTYT2</td><td>technomancy: I don't know what either of those mean</td></tr>
+<tr id="t2009A" class="h r"><td><a href="#t2009A">20:09</a></td><td class="nk">tieTYT2</td><td>what do you mean by closed?</td></tr>
+<tr id="t2009A" class="h r"><td><a href="#t2009A">20:09</a></td><td class="nk">tieTYT2</td><td>weavejester: let me check that out</td></tr>
+<tr id="t2009A" class="h"><td><a href="#t2009A">20:09</a></td><td class="ns">technomancy</td><td>tieTYT2: compare it to cond vs defmulti</td></tr>
+<tr id="t2009A" class="h r"><td><a href="#t2009A">20:09</a></td><td class="ns">technomancy</td><td>tieTYT2: cond only works on values known up-front; defmulti can be extended after the fact</td></tr>
+<tr id="t2010A"><td><a href="#t2010A">20:10</a></td><td class="nk">tieTYT2</td><td>so cond is called &quot;closed&quot;?</td></tr>
+<tr id="t2010A" class="h"><td><a href="#t2010A">20:10</a></td><td class="ns">technomancy</td><td>yeah</td></tr>
+<tr id="t2010A" class="h r"><td><a href="#t2010A">20:10</a></td><td class="ns">technomancy</td><td>tieTYT2: note that I do not find this justification persuasive at all</td></tr>
+<tr id="t2010A" class="h"><td><a href="#t2010A">20:10</a></td><td class="nd">hiredman</td><td>you cannot extend a pattern match or a cond with rewriting the original code, but you can extend defmultis from new code without touch the old code</td></tr>
+<tr id="t2011A" class="h"><td><a href="#t2011A">20:11</a></td><td class="nk">tieTYT2</td><td>why can't you have both?</td></tr>
+<tr id="t2011A" class="h"><td><a href="#t2011A">20:11</a></td><td class="ny">bbloom</td><td>you can only be open or closed with respect to something…. cond is closed to adding cases at runtime</td></tr>
+<tr id="t2011A" class="h"><td><a href="#t2011A">20:11</a></td><td class="nk">tieTYT2</td><td>I never thought of defmulti as an answer to pattern matching.  I always thought of destructuring as an answer to pattern matching</td></tr>
+<tr id="t2012A" class="h"><td><a href="#t2012A">20:12</a></td><td class="ns">technomancy</td><td>tieTYT2: I only brought up defmulti as an example to explain closed/open</td></tr>
+<tr id="t2012A" class="h"><td><a href="#t2012A">20:12</a></td><td class="nk">tieTYT2</td><td>technomancy: ohh</td></tr>
+<tr id="t2012A" class="h"><td><a href="#t2012A">20:12</a></td><td class="nl">clojurebot</td><td>technomancy is to blame for all failures</td></tr>
+<tr id="t2012A" class="h"><td><a href="#t2012A">20:12</a></td><td class="ns">technomancy</td><td>you can certainly have both</td></tr>
+<tr id="t2012A" class="h"><td><a href="#t2012A">20:12</a></td><td class="nd">hiredman</td><td>org-mode has org-babel which lets you put in little snippets of code (properly hilighted using the mode of your choice) and then execute the code and insert the result right in place in the document</td></tr>
+<tr id="t2012A" class="h"><td><a href="#t2012A">20:12</a></td><td class="ns">technomancy</td><td>clojurebot: you're one to talk</td></tr>
+<tr id="t2012A" class="h"><td><a href="#t2012A">20:12</a></td><td class="nl">clojurebot</td><td>Huh?</td></tr>
+<tr id="t2012A" class="h"><td><a href="#t2012A">20:12</a></td><td class="ny">bbloom</td><td>tieTYT2: pattern matching is desructuring plus ordered choice. i think that the ordered choice bit is the bit that rich doesn't like</td></tr>
+<tr id="t2012A" class="h"><td><a href="#t2012A">20:12</a></td><td class="nj">weavejester</td><td>Has anyone made much use of watches on refs?</td></tr>
+<tr id="t2012A" class="h"><td><a href="#t2012A">20:12</a></td><td class="nd">hiredman</td><td>I use them for a debugging a lot</td></tr>
+<tr id="t2013A" class="h"><td><a href="#t2013A">20:13</a></td><td class="nk">tieTYT2</td><td>bbloom: what's the downside to that?</td></tr>
+<tr id="t2013A" class="h"><td><a href="#t2013A">20:13</a></td><td class="nm">amalloy</td><td>weavejester: i've watched a couple of atoms, but not for very good reasons</td></tr>
+<tr id="t2013A" class="h"><td><a href="#t2013A">20:13</a></td><td class="ny">bbloom</td><td>tieTYT2: consider a complex cond block… you can't re-order statements without considering logical implications of the conditions/predicates</td></tr>
+<tr id="t2014A" class="h r"><td><a href="#t2014A">20:14</a></td><td class="ny">bbloom</td><td>tieTYT2: for example if you had (cond (pos? x) :pos (even? x) :even) then what you reeaaaly mean is not :even, but :negative-and-even</td></tr>
+<tr id="t2015A" class="h"><td><a href="#t2015A">20:15</a></td><td class="nj">weavejester</td><td>I think I'm going to try and use watches in place of an event queue.</td></tr>
+<tr id="t2015A" class="h"><td><a href="#t2015A">20:15</a></td><td class="ny">bbloom</td><td>if you re-order the clauses, you are changing the meaning. that's not true of multimethods for example</td></tr>
+<tr id="t2015A" class="h"><td><a href="#t2015A">20:15</a></td><td class="nk">tieTYT2</td><td>true</td></tr>
+<tr id="t2016A" class="h"><td><a href="#t2016A">20:16</a></td><td class="ny">bbloom</td><td>pattern matching is most useful when you want to do exhaustive case analysis. like in haskell where you have algebraic data types</td></tr>
+<tr id="t2016A" class="h r"><td><a href="#t2016A">20:16</a></td><td class="ny">bbloom</td><td>in which case, you really want a switch b/c that lets you reorder the clauses</td></tr>
+<tr id="t2016A" class="h r"><td><a href="#t2016A">20:16</a></td><td class="ny">bbloom</td><td>i've seen some haskell code that makes some pretty subtle assumptions based on the order of patterns. i can be confusing</td></tr>
+<tr id="t2016A" class="h"><td><a href="#t2016A">20:16</a></td><td class="nk">tieTYT2</td><td>in my mind, he chose destructuring instead of pattern matching.  But it sounds like everyone here is saying he didn't want pattern matching because it can complicate things</td></tr>
+<tr id="t2016A" class="h r"><td><a href="#t2016A">20:16</a></td><td class="nk">tieTYT2</td><td>and destructuring is not related</td></tr>
+<tr id="t2016A" class="h"><td><a href="#t2016A">20:16</a></td><td class="ny">bbloom</td><td>he said that in a talk at one point</td></tr>
+<tr id="t2017A" class="h"><td><a href="#t2017A">20:17</a></td><td class="nk">tieTYT2</td><td>bbloom: the one on simple made easy?</td></tr>
+<tr id="t2017A" class="h r"><td><a href="#t2017A">20:17</a></td><td class="nk">tieTYT2</td><td>yeah I noticed that, but I didn't understand why</td></tr>
+<tr id="t2017A" class="h"><td><a href="#t2017A">20:17</a></td><td class="ny">bbloom</td><td>he said something to the effect that pattern matching complects name binding and ordered choice while remaining closed to adding cases at runtime</td></tr>
+<tr id="t2017A" class="h r"><td><a href="#t2017A">20:17</a></td><td class="ny">bbloom</td><td>destructuring, as implemented in clojure, is closed with respect to adding new pattern types</td></tr>
+<tr id="t2018A" class="h"><td><a href="#t2018A">20:18</a></td><td class="nk">tieTYT2</td><td>he says that, but I don't see him giving an alternative</td></tr>
+<tr id="t2018A" class="h r"><td><a href="#t2018A">20:18</a></td><td class="nk">tieTYT2</td><td>or something better</td></tr>
+<tr id="t2018A" class="h"><td><a href="#t2018A">20:18</a></td><td class="ny">bbloom</td><td>so the &quot;better&quot; thing is predicate dispatch</td></tr>
+<tr id="t2018A" class="h r"><td><a href="#t2018A">20:18</a></td><td class="ny">bbloom</td><td>but predicate dispatch is still somewhat of an open research problem</td></tr>
+<tr id="t2018A" class="h"><td><a href="#t2018A">20:18</a></td><td class="nk">tieTYT2</td><td>eg: cond?</td></tr>
+<tr id="t2019A" class="h r"><td><a href="#t2019A">20:19</a></td><td class="nk">tieTYT2</td><td>or defmulti?</td></tr>
+<tr id="t2019A" class="h"><td><a href="#t2019A">20:19</a></td><td class="ny">bbloom</td><td>*shrug* cond is just so simple &amp; so often useful that you kinda gotta have it</td></tr>
+<tr id="t2019A" class="h"><td><a href="#t2019A">20:19</a></td><td class="nk">tieTYT2</td><td>for me: <a href="http://stackoverflow.com/questions/5671627/what-is-predicate-dispatch">http://stackoverflow.com/questions/5671627/what-is-predicate-dispatch</a></td></tr>
+<tr id="t2020A"><td><a href="#t2020A">20:20</a></td><td class="ny">bbloom</td><td>the real hard part of predicate dispatch is determining logical implication</td></tr>
+<tr id="t2020A" class="h"><td><a href="#t2020A">20:20</a></td><td class="nk">tieTYT2</td><td>i never thought of using multimethods this way</td></tr>
+<tr id="t2020A" class="h r"><td><a href="#t2020A">20:20</a></td><td class="nk">tieTYT2</td><td>wouldn't it be frowned upon to use it when you could use pattern matching?</td></tr>
+<tr id="t2020A" class="h r"><td><a href="#t2020A">20:20</a></td><td class="nk">tieTYT2</td><td>i've been told it's pretty slow</td></tr>
+<tr id="t2020A" class="h"><td><a href="#t2020A">20:20</a></td><td class="ny">bbloom</td><td>it's only really slow when dispatching on the java type hierarchy</td></tr>
+<tr id="t2020A" class="h r"><td><a href="#t2020A">20:20</a></td><td class="ny">bbloom</td><td>it's reasonably fast otherwise</td></tr>
+<tr id="t2020A" class="h r"><td><a href="#t2020A">20:20</a></td><td class="ny">bbloom</td><td>not as fast as protocols &amp; simple branches, but still pretty quick</td></tr>
+<tr id="t2021A" class="h"><td><a href="#t2021A">20:21</a></td><td class="nk">tieTYT2</td><td>i see.  I've written two small programs that use multi methods and they both dispatch on symbols</td></tr>
+<tr id="t2021A" class="h"><td><a href="#t2021A">20:21</a></td><td class="ny">bbloom</td><td>see <a href="http://homes.cs.washington.edu/~mernst/pubs/dispatching-ecoop98-abstract.html">http://homes.cs.washington.edu/~mernst/pubs/dispatching-ecoop98-abstract.html</a></td></tr>
+<tr id="t2021A" class="h"><td><a href="#t2021A">20:21</a></td><td class="nk">tieTYT2</td><td>or contents of a string</td></tr>
+<tr id="t2023A" class="h r"><td><a href="#t2023A">20:23</a></td><td class="nk">tieTYT2</td><td>thanks</td></tr>
+<tr id="t2024A" class="h r"><td><a href="#t2024A">20:24</a></td><td class="nk">tieTYT2</td><td>i had this function that needed to do different things depending on the count of the sequence passed in.  I didn't consider a multimethod as a good choice to implement that</td></tr>
+<tr id="t2025A" class="h"><td><a href="#t2025A">20:25</a></td><td class="ny">bbloom</td><td>tieTYT2: if the count only falls into a fixed set of cases, like 0, 1, 2, or N… then case is the way to go</td></tr>
+<tr id="t2025A" class="h r"><td><a href="#t2025A">20:25</a></td><td class="ny">bbloom</td><td>or cond even</td></tr>
+<tr id="t2025A" class="h"><td><a href="#t2025A">20:25</a></td><td class="nk">tieTYT2</td><td>yeah that's pretty much what I ended up doing</td></tr>
+<tr id="t2025A" class="h"><td><a href="#t2025A">20:25</a></td><td class="ny">bbloom</td><td>a multimethod is useful when you want other folks to be able to add cases</td></tr>
+<tr id="t2025A" class="h"><td><a href="#t2025A">20:25</a></td><td class="nk">tieTYT2</td><td>yeah I don't have that situation</td></tr>
+<tr id="t2025A" class="h"><td><a href="#t2025A">20:25</a></td><td class="ny">bbloom</td><td>you need to ask the question &quot;do i need open dispatch?&quot;</td></tr>
+<tr id="t2025A" class="h r"><td><a href="#t2025A">20:25</a></td><td class="ny">bbloom</td><td>if the answer is no, choose something simpler</td></tr>
+<tr id="t2025A" class="h"><td><a href="#t2025A">20:25</a></td><td class="nk">tieTYT2</td><td>whereas pattern matching is useful even if you don't need open dispatch</td></tr>
+<tr id="t2026A" class="h r"><td><a href="#t2026A">20:26</a></td><td class="nk">tieTYT2</td><td>it would have been good in this situation.  I think a case/cond was more complicated than pattern matching would have been</td></tr>
+<tr id="t2027A" class="h"><td><a href="#t2027A">20:27</a></td><td class="ny">bbloom</td><td>so i agree that pattern matching is sometimes useful, but i think it's attractive syntax means that people tend to use it by default and that means creeping complexity in logical ordering of predicates</td></tr>
+<tr id="t2027A" class="h r"><td><a href="#t2027A">20:27</a></td><td class="ny">bbloom</td><td>fewer branching constructs in your code is generally easier to understand &amp; pattern matching inherently adds one branch point per pattern</td></tr>
+<tr id="t2027A" class="h"><td><a href="#t2027A">20:27</a></td><td class="nk">tieTYT2</td><td>perhaps you're right.  I only used haskell for 1-2 months so I wouldn't have discovered that by then I think</td></tr>
+<tr id="t2029A" class="h"><td><a href="#t2029A">20:29</a></td><td class="ny">bbloom</td><td>i think pattern matching is absolutely a more concise notation for a lot of common patterns in code. however, i've found that prefer making an explicit decision between if, cond, case, when, etc. my code may be a couple lines longer, but it's easier to read &amp; refactor. but that's just my opinion</td></tr>
+<tr id="t2029A" class="h"><td><a href="#t2029A">20:29</a></td><td class="nk">tieTYT2</td><td>but IME, the pattern matching reduces your overall code so it makes up for that issue</td></tr>
+<tr id="t2031A"><td><a href="#t2031A">20:31</a></td><td class="ns">technomancy</td><td>I agree</td></tr>
+<tr id="t2031A" class="h r"><td><a href="#t2031A">20:31</a></td><td class="ns">technomancy</td><td>I would use core.match if it didn't break AOT</td></tr>
+<tr id="t2032A" class="h"><td><a href="#t2032A">20:32</a></td><td class="nk">tieTYT2</td><td>that's an intimidating restriction</td></tr>
+<tr id="t2032A" class="h r"><td><a href="#t2032A">20:32</a></td><td class="nk">tieTYT2</td><td>i'm not experienced enough to knwo if I need that</td></tr>
+<tr id="t2032A" class="h"><td><a href="#t2032A">20:32</a></td><td class="nj">pjstadig</td><td>meh</td></tr>
+<tr id="t2032A" class="h r"><td><a href="#t2032A">20:32</a></td><td class="nj">pjstadig</td><td>AOT is kinda broken already</td></tr>
+<tr id="t2032A" class="h"><td><a href="#t2032A">20:32</a></td><td class="nl">clojurebot</td><td>In Ordnung</td></tr>
+<tr id="t2032A" class="h"><td><a href="#t2032A">20:32</a></td><td class="nj">pjstadig</td><td>~AOT</td></tr>
+<tr id="t2032A" class="h"><td><a href="#t2032A">20:32</a></td><td class="nl">clojurebot</td><td>AOT is kinda broken already</td></tr>
+<tr id="t2032A" class="h"><td><a href="#t2032A">20:32</a></td><td class="nj">pjstadig</td><td>haha</td></tr>
+<tr id="t2032A" class="h"><td><a href="#t2032A">20:32</a></td><td class="ns">technomancy</td><td>pjstadig: not for libraries obvs</td></tr>
+<tr id="t2033A" class="h r"><td><a href="#t2033A">20:33</a></td><td class="ns">technomancy</td><td>I mean I wouldn't use it for libs</td></tr>
+<tr id="t2033A" class="h r"><td><a href="#t2033A">20:33</a></td><td class="ns">technomancy</td><td>but I always AOT before deployment</td></tr>
+<tr id="t2033A" class="h r"><td><a href="#t2033A">20:33</a></td><td class="ns">technomancy</td><td>(not on my own box of course)</td></tr>
+<tr id="t2034A" class="h"><td><a href="#t2034A">20:34</a></td><td class="nd">hiredman</td><td>someone could just fix core.match</td></tr>
+<tr id="t2035A" class="h r"><td><a href="#t2035A">20:35</a></td><td class="nd">hiredman</td><td>ugh, the jira issues doesn't have a reproducable case</td></tr>
+<tr id="t2035A" class="h"><td><a href="#t2035A">20:35</a></td><td class="nk">tieTYT2</td><td><a href="http://clojuredocs.org/clojure_core/clojure.core/for">http://clojuredocs.org/clojure_core/clojure.core/for</a>  I really think the ordering of the two examples for ; Demonstrating difference between :when and :while    should be swapped</td></tr>
+<tr id="t2035A" class="h"><td><a href="#t2035A">20:35</a></td><td class="nd">hiredman</td><td>ah, this other issue has a reproducable case</td></tr>
+<tr id="t2036A" class="h"><td><a href="#t2036A">20:36</a></td><td class="nk">tieTYT2</td><td>is it always fixable?</td></tr>
+<tr id="t2038A" class="h"><td><a href="#t2038A">20:38</a></td><td class="nd">hiredman</td><td>other languages have pattern matching, proving pattern matching can be done ona turing machine, clojure is turing machine equiv, so clojure can do pattern matching, so it is fixable</td></tr>
+<tr id="t2038A" class="h r"><td><a href="#t2038A">20:38</a></td><td class="nd">hiredman</td><td>qed</td></tr>
+<tr id="t2038A" class="h r"><td><a href="#t2038A">20:38</a></td><td class="nd">hiredman</td><td>it just may mean embedding a haskell or ml compiler in a clojure macro</td></tr>
+<tr id="t2039A" class="h"><td><a href="#t2039A">20:39</a></td><td class="ny">bbloom</td><td>heh.</td></tr>
+<tr id="t2043A"><td><a href="#t2043A">20:43</a></td><td class="nd">hiredman</td><td>the core-futures stuff is inspiring in that regard, the macro turns clojure code in to some kind of traditional compiler formalism (SSA, CPS, ANF) does its thing on the formalism, then regenerates clojure code from the formalism</td></tr>
+<tr id="t2044A" class="h"><td><a href="#t2044A">20:44</a></td><td class="nk">tieTYT2</td><td>this is over my head</td></tr>
+<tr id="t2044A" class="h"><td><a href="#t2044A">20:44</a></td><td class="nd">hiredman</td><td>which makes sense for more complicated macros that are really source to source compilers</td></tr>
+<tr id="t2048A" class="h"><td><a href="#t2048A">20:48</a></td><td class="nm">amalloy</td><td>i haven't looked at core-futures myself, but i heard it was SSA, from someone who was puzzled that it wasn't CPS</td></tr>
+<tr id="t2049A" class="h"><td><a href="#t2049A">20:49</a></td><td class="nd">hiredman</td><td>someone showed that cps and ssa are equivalent, but cps is used a lot for functional languages</td></tr>
+<tr id="t2052A" class="r"><td><a href="#t2052A">20:52</a></td><td class="nd">hiredman</td><td>the guile guy had a blog post a few years ago</td></tr>
+<tr id="t2053A" class="h r"><td><a href="#t2053A">20:53</a></td><td class="nd">hiredman</td><td><a href="http://wingolog.org/archives/2011/07/12/static-single-assignment-for-functional-programmers/">http://wingolog.org/archives/2011/07/12/static-single-assignment-for-functional-programmers/</a></td></tr>
+<tr id="t2118A"><td><a href="#t2118A">21:18</a></td><td class="nx">qbg_</td><td>hiredman: Do you have link describing core-futures?</td></tr>
+<tr id="t2122A"><td><a href="#t2122A">21:22</a></td><td class="nd">hiredman</td><td><a href="http://dev.clojure.org/display/design/Async+blocks">http://dev.clojure.org/display/design/Async+blocks</a></td></tr>
+<tr id="t2124A" class="h"><td><a href="#t2124A">21:24</a></td><td class="nx">qbg_</td><td>nice</td></tr>
+<tr id="t2124A" class="h"><td><a href="#t2124A">21:24</a></td><td class="nf">tomoj</td><td>really more core-async</td></tr>
+<tr id="t2125A" class="h r"><td><a href="#t2125A">21:25</a></td><td class="nf">tomoj</td><td>core-futures will I think be replaced</td></tr>
+<tr id="t2125A" class="h r"><td><a href="#t2125A">21:25</a></td><td class="nf">tomoj</td><td>or maybe they'll stick with it, but I remember a note somewhere saying &quot;this is temporary, TODO decide on future implementation&quot; or something</td></tr>
+<tr id="t2127A" class="h r"><td><a href="#t2127A">21:27</a></td><td class="nf">tomoj</td><td>delightfully there is only one small spot in core-async that depends on core-futures</td></tr>
+<tr id="t2127A" class="h"><td><a href="#t2127A">21:27</a></td><td class="na">dnolen</td><td>tomoj: i believe they are two distinct and necessary pieces</td></tr>
+<tr id="t2127A" class="h"><td><a href="#t2127A">21:27</a></td><td class="nf">tomoj</td><td>indeed</td></tr>
+<tr id="t2128A" class="h r"><td><a href="#t2128A">21:28</a></td><td class="nf">tomoj</td><td>I just mean &quot;Async blocks&quot; and the work on the relevance branch is more about core-async than core-futures</td></tr>
+<tr id="t2128A" class="h r"><td><a href="#t2128A">21:28</a></td><td class="nf">tomoj</td><td>oh but the branch is called core-futures, heh</td></tr>
+<tr id="t2128A" class="h r"><td><a href="#t2128A">21:28</a></td><td class="nf">tomoj</td><td>«Note: the implementation of futures should be considered in &quot;draft&quot; phase, it will change radically before an alpha is released.»</td></tr>
+<tr id="t2132A"><td><a href="#t2132A">21:32</a></td><td class="nu">qbg</td><td>that is beautiful</td></tr>
+</tbody></table></main></body></html>

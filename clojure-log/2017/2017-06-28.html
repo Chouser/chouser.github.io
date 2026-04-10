@@ -1,0 +1,569 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#clojure – 2017-06-28</title><link rel="stylesheet" href="../style.css"></head><body>
+<header class="sh"><a class="st" href="../index.html">#clojure logs</a><nav class="dn"><a href="2017-06-27.html">&larr;</a><span>2017-06-28</span><a href="2017-06-29.html">&rarr;</a></nav></header>
+<main><p class="dh">2017-06-28</p><table class="lg"><tbody>
+<tr id="t0041A"><td><a href="#t0041A">00:41</a></td><td class="n2">mgaare</td><td>Why don't specs implement IFn</td></tr>
+<tr id="t0043A" class="h r"><td><a href="#t0043A">00:43</a></td><td class="n2">mgaare</td><td>It would be so nice to have something like, (s/spec a-bunch-of-predicate-logic-here :gen useful-generator) and have the result be callable as a normal pred</td></tr>
+<tr id="t0101A"><td><a href="#t0101A">01:01</a></td><td class="nm">amalloy</td><td>aren't specs able to do a bunch of things? conform a thing, act like a predicate, produce an error report...which of those things should it do when called as a function?</td></tr>
+<tr id="t0103A" class="h"><td><a href="#t0103A">01:03</a></td><td class="n2">mgaare</td><td>I think they should act like a predicate</td></tr>
+<tr id="t0104A" class="h r"><td><a href="#t0104A">01:04</a></td><td class="n2">mgaare</td><td>as it stands now, maybe I'ved missed it but I don't see a way to get the same functionality that, say, int? has. Where it can be used as a spec, can be called as a predicate function, and has a generator</td></tr>
+<tr id="t0104A" class="h"><td><a href="#t0104A">01:04</a></td><td class="nm">amalloy</td><td>my point is, what if someone else disagrees? why should a predicate be the most interesting thing?</td></tr>
+<tr id="t0104A" class="h r"><td><a href="#t0104A">01:04</a></td><td class="nm">amalloy</td><td>suppose i think it would be far better if it produced an error report instead</td></tr>
+<tr id="t0105A" class="h r"><td><a href="#t0105A">01:05</a></td><td class="nm">amalloy</td><td>isn't it great that when i read your code, i can tell what you're using a spec for by what function you call on the spec?</td></tr>
+<tr id="t0106A" class="h"><td><a href="#t0106A">01:06</a></td><td class="n2">mgaare</td><td>another solution would be if spec supported adding generators to functions</td></tr>
+<tr id="t0107A" class="h r"><td><a href="#t0107A">01:07</a></td><td class="n2">mgaare</td><td>or I wonder if you could do that with fdef</td></tr>
+<tr id="t0107A" class="h r"><td><a href="#t0107A">01:07</a></td><td class="n2">mgaare</td><td>hmm</td></tr>
+<tr id="t0107A" class="h r"><td><a href="#t0107A">01:07</a></td><td class="n2">mgaare</td><td>doesn't seem that way</td></tr>
+<tr id="t0109A" class="h r"><td><a href="#t0109A">01:09</a></td><td class="n2">mgaare</td><td>amalloy: and to your question, right now we both lose because they do nothing at all ;)</td></tr>
+<tr id="t0109A" class="h"><td><a href="#t0109A">01:09</a></td><td class="nm">amalloy</td><td>no, i win because i actually think it's great to have named functions for doing things</td></tr>
+<tr id="t0111A"><td><a href="#t0111A">01:11</a></td><td class="n2">mgaare</td><td>So do I, but it seems like our predicates are destined to be second class citizens to the built-in clojure ones, as they get generator support and we have no apparent way to add it to ours</td></tr>
+<tr id="t0113A" class="h"><td><a href="#t0113A">01:13</a></td><td class="nm">amalloy</td><td>what's this about generator support for core functions? i haven't really kept up with development</td></tr>
+<tr id="t0117A" class="h"><td><a href="#t0117A">01:17</a></td><td class="n2">mgaare</td><td>a whole slew of predicates in core have generators. So you can call s/gen on a variety of things like nat-int?, inst?, string? and so forth and it returns a generator. But the mechanism for this is a hard-coded list in clojure.spec.gen.alpha</td></tr>
+<tr id="t0123A"><td><a href="#t0123A">01:23</a></td><td class="nm">amalloy</td><td>is it? i agree that that sounds pretty silly. i can't find the source for that, though</td></tr>
+<tr id="t0123A" class="h r"><td><a href="#t0123A">01:23</a></td><td class="nm">amalloy</td><td>i could easily be missing it, of course. as i said, i'm not current</td></tr>
+<tr id="t0134A"><td><a href="#t0134A">01:34</a></td><td class="n2">mgaare</td><td>it's a little tricky to trace. `s/gen` calls down to `gensub` which calls `specize` on the predicate, which calls `spec-impl` for objects, that reifies a thing that will call spec.gen.alpha/gen-for-pred to get a generator, which is this here <a href="https://github.com/clojure/spec.alpha/blob/master/src/main/clojure/clojure/spec/gen/alpha.clj#L187">https://github.com/clojure/spec.alpha/blob/master/src/main/clojure/clojure/spec/gen/alpha.clj#L187</a> that gets the generator out of this map <a href="https://github.com/clojure/spec.alpha/blob/master/src/main/clojure/clojure/spec/">https://github.com/clojure/spec.alpha/blob/master/src/main/clojure/clojure/spec/</a></td></tr>
+<tr id="t0134A" class="h r"><td><a href="#t0134A">01:34</a></td><td class="n2">mgaare</td><td>gen/alpha.clj#L128</td></tr>
+<tr id="t0138A" class="h"><td><a href="#t0138A">01:38</a></td><td class="nm">amalloy</td><td>huh. confirmed, that seems lame</td></tr>
+<tr id="t0153A"><td><a href="#t0153A">01:53</a></td><td class="nb">dysfun</td><td>spec is a bit crack</td></tr>
+<tr id="t0154A" class="h"><td><a href="#t0154A">01:54</a></td><td class="nd">TEttinger</td><td>a spec for crack though, now that woul be something</td></tr>
+<tr id="t0204A" class="r"><td><a href="#t0204A">02:04</a></td><td class="nd">TEttinger</td><td>hm. thinking about <a href="https://github.com/rschmitt/dynamic-object">https://github.com/rschmitt/dynamic-object</a> and (de)serialization of hand-written values as opposed to machine-written ones</td></tr>
+<tr id="t0205A" class="h r"><td><a href="#t0205A">02:05</a></td><td class="nd">TEttinger</td><td>I love clojure's approach to writing data for prototyping, and I don't know if I have seen or used something better at that use</td></tr>
+<tr id="t0207A" class="h r"><td><a href="#t0207A">02:07</a></td><td class="nd">TEttinger</td><td>I don't know if there's any kind of way that homogeneous, no-types-declared collections will easily translate to Java, which is of course pretty strict on types if you want to get your IDE to do any work</td></tr>
+<tr id="t0222A"><td><a href="#t0222A">02:22</a></td><td class="nb">dysfun</td><td>TEttinger: sure, List&lt;String&gt; is just List&lt;Object&gt; at runtime</td></tr>
+<tr id="t0223A" class="h r"><td><a href="#t0223A">02:23</a></td><td class="nb">dysfun</td><td>well, it's more like List at runtime, really, but you get my point</td></tr>
+<tr id="t0224A" class="h"><td><a href="#t0224A">02:24</a></td><td class="nd">TEttinger</td><td>yes, but the IDE won't be too helpful if you constantly cast each Object you get from a List to String in Java code</td></tr>
+<tr id="t0224A" class="h"><td><a href="#t0224A">02:24</a></td><td class="nb">dysfun</td><td>oh well</td></tr>
+<tr id="t0224A" class="h r"><td><a href="#t0224A">02:24</a></td><td class="nb">dysfun</td><td>shouldn't rely on an IDE then</td></tr>
+<tr id="t0225A" class="h"><td><a href="#t0225A">02:25</a></td><td class="nd">TEttinger</td><td>you shouldn't rely on coffee then</td></tr>
+<tr id="t0225A" class="h"><td><a href="#t0225A">02:25</a></td><td class="nb">dysfun</td><td>i shouldn't, you're right.</td></tr>
+<tr id="t0225A" class="h"><td><a href="#t0225A">02:25</a></td><td class="nd">TEttinger</td><td>heh</td></tr>
+<tr id="t0225A" class="h r"><td><a href="#t0225A">02:25</a></td><td class="nd">TEttinger</td><td>unneeded performance boost!</td></tr>
+<tr id="t0226A" class="h"><td><a href="#t0226A">02:26</a></td><td class="nb">dysfun</td><td>meanwhile, i've given up trying to be polite in an email and left it at &quot;call me&quot;</td></tr>
+<tr id="t0226A" class="h"><td><a href="#t0226A">02:26</a></td><td class="nd">TEttinger</td><td>, maybe</td></tr>
+<tr id="t0226A" class="h"><td><a href="#t0226A">02:26</a></td><td class="nl">clojurebot</td><td>#error {\n :cause &quot;Unable to resolve symbol: maybe in this context&quot;\n :via\n [{:type clojure.lang.Compiler$CompilerException\n   :message &quot;java.lang.RuntimeException: Unable to resolve symbol: maybe in this context, compiling:(NO_SOURCE_PATH:0:0)&quot;\n   :at [clojure.lang.Compiler analyze &quot;Compiler.java&quot; 6719]}\n  {:type java.lang.RuntimeException\n   :message &quot;Unable to resolve symbol: maybe in this...</td></tr>
+<tr id="t0226A" class="h"><td><a href="#t0226A">02:26</a></td><td class="nd">TEttinger</td><td>,:maybe</td></tr>
+<tr id="t0226A" class="h"><td><a href="#t0226A">02:26</a></td><td class="nl">clojurebot</td><td>:maybe</td></tr>
+<tr id="t0226A" class="h"><td><a href="#t0226A">02:26</a></td><td class="nd">TEttinger</td><td>there.</td></tr>
+<tr id="t0227A" class="h"><td><a href="#t0227A">02:27</a></td><td class="nb">dysfun</td><td>hello, maybe</td></tr>
+<tr id="t0227A" class="h"><td><a href="#t0227A">02:27</a></td><td class="nd">TEttinger</td><td>this is your cousin, maybee</td></tr>
+<tr id="t0335A"><td><a href="#t0335A">03:35</a></td><td class="nj">Wxckol</td><td>Hey</td></tr>
+<tr id="t0336A" class="h"><td><a href="#t0336A">03:36</a></td><td class="nd">TEttinger</td><td>hello</td></tr>
+<tr id="t0336A" class="h"><td><a href="#t0336A">03:36</a></td><td class="nb">dysfun</td><td>wotcha</td></tr>
+<tr id="t0339A" class="h"><td><a href="#t0339A">03:39</a></td><td class="nj">Wxckol</td><td>What does Clojure is for?</td></tr>
+<tr id="t0339A" class="h"><td><a href="#t0339A">03:39</a></td><td class="nb">dysfun</td><td>it's a general purpose programming language</td></tr>
+<tr id="t0339A" class="h"><td><a href="#t0339A">03:39</a></td><td class="nj">Wxckol</td><td>general purpose like what?</td></tr>
+<tr id="t0339A" class="h r"><td><a href="#t0339A">03:39</a></td><td class="nj">Wxckol</td><td>im a general ignorant :D</td></tr>
+<tr id="t0339A" class="h"><td><a href="#t0339A">03:39</a></td><td class="nb">dysfun</td><td>well, in short, you can do most things with it</td></tr>
+<tr id="t0340A"><td><a href="#t0340A">03:40</a></td><td class="nj">Wxckol</td><td>What do you do with it?</td></tr>
+<tr id="t0340A" class="h"><td><a href="#t0340A">03:40</a></td><td class="nb">dysfun</td><td>build websites mostly</td></tr>
+<tr id="t0340A" class="h"><td><a href="#t0340A">03:40</a></td><td class="nj">Wxckol</td><td>Can you show me something you built with it?</td></tr>
+<tr id="t0341A" class="h"><td><a href="#t0341A">03:41</a></td><td class="nb">dysfun</td><td><a href="https://github.com/irresponsible/anarchy">https://github.com/irresponsible/anarchy</a> is a simple business logic engine i built in clojure</td></tr>
+<tr id="t0342A" class="h"><td><a href="#t0342A">03:42</a></td><td class="nx">Para_</td><td>&quot;business logic engine&quot; sounds horribly engineered solution looking for a problem</td></tr>
+<tr id="t0342A" class="h"><td><a href="#t0342A">03:42</a></td><td class="nj">Wxckol</td><td>Mh, ok (thank you), but it's beyond my knowledge for now. What about a website, can you show me a website?</td></tr>
+<tr id="t0342A" class="h"><td><a href="#t0342A">03:42</a></td><td class="nx">Para_</td><td>YMMV of course, rule engines have never appealed to me</td></tr>
+<tr id="t0342A" class="h"><td><a href="#t0342A">03:42</a></td><td class="nb">dysfun</td><td>it's not a traditional rule engine</td></tr>
+<tr id="t0343A" class="h r"><td><a href="#t0343A">03:43</a></td><td class="nb">dysfun</td><td>i can show you a website, but that it's written in clojure will make no difference to your experience of it</td></tr>
+<tr id="t0343A" class="h"><td><a href="#t0343A">03:43</a></td><td class="nj">Wxckol</td><td>Just wanted to take a look you know</td></tr>
+<tr id="t0343A" class="h"><td><a href="#t0343A">03:43</a></td><td class="nb">dysfun</td><td>that's the thing about general purpose programming languages - they can all do much the same things, they just do them differently</td></tr>
+<tr id="t0343A" class="h r"><td><a href="#t0343A">03:43</a></td><td class="nb">dysfun</td><td>well, <a href="https://bleeckerburger.co.uk/">https://bleeckerburger.co.uk/</a> is written in clojure, but what i said above</td></tr>
+<tr id="t0344A" class="h"><td><a href="#t0344A">03:44</a></td><td class="nj">Wxckol</td><td>So you write all this with code? No gui at all</td></tr>
+<tr id="t0344A" class="h r"><td><a href="#t0344A">03:44</a></td><td class="nj">Wxckol</td><td>?</td></tr>
+<tr id="t0347A" class="h"><td><a href="#t0347A">03:47</a></td><td class="nb">dysfun</td><td>yup</td></tr>
+<tr id="t0347A" class="h r"><td><a href="#t0347A">03:47</a></td><td class="nb">dysfun</td><td>i mean the html can be trivially edited in a gui if you want, but i choose not to</td></tr>
+<tr id="t0348A" class="h r"><td><a href="#t0348A">03:48</a></td><td class="nb">dysfun</td><td>well, actually the template engine probably knackers gui editability</td></tr>
+<tr id="t0348A" class="h r"><td><a href="#t0348A">03:48</a></td><td class="nb">dysfun</td><td>but it started as html and then i just edited the template in</td></tr>
+<tr id="t0349A" class="h r"><td><a href="#t0349A">03:49</a></td><td class="nb">dysfun</td><td><a href="https://github.com/tonsky/datascript-chat">https://github.com/tonsky/datascript-chat</a> # here is an example of a more dynamic app written in clojurescript</td></tr>
+<tr id="t0349A" class="h r"><td><a href="#t0349A">03:49</a></td><td class="nb">dysfun</td><td>the burger site actually has a very shiny admin panel written in clojurescript too, but i can't show you that</td></tr>
+<tr id="t0425A"><td><a href="#t0425A">04:25</a></td><td class="nq">Hanonim</td><td>Yop</td></tr>
+<tr id="t0425A" class="h"><td><a href="#t0425A">04:25</a></td><td class="nb">dysfun</td><td>hiya</td></tr>
+<tr id="t0425A" class="h"><td><a href="#t0425A">04:25</a></td><td class="nq">Hanonim</td><td>good ?</td></tr>
+<tr id="t0426A" class="h"><td><a href="#t0426A">04:26</a></td><td class="nb">dysfun</td><td>okay i guess, tired</td></tr>
+<tr id="t0429A" class="h"><td><a href="#t0429A">04:29</a></td><td class="nu">osfabibisi</td><td>apparently Kafka think they have solved Exactly Once</td></tr>
+<tr id="t0430A"><td><a href="#t0430A">04:30</a></td><td class="nb">dysfun</td><td>well, they're presumably trying to compete with flink</td></tr>
+<tr id="t0430A" class="h r"><td><a href="#t0430A">04:30</a></td><td class="nb">dysfun</td><td>(flink claims exactly-once, so it's nice to know we've made such progress with the provably hard german tank commander problem</td></tr>
+<tr id="t0435A" class="h"><td><a href="#t0435A">04:35</a></td><td class="nq">Hanonim</td><td>osfabibisi: only in special occasions</td></tr>
+<tr id="t0435A" class="h"><td><a href="#t0435A">04:35</a></td><td class="nu">osfabibisi</td><td>so what's the flink-definition-of-exactly-once?</td></tr>
+<tr id="t0436A" class="h"><td><a href="#t0436A">04:36</a></td><td class="nb">dysfun</td><td>i suspect &quot;exactly once except when something goes wrong&quot;</td></tr>
+<tr id="t0436A" class="h"><td><a href="#t0436A">04:36</a></td><td class="nu">osfabibisi</td><td>ah</td></tr>
+<tr id="t0436A" class="h r"><td><a href="#t0436A">04:36</a></td><td class="nu">osfabibisi</td><td>so &quot;not exactly once&quot;</td></tr>
+<tr id="t0437A" class="h"><td><a href="#t0437A">04:37</a></td><td class="nb">dysfun</td><td>well, we have a mathematical proof of the hardness of this problem, so...</td></tr>
+<tr id="t0438A" class="h r"><td><a href="#t0438A">04:38</a></td><td class="nb">dysfun</td><td>anyway, exactly once except in case of error is basically as good as you can get, it's what you do in the case of error that matters</td></tr>
+<tr id="t0439A" class="h"><td><a href="#t0439A">04:39</a></td><td class="nu">osfabibisi</td><td>ah ok</td></tr>
+<tr id="t0439A" class="h r"><td><a href="#t0439A">04:39</a></td><td class="nu">osfabibisi</td><td>and does that work out being better than at-least-once in practice?</td></tr>
+<tr id="t0439A" class="h"><td><a href="#t0439A">04:39</a></td><td class="nb">dysfun</td><td>it depends what you're doing</td></tr>
+<tr id="t0440A" class="r"><td><a href="#t0440A">04:40</a></td><td class="nb">dysfun</td><td>there is also the other category - at most once</td></tr>
+<tr id="t0441A" class="h r"><td><a href="#t0441A">04:41</a></td><td class="nb">dysfun</td><td>at most once is what linkedin use for emails, because noone complains if they don't receive yet another fucking email</td></tr>
+<tr id="t0444A" class="h"><td><a href="#t0444A">04:44</a></td><td class="nd">TEttinger</td><td>linkedin can show restraint on emails???</td></tr>
+<tr id="t0444A" class="h r"><td><a href="#t0444A">04:44</a></td><td class="nd">TEttinger</td><td>how surprising</td></tr>
+<tr id="t0444A" class="h r"><td><a href="#t0444A">04:44</a></td><td class="nd">TEttinger</td><td>I think they're just a spam council</td></tr>
+<tr id="t0445A" class="h"><td><a href="#t0445A">04:45</a></td><td class="nb">dysfun</td><td>no, the outage of linkedin services can show restraint on emails</td></tr>
+<tr id="t0446A" class="h"><td><a href="#t0446A">04:46</a></td><td class="n1">Carr0t</td><td>I wonder if they've done it by decoupling message sending from message sent checking. e.g. message is sent with UUID. Instead of resending on no ack you just keep asking &quot;Have you got the message with UUID X&quot; until you get either a yes or no. ON yes, mark as sent. On no, resend message with new UUID and start asking about *that* one</td></tr>
+<tr id="t0447A" class="h"><td><a href="#t0447A">04:47</a></td><td class="nb">dysfun</td><td>ah, but what happens if the machine receives it but then goes offline before it's done processing?</td></tr>
+<tr id="t0447A" class="h"><td><a href="#t0447A">04:47</a></td><td class="nu">osfabibisi</td><td>ah yes, I understood that better written down ;-)</td></tr>
+<tr id="t0449A" class="h r"><td><a href="#t0449A">04:49</a></td><td class="nu">osfabibisi</td><td>ah yes, this is the thing that Paxos is meant to solve? (still not entirely sure what that is, I keep confusing it with the stock cube)</td></tr>
+<tr id="t0451A"><td><a href="#t0451A">04:51</a></td><td class="nb">dysfun</td><td>paxos and raft attempt to solve this problem, yes</td></tr>
+<tr id="t0452A" class="h"><td><a href="#t0452A">04:52</a></td><td class="nd">TEttinger</td><td>they just need to verify that they have received the message before the message was sent. a clear violation of causality, just like uber is a clear violation of taxi regulations</td></tr>
+<tr id="t0453A" class="h"><td><a href="#t0453A">04:53</a></td><td class="nt">torrent-of-ions</td><td>Is &quot;Joy of Clojure&quot; worth buying considering a) I'm a Common Lisper, and b) it's only v1.4 of Clojure?</td></tr>
+<tr id="t0453A" class="h"><td><a href="#t0453A">04:53</a></td><td class="nu">osfabibisi</td><td>I liked JoC</td></tr>
+<tr id="t0454A" class="h"><td><a href="#t0454A">04:54</a></td><td class="nb">dysfun</td><td>it depends on whether it's the sort of book you like to read</td></tr>
+<tr id="t0454A" class="h"><td><a href="#t0454A">04:54</a></td><td class="nd">TEttinger</td><td>clojure's different enough from CL, so having a good book helps</td></tr>
+<tr id="t0454A" class="h"><td><a href="#t0454A">04:54</a></td><td class="nt">torrent-of-ions</td><td>Oh, it's 1.6 actually</td></tr>
+<tr id="t0454A" class="h"><td><a href="#t0454A">04:54</a></td><td class="nd">TEttinger</td><td>not very old huh</td></tr>
+<tr id="t0454A" class="h r"><td><a href="#t0454A">04:54</a></td><td class="nd">TEttinger</td><td>1.7 was transducers? or was that 1.6?</td></tr>
+<tr id="t0454A" class="h"><td><a href="#t0454A">04:54</a></td><td class="nt">torrent-of-ions</td><td>1.7</td></tr>
+<tr id="t0454A" class="h"><td><a href="#t0454A">04:54</a></td><td class="nb">dysfun</td><td>1.7</td></tr>
+<tr id="t0455A" class="h"><td><a href="#t0455A">04:55</a></td><td class="nd">TEttinger</td><td>I still haven't used a transducer knowingly</td></tr>
+<tr id="t0455A" class="h"><td><a href="#t0455A">04:55</a></td><td class="nt">torrent-of-ions</td><td>I suppose those additions don't change the fundamentals</td></tr>
+<tr id="t0456A" class="h r"><td><a href="#t0456A">04:56</a></td><td class="nt">torrent-of-ions</td><td>I'm still a bit unclear about fundamentals like names and symbols</td></tr>
+<tr id="t0456A" class="h"><td><a href="#t0456A">04:56</a></td><td class="nb">dysfun</td><td>no, not at all</td></tr>
+<tr id="t0457A" class="h r"><td><a href="#t0457A">04:57</a></td><td class="nb">dysfun</td><td>i use transducers quite a lot, but i don't write new ones</td></tr>
+<tr id="t0458A" class="h"><td><a href="#t0458A">04:58</a></td><td class="nt">torrent-of-ions</td><td>Also I hate buying technical books just before a new version comes out, but I can't find any news about a 3rd edition</td></tr>
+<tr id="t0458A" class="h r"><td><a href="#t0458A">04:58</a></td><td class="nt">torrent-of-ions</td><td>I'll order it then</td></tr>
+<tr id="t0458A" class="h"><td><a href="#t0458A">04:58</a></td><td class="nb">dysfun</td><td>i can't see a new edition this year</td></tr>
+<tr id="t0458A" class="h r"><td><a href="#t0458A">04:58</a></td><td class="nb">dysfun</td><td>or in the near future, generally</td></tr>
+<tr id="t0459A" class="h r"><td><a href="#t0459A">04:59</a></td><td class="nb">dysfun</td><td>not with significant changes anyway, maybe a reprint</td></tr>
+<tr id="t0520A"><td><a href="#t0520A">05:20</a></td><td class="nu">osfabibisi</td><td>dysfun: are you back on Clojure, or just visiting? ;-)</td></tr>
+<tr id="t0521A" class="h"><td><a href="#t0521A">05:21</a></td><td class="nq">Hanonim</td><td>it's weird, after quite a while with clojure, i start missing imperative langs</td></tr>
+<tr id="t0521A" class="h"><td><a href="#t0521A">05:21</a></td><td class="nb">dysfun</td><td>i am writing clojure, but not contributing to it</td></tr>
+<tr id="t0521A" class="h"><td><a href="#t0521A">05:21</a></td><td class="nu">osfabibisi</td><td>aha</td></tr>
+<tr id="t0522A" class="h r"><td><a href="#t0522A">05:22</a></td><td class="nu">osfabibisi</td><td>contributing to core?  or to your irresponsible modules?</td></tr>
+<tr id="t0522A" class="h"><td><a href="#t0522A">05:22</a></td><td class="nb">dysfun</td><td>core. i am still doing irresponsible because i use them too</td></tr>
+<tr id="t0522A" class="h"><td><a href="#t0522A">05:22</a></td><td class="nu">osfabibisi</td><td>good good</td></tr>
+<tr id="t0525A" class="h"><td><a href="#t0525A">05:25</a></td><td class="nb">dysfun</td><td>i've stopped bothering with the site though</td></tr>
+<tr id="t0525A" class="h"><td><a href="#t0525A">05:25</a></td><td class="n6">deadghost</td><td>hmm did dysfun jump langs?</td></tr>
+<tr id="t0525A" class="h"><td><a href="#t0525A">05:25</a></td><td class="nb">dysfun</td><td>it will eventually turn into the irresponsible software guild and include stuff written in kotlin, or if i ever build the damn thing, kotlisp</td></tr>
+<tr id="t0526A" class="h"><td><a href="#t0526A">05:26</a></td><td class="nq">Hanonim</td><td>so you've chosen kotlin for your lisp ?</td></tr>
+<tr id="t0526A" class="h"><td><a href="#t0526A">05:26</a></td><td class="nb">dysfun</td><td>it's seeming likely, but it's not definite</td></tr>
+<tr id="t0527A" class="h"><td><a href="#t0527A">05:27</a></td><td class="nq">Hanonim</td><td>because of the type system ?</td></tr>
+<tr id="t0528A" class="h"><td><a href="#t0528A">05:28</a></td><td class="nb">dysfun</td><td>i use a lot of java libraries. using them is often a pain in clojure because it tries to have its two worlds thing, whereas kotlin just does java++</td></tr>
+<tr id="t0528A" class="h"><td><a href="#t0528A">05:28</a></td><td class="nu">osfabibisi</td><td>oh? we've found Java interop in clojure quite painless</td></tr>
+<tr id="t0528A" class="h"><td><a href="#t0528A">05:28</a></td><td class="nb">dysfun</td><td>kotlin is not going to win any awards for outstanding revolutionary design, it's just java++, done quite wel</td></tr>
+<tr id="t0528A" class="h r"><td><a href="#t0528A">05:28</a></td><td class="nb">dysfun</td><td>well*</td></tr>
+<tr id="t0529A" class="h r"><td><a href="#t0529A">05:29</a></td><td class="nb">dysfun</td><td>it is often painless, but equally often painful</td></tr>
+<tr id="t0550A"><td><a href="#t0550A">05:50</a></td><td class="nu">osfabibisi</td><td>ah, hehe</td></tr>
+<tr id="t0551A" class="h"><td><a href="#t0551A">05:51</a></td><td class="nb">dysfun</td><td>:D i just talked a potential client into making an improved offer</td></tr>
+<tr id="t0551A" class="h"><td><a href="#t0551A">05:51</a></td><td class="nu">osfabibisi</td><td>woohoo</td></tr>
+<tr id="t0555A" class="h"><td><a href="#t0555A">05:55</a></td><td class="n0">audriusm</td><td>how will you improve the offer? :)</td></tr>
+<tr id="t0555A" class="h"><td><a href="#t0555A">05:55</a></td><td class="nb">dysfun</td><td>well i improved it by asking them to improve it</td></tr>
+<tr id="t0555A" class="h r"><td><a href="#t0555A">05:55</a></td><td class="nb">dysfun</td><td>and mentioned what their competition were offering</td></tr>
+<tr id="t0600A"><td><a href="#t0600A">06:00</a></td><td class="nu">osfabibisi</td><td>is it a fun gig?</td></tr>
+<tr id="t0601A" class="h"><td><a href="#t0601A">06:01</a></td><td class="nb">dysfun</td><td>no, but it's less un-fun that commuting 2 hours a day</td></tr>
+<tr id="t0601A" class="h r"><td><a href="#t0601A">06:01</a></td><td class="nb">dysfun</td><td>than*</td></tr>
+<tr id="t0610A"><td><a href="#t0610A">06:10</a></td><td class="nu">osfabibisi</td><td>this is true</td></tr>
+<tr id="t0613A" class="h"><td><a href="#t0613A">06:13</a></td><td class="nb">dysfun</td><td>gosh, there are engineers up the pylon i see out of my window. it's the most interesting thing i've seen this week</td></tr>
+<tr id="t0805A"><td><a href="#t0805A">08:05</a></td><td class="nq">Makis</td><td>Is there a trick to using Himera and tryclj because I keep getting errors even when I use some existing examples?</td></tr>
+<tr id="t0828A"><td><a href="#t0828A">08:28</a></td><td class="nu">osfabibisi</td><td>so the Clojure example in <a href="http://www.bradcypert.com/5-programming-languages-you-could-learn-from/">http://www.bradcypert.com/5-programming-languages-you-could-learn-from/</a></td></tr>
+<tr id="t0828A" class="h r"><td><a href="#t0828A">08:28</a></td><td class="nu">osfabibisi</td><td>why doesn't that blow it's stack?  does lazy-cat do some magic there, even though it's not tail recursive?</td></tr>
+<tr id="t0843A"><td><a href="#t0843A">08:43</a></td><td class="nr">raek</td><td>osfabibisi: yes. lazy-cat is a macro. the body of the lazy-cat form is wrapped up in a thunk and that thunk is returned immediately.</td></tr>
+<tr id="t0843A" class="h"><td><a href="#t0843A">08:43</a></td><td class="nb">dysfun</td><td>i just looked at the source, it uses concat</td></tr>
+<tr id="t0843A" class="h r"><td><a href="#t0843A">08:43</a></td><td class="nb">dysfun</td><td>so if it's a very big list, and you realise it all at once, it likely *will* blow its stack</td></tr>
+<tr id="t0845A" class="h"><td><a href="#t0845A">08:45</a></td><td class="nr">raek</td><td>oh, you're right. it calls concat immediately. but the arguments to concat are wrapped in lazy-seq which is the thing that delays the computation</td></tr>
+<tr id="t0846A" class="h"><td><a href="#t0846A">08:46</a></td><td class="nb">dysfun</td><td>also that quicksort assumes uniquity in the source collection</td></tr>
+<tr id="t0846A" class="h"><td><a href="#t0846A">08:46</a></td><td class="nr">raek</td><td>so (lazy-cat e1 e2 ... e1000) becomes (concat (lazy-seq e1) (lazy-seq e2) ... (lazy-seq e1000))</td></tr>
+<tr id="t0846A" class="h"><td><a href="#t0846A">08:46</a></td><td class="nb">dysfun</td><td>it will actually malfunction if an item goes twice by the looks of it</td></tr>
+<tr id="t0846A" class="h"><td><a href="#t0846A">08:46</a></td><td class="nr">raek</td><td>dysfun: why would a big list blow the stack?</td></tr>
+<tr id="t0847A" class="h"><td><a href="#t0847A">08:47</a></td><td class="nb">dysfun</td><td>raek: because each call to realise a new element adds a stack frame</td></tr>
+<tr id="t0848A" class="h r"><td><a href="#t0848A">08:48</a></td><td class="nb">dysfun</td><td>haskell only gets away with pervasive laziness because the VM is built around it</td></tr>
+<tr id="t0848A" class="h"><td><a href="#t0848A">08:48</a></td><td class="nr">raek</td><td>hmm right.</td></tr>
+<tr id="t0849A" class="h r"><td><a href="#t0849A">08:49</a></td><td class="nr">raek</td><td>if the partition is perfectly balanced the lazy sequences becomes nested at a depth of log2 n</td></tr>
+<tr id="t0849A" class="h"><td><a href="#t0849A">08:49</a></td><td class="nb">dysfun</td><td>yes. in general we assume the stack size is log(heapsize)</td></tr>
+<tr id="t0850A" class="r"><td><a href="#t0850A">08:50</a></td><td class="nb">dysfun</td><td>much garbage collection theory is based on that</td></tr>
+<tr id="t0851A" class="h"><td><a href="#t0851A">08:51</a></td><td class="nr">raek</td><td>but I suppose you could design a pathological input that makes all the partitions maximally unbalanced, so that the stack depth needed would indeed be proportional to n!</td></tr>
+<tr id="t0851A" class="h"><td><a href="#t0851A">08:51</a></td><td class="nb">dysfun</td><td>even with a perfect balance, it's vulnerable to large inputs</td></tr>
+<tr id="t0852A" class="h r"><td><a href="#t0852A">08:52</a></td><td class="nb">dysfun</td><td>periodically someone turns up asking about a very strange stack overflow bug that appeared in production and it usually turns out it's concat's fault</td></tr>
+<tr id="t0933A"><td><a href="#t0933A">09:33</a></td><td class="nu">osfabibisi</td><td>raek, dysfun: sorry, got called away after asking that question</td></tr>
+<tr id="t0933A" class="h r"><td><a href="#t0933A">09:33</a></td><td class="nu">osfabibisi</td><td>so essentially that function *will* blow its stack on large inputs?</td></tr>
+<tr id="t0934A" class="h"><td><a href="#t0934A">09:34</a></td><td class="nb">dysfun</td><td>pretty much</td></tr>
+<tr id="t0934A" class="h"><td><a href="#t0934A">09:34</a></td><td class="nu">osfabibisi</td><td>cool.  that was my guess, but I thought I'd ask in case I'd misunderstood ;-)</td></tr>
+<tr id="t1031A"><td><a href="#t1031A">10:31</a></td><td class="nb">dysfun</td><td>so i spent an hour today tracking down a bug that would have been pointed out by even a half-arsed type system</td></tr>
+<tr id="t1031A" class="h"><td><a href="#t1031A">10:31</a></td><td class="na">TMA</td><td>would it help if (lazy-cat e1 e2 ... e1000) were (concat (lazy-seq e1) (lazy-cat e2 ... e1000))?</td></tr>
+<tr id="t1032A" class="h"><td><a href="#t1032A">10:32</a></td><td class="nb">dysfun</td><td>it might be less awful than the original in a large collection, but it still suffers the same basic flaw</td></tr>
+<tr id="t1032A" class="h r"><td><a href="#t1032A">10:32</a></td><td class="nb">dysfun</td><td>but making it lazy seems rather pointless</td></tr>
+<tr id="t1036A" class="h"><td><a href="#t1036A">10:36</a></td><td class="nu">osfabibisi</td><td>is there an existing function for (defn check [message predicate] (when (predicate message) message)) ?</td></tr>
+<tr id="t1036A" class="h r"><td><a href="#t1036A">10:36</a></td><td class="nu">osfabibisi</td><td>e.g. you can (some-&gt; thing (check some-predicate?) (...))</td></tr>
+<tr id="t1038A" class="h"><td><a href="#t1038A">10:38</a></td><td class="nb">dysfun</td><td>er, isn't that... some-&gt; ?</td></tr>
+<tr id="t1040A"><td><a href="#t1040A">10:40</a></td><td class="nu">osfabibisi</td><td>hmm, not exactly, some-&gt; would just path the truthy value of the predicate</td></tr>
+<tr id="t1040A" class="h r"><td><a href="#t1040A">10:40</a></td><td class="nu">osfabibisi</td><td>it's a converter from truthy predicate into threading macro guard</td></tr>
+<tr id="t1040A" class="h"><td><a href="#t1040A">10:40</a></td><td class="nb">dysfun</td><td>cond-&gt; ?</td></tr>
+<tr id="t1041A" class="h r"><td><a href="#t1041A">10:41</a></td><td class="nb">dysfun</td><td>but i think from your description not quite</td></tr>
+<tr id="t1043A" class="h"><td><a href="#t1043A">10:43</a></td><td class="nu">osfabibisi</td><td>I can't figure out cond-&gt; at all tbh ;-)</td></tr>
+<tr id="t1044A" class="h r"><td><a href="#t1044A">10:44</a></td><td class="nu">osfabibisi</td><td>I think the `check` definition should do for now, ta for suggestions</td></tr>
+<tr id="t1044A" class="h"><td><a href="#t1044A">10:44</a></td><td class="nb">dysfun</td><td>,(for [i (range 10)] (cond-&gt; i odd? #(* 2 %)))</td></tr>
+<tr id="t1045A" class="h"><td><a href="#t1045A">10:45</a></td><td class="nl">clojurebot</td><td>(#object[sandbox$eval40$iter__36__41$fn__42$fn__43$G__44__45 0x23881a68 &quot;sandbox$eval40$iter__36__41$fn__42$fn__43$G__44__45@23881a68&quot;] #object[sandbox$eval40$iter__36__41$fn__42$fn__43$G__44__45 0x3c7db411 &quot;sandbox$eval40$iter__36__41$fn__42$fn__43$G__44__45@3c7db411&quot;] #object[sandbox$eval40$iter__36__41$fn__42$fn__43$G__44__45 0x60b8e71d &quot;sandbox$eval40$iter__36__41$fn__42$fn__43$G__44__45@60b8e...</td></tr>
+<tr id="t1045A" class="h"><td><a href="#t1045A">10:45</a></td><td class="nb">dysfun</td><td>,(for [i (range 10)] (cond-&gt; i odd? (#(* 2 %))))</td></tr>
+<tr id="t1045A" class="h"><td><a href="#t1045A">10:45</a></td><td class="nl">clojurebot</td><td>(0 2 4 6 8 ...)</td></tr>
+<tr id="t1046A" class="h"><td><a href="#t1046A">10:46</a></td><td class="nu">osfabibisi</td><td>,(map #(* 2 %) (range 10))</td></tr>
+<tr id="t1046A" class="h"><td><a href="#t1046A">10:46</a></td><td class="nl">clojurebot</td><td>(0 2 4 6 8 ...)</td></tr>
+<tr id="t1046A" class="h"><td><a href="#t1046A">10:46</a></td><td class="nu">osfabibisi</td><td>I still don't understand your example</td></tr>
+<tr id="t1046A" class="h r"><td><a href="#t1046A">10:46</a></td><td class="nu">osfabibisi</td><td>if it's odd, it multiplies by 2?  wouldn't that be (2, 6, 10, ...) ?</td></tr>
+<tr id="t1046A" class="h"><td><a href="#t1046A">10:46</a></td><td class="nb">dysfun</td><td>well, it's like -&gt; except i inserted the predicate odd? in the middle</td></tr>
+<tr id="t1048A" class="h r"><td><a href="#t1048A">10:48</a></td><td class="nb">dysfun</td><td>to be fair, *i* was expecting to see something different as well</td></tr>
+<tr id="t1048A" class="h"><td><a href="#t1048A">10:48</a></td><td class="nu">osfabibisi</td><td>yeah, I have no idea what it's doing though</td></tr>
+<tr id="t1048A" class="h r"><td><a href="#t1048A">10:48</a></td><td class="nu">osfabibisi</td><td>ah, heh</td></tr>
+<tr id="t1305A"><td><a href="#t1305A">13:05</a></td><td class="n9">TimMc</td><td>Thing I'm really tired of in Clojure: Not being certain I can find all the places my code looks at a really generically named key in a datastructure.</td></tr>
+<tr id="t1305A" class="h r"><td><a href="#t1305A">13:05</a></td><td class="n9">TimMc</td><td>Like if I have something under :data in a map, there's no good way to grep for all references to that.</td></tr>
+<tr id="t1307A" class="h"><td><a href="#t1307A">13:07</a></td><td class="n7">osfameron</td><td>hmm. that's a weakly typed issue in general isn't it?</td></tr>
+<tr id="t1307A" class="h r"><td><a href="#t1307A">13:07</a></td><td class="n7">osfameron</td><td>or possibly a hint that you should rename your map keys to something less generic</td></tr>
+<tr id="t1307A" class="h"><td><a href="#t1307A">13:07</a></td><td class="nb">dysfun</td><td>namespaced keywords (which rich has been banging on about a lot recently) *almost* solve that one</td></tr>
+<tr id="t1308A" class="h r"><td><a href="#t1308A">13:08</a></td><td class="nb">dysfun</td><td>(as in you need to substitute something that reads namespaces for grep in order to solve the typical case)</td></tr>
+<tr id="t1309A" class="h"><td><a href="#t1309A">13:09</a></td><td class="n7">osfameron</td><td>it's interesting that Haskell just avoids having arbitrary maps of data and makes you model your structures up front</td></tr>
+<tr id="t1309A" class="h r"><td><a href="#t1309A">13:09</a></td><td class="n7">osfameron</td><td>I sometimes wonder if that trade-off would be worth it</td></tr>
+<tr id="t1309A" class="h"><td><a href="#t1309A">13:09</a></td><td class="nb">dysfun</td><td>michael snoyman said he'd quite like to remove tuples</td></tr>
+<tr id="t1309A" class="h"><td><a href="#t1309A">13:09</a></td><td class="n7">osfameron</td><td>I mean, on larger-scale projects than I've worked on</td></tr>
+<tr id="t1310A"><td><a href="#t1310A">13:10</a></td><td class="ns">technomancy</td><td>osfameron: you don't need haskell for that; racket encourages that too</td></tr>
+<tr id="t1310A" class="h"><td><a href="#t1310A">13:10</a></td><td class="n7">osfameron</td><td>at least tuples are typed-ish, but yeah</td></tr>
+<tr id="t1310A" class="h r"><td><a href="#t1310A">13:10</a></td><td class="n7">osfameron</td><td>right, I should have said &quot;e.g. Haskell&quot; ;-)</td></tr>
+<tr id="t1310A" class="h r"><td><a href="#t1310A">13:10</a></td><td class="n7">osfameron</td><td>the generic maps thing is Oh So Convenient for as long as you can actually remember and reason about what you're doing</td></tr>
+<tr id="t1310A" class="h r"><td><a href="#t1310A">13:10</a></td><td class="n7">osfameron</td><td>(which for me isn't very long, as I am a simple squirrel)</td></tr>
+<tr id="t1310A" class="h"><td><a href="#t1310A">13:10</a></td><td class="nb">dysfun</td><td>it's really good for prototyping</td></tr>
+<tr id="t1311A" class="h r"><td><a href="#t1311A">13:11</a></td><td class="nb">dysfun</td><td>and it's very good for eliminating boilerplate</td></tr>
+<tr id="t1311A" class="h r"><td><a href="#t1311A">13:11</a></td><td class="nb">dysfun</td><td>but as your code grows up, i don't think it scales</td></tr>
+<tr id="t1311A" class="h"><td><a href="#t1311A">13:11</a></td><td class="n7">osfameron</td><td>right, I've not done sufficiently complex things in Haskell to worry about boilerplate tbh</td></tr>
+<tr id="t1311A" class="h r"><td><a href="#t1311A">13:11</a></td><td class="n7">osfameron</td><td>I should fix that...</td></tr>
+<tr id="t1311A" class="h"><td><a href="#t1311A">13:11</a></td><td class="nb">dysfun</td><td>i got lost down the GHC.Generics hole a couple of months back</td></tr>
+<tr id="t1312A" class="h r"><td><a href="#t1312A">13:12</a></td><td class="nb">dysfun</td><td>the other thing maps are good for is interop with json</td></tr>
+<tr id="t1312A" class="h"><td><a href="#t1312A">13:12</a></td><td class="nd">justin_smith</td><td>the compromise that works best for me is arbitrary hash-maps locally (eg. within one set of tightly coupled namespaces in one project) and schemas / defrecords between subsystems, enforcing specific keys or even using types instead of mappy things</td></tr>
+<tr id="t1313A" class="h r"><td><a href="#t1313A">13:13</a></td><td class="nd">justin_smith</td><td>kind of like how shorter names are OK in small scopes but as scope gets larger you want more and more description in a name</td></tr>
+<tr id="t1313A" class="h"><td><a href="#t1313A">13:13</a></td><td class="n9">TimMc</td><td>osfameron: Yeah, weakly typed and some related stuff. If I had schemas on all this code, I could find references to the schemas...</td></tr>
+<tr id="t1313A" class="h"><td><a href="#t1313A">13:13</a></td><td class="nd">justin_smith</td><td>plain-old-arbitrary-data is great in small scopes, more reification and validation of structures is good for things that crosses boundaries</td></tr>
+<tr id="t1314A" class="h r"><td><a href="#t1314A">13:14</a></td><td class="nd">justin_smith</td><td>haha</td></tr>
+<tr id="t1314A" class="h"><td><a href="#t1314A">13:14</a></td><td class="n7">osfameron</td><td>justin_smith: interesthing - though again, at odds with dysfun's comment that it's the *weakly* typed stuff that is trivial to serialize and pass as JSON ;-)</td></tr>
+<tr id="t1314A" class="h"><td><a href="#t1314A">13:14</a></td><td class="ns">technomancy</td><td>also we need letrec</td></tr>
+<tr id="t1314A" class="h"><td><a href="#t1314A">13:14</a></td><td class="n7">osfameron</td><td>the French painter? ;-P</td></tr>
+<tr id="t1315A" class="h"><td><a href="#t1315A">13:15</a></td><td class="nb">dysfun</td><td>no, we don't need letrec, we need letnonrec</td></tr>
+<tr id="t1315A" class="h"><td><a href="#t1315A">13:15</a></td><td class="nd">justin_smith</td><td>osfameron: right, I think more structure at boundaries and less in the implementation is the path to sanity, not the opposite</td></tr>
+<tr id="t1315A" class="h"><td><a href="#t1315A">13:15</a></td><td class="n9">TimMc</td><td>so we should use SOAP is what I'm hearing</td></tr>
+<tr id="t1315A" class="h"><td><a href="#t1315A">13:15</a></td><td class="ns">technomancy</td><td>dysfun: reference to <a href="https://news.ycombinator.com/item?id=8226934">https://news.ycombinator.com/item?id=8226934</a></td></tr>
+<tr id="t1315A" class="h"><td><a href="#t1315A">13:15</a></td><td class="nd">justin_smith</td><td>oh man...</td></tr>
+<tr id="t1316A" class="h"><td><a href="#t1316A">13:16</a></td><td class="n7">osfameron</td><td>TimMc: eeeeek!</td></tr>
+<tr id="t1318A" class="h"><td><a href="#t1318A">13:18</a></td><td class="nb">dysfun</td><td>shouldn't you sit *on* the sofa to watch doctor who?</td></tr>
+<tr id="t1318A" class="h"><td><a href="#t1318A">13:18</a></td><td class="nd">justin_smith</td><td>TimMc: SOAP is terrible, but I'd still want the type checking at the edges to be strictest - because that's where you get the real cascading problems, is stuff that comes from furthest away, because you need to read unrelated code to understand it, and the odds that no one dev read both parts of the codebase increase...</td></tr>
+<tr id="t1318A" class="h"><td><a href="#t1318A">13:18</a></td><td class="ns">technomancy</td><td>dysfun: you start out on the sofa and you end up behind the sofa once the daleks show up</td></tr>
+<tr id="t1318A" class="h r"><td><a href="#t1318A">13:18</a></td><td class="ns">technomancy</td><td>it's traditional</td></tr>
+<tr id="t1318A" class="h"><td><a href="#t1318A">13:18</a></td><td class="nd">justin_smith</td><td>also it's attention span friendly / uses human working memory nicely</td></tr>
+<tr id="t1319A" class="h"><td><a href="#t1319A">13:19</a></td><td class="ns">technomancy</td><td>justin_smith: starting to sound like grpc</td></tr>
+<tr id="t1319A" class="h"><td><a href="#t1319A">13:19</a></td><td class="n9">TimMc</td><td>also aparently everyone watches movies on their smartwatches or whatever these days so it's not like you need to be in any one place</td></tr>
+<tr id="t1319A" class="h"><td><a href="#t1319A">13:19</a></td><td class="nb">dysfun</td><td>yeah, there's no better experience than watching a movie on a tiny tiny screen</td></tr>
+<tr id="t1320A"><td><a href="#t1320A">13:20</a></td><td class="n9">TimMc</td><td>I pipe all YouTube videos to my NumLock light.</td></tr>
+<tr id="t1320A" class="h"><td><a href="#t1320A">13:20</a></td><td class="nd">justin_smith</td><td>dysfun: I assume you've seen the classic David Lynch rant <a href="https://www.youtube.com/watch?v=wKiIroiCvZ0">https://www.youtube.com/watch?v=wKiIroiCvZ0</a></td></tr>
+<tr id="t1320A" class="h r"><td><a href="#t1320A">13:20</a></td><td class="nd">justin_smith</td><td>technomancy: I'm unfamiliar... is it any good?</td></tr>
+<tr id="t1320A" class="h"><td><a href="#t1320A">13:20</a></td><td class="ns">technomancy</td><td>justin_smith: well... no? maybe? I don't know.</td></tr>
+<tr id="t1321A" class="h r"><td><a href="#t1321A">13:21</a></td><td class="ns">technomancy</td><td>it has some neat features, but protobufs are annoying.</td></tr>
+<tr id="t1321A" class="h r"><td><a href="#t1321A">13:21</a></td><td class="ns">technomancy</td><td>grpc alone is pretty nice; it gives you distributed tracing, cancellation of requests, automated backoff, etc</td></tr>
+<tr id="t1322A" class="h r"><td><a href="#t1322A">13:22</a></td><td class="ns">technomancy</td><td>but it's usually paired with protobufs which are efficient but extremely awkward to use from clojure</td></tr>
+<tr id="t1322A" class="h r"><td><a href="#t1322A">13:22</a></td><td class="ns">technomancy</td><td>I think grpc with edn or transit would be pretty nice</td></tr>
+<tr id="t1322A" class="h"><td><a href="#t1322A">13:22</a></td><td class="nb">dysfun</td><td>s/to use from clojure// # FTFY</td></tr>
+<tr id="t1322A" class="h"><td><a href="#t1322A">13:22</a></td><td class="ns">technomancy</td><td>with specs at the service boundaries, of course</td></tr>
+<tr id="t1322A" class="h"><td><a href="#t1322A">13:22</a></td><td class="nd">justin_smith</td><td>of course</td></tr>
+<tr id="t1323A" class="h"><td><a href="#t1323A">13:23</a></td><td class="ns">technomancy</td><td>the problem is if you use protobufs then people think that means you don't need spec, but protobufs are lame</td></tr>
+<tr id="t1323A" class="h"><td><a href="#t1323A">13:23</a></td><td class="nb">dysfun</td><td>nah, you need to generate protocolbuffers from specs</td></tr>
+<tr id="t1323A" class="h"><td><a href="#t1323A">13:23</a></td><td class="ns">technomancy</td><td>hm... now there's an idea</td></tr>
+<tr id="t1323A" class="h"><td><a href="#t1323A">13:23</a></td><td class="nb">dysfun</td><td>because specs are better than types</td></tr>
+<tr id="t1324A" class="h"><td><a href="#t1324A">13:24</a></td><td class="nd">justin_smith</td><td>the system I have in development now uses transit event sourcing on kafka topics to build a state deterministically from a log, and all the job logic is driven by the state in a model derived from petri nets (pool of available workers, pool of jobs, join the two to represent an &quot;in progress&quot; object, etc.)</td></tr>
+<tr id="t1324A" class="h"><td><a href="#t1324A">13:24</a></td><td class="ns">technomancy</td><td>is it common to keep specs for a service in a separate dependency artifact from any implementation?</td></tr>
+<tr id="t1324A" class="h"><td><a href="#t1324A">13:24</a></td><td class="nd">justin_smith</td><td>where the jobs and workers and in progress tasks are all reified in a hash map that is guaranteed identical in every process</td></tr>
+<tr id="t1325A" class="h"><td><a href="#t1325A">13:25</a></td><td class="nb">dysfun</td><td>technomancy: i haven't seen anyone do that yet</td></tr>
+<tr id="t1325A" class="h"><td><a href="#t1325A">13:25</a></td><td class="nd">justin_smith</td><td>technomancy: I do this for things that talk to two separate codebases, I have app a, app b, and then schemas c which is referenced by a and b</td></tr>
+<tr id="t1325A" class="h r"><td><a href="#t1325A">13:25</a></td><td class="nd">justin_smith</td><td>this was designed before spec though</td></tr>
+<tr id="t1326A" class="h r"><td><a href="#t1326A">13:26</a></td><td class="nd">justin_smith</td><td>that seems likea pretty natural choice</td></tr>
+<tr id="t1326A" class="h r"><td><a href="#t1326A">13:26</a></td><td class="nd">justin_smith</td><td>I think spec is a bit too new for there to be real systems with N&gt;1 apps in communication and specs in between</td></tr>
+<tr id="t1327A" class="h"><td><a href="#t1327A">13:27</a></td><td class="nd">hiredman</td><td>itym the tooling for protobufs is lame</td></tr>
+<tr id="t1327A" class="h"><td><a href="#t1327A">13:27</a></td><td class="ns">technomancy</td><td>surely N=2 isn't that rare?</td></tr>
+<tr id="t1327A" class="h"><td><a href="#t1327A">13:27</a></td><td class="nd">justin_smith</td><td>oh yeah, some people put their cljs in separate apps right</td></tr>
+<tr id="t1328A" class="h"><td><a href="#t1328A">13:28</a></td><td class="ns">technomancy</td><td>hiredman: well sure, but what motivation to improve the tooling is there? even if it were decent it still isn't very compelling vs transit or msgpack</td></tr>
+<tr id="t1335A"><td><a href="#t1335A">13:35</a></td><td class="nd">hiredman</td><td>yeah, I am not sure for message passing kind of things, I am thinking more about storing data, I've had bad experiences processing lots of edn</td></tr>
+<tr id="t1336A" class="h"><td><a href="#t1336A">13:36</a></td><td class="ns">technomancy</td><td>interesting; yeah that's different</td></tr>
+<tr id="t1340A"><td><a href="#t1340A">13:40</a></td><td class="ne">gpk</td><td>Is Clojure any good for small command line programs? I'm thinking that the jvm overhead would be too high</td></tr>
+<tr id="t1340A" class="h"><td><a href="#t1340A">13:40</a></td><td class="nd">justin_smith</td><td>the jvm overhead is fine! it's the clojure compiler that's too heavy for that</td></tr>
+<tr id="t1341A" class="h r"><td><a href="#t1341A">13:41</a></td><td class="nd">justin_smith</td><td>though cljs + node for command line can work (see for example lumo which is a self hosting clojurescript you can install via npm)</td></tr>
+<tr id="t1341A" class="h"><td><a href="#t1341A">13:41</a></td><td class="ns">technomancy</td><td>I would recommend racket or ocaml for small programs instead</td></tr>
+<tr id="t1341A" class="h"><td><a href="#t1341A">13:41</a></td><td class="nd">justin_smith</td><td>yeah, ocaml is great for small things that have to start up quickly</td></tr>
+<tr id="t1341A" class="h"><td><a href="#t1341A">13:41</a></td><td class="ne">gpk</td><td>I currently use python</td></tr>
+<tr id="t1341A" class="h"><td><a href="#t1341A">13:41</a></td><td class="nd">hiredman</td><td>it depends on what you find acceptable</td></tr>
+<tr id="t1341A" class="h"><td><a href="#t1341A">13:41</a></td><td class="ne">gpk</td><td>Or C</td></tr>
+<tr id="t1342A" class="h"><td><a href="#t1342A">13:42</a></td><td class="nd">hiredman</td><td>I write a lot of command line stuff in clojure, but most of it is sort of fire in forget or it is a long running task anyway</td></tr>
+<tr id="t1344A" class="h"><td><a href="#t1344A">13:44</a></td><td class="ne">gpk</td><td>justin_smith: can one not compile clojure ahead of time?</td></tr>
+<tr id="t1345A" class="h"><td><a href="#t1345A">13:45</a></td><td class="nd">justin_smith</td><td>you can, but there's still a certain amount of bootstrapping of clojure itself</td></tr>
+<tr id="t1346A" class="h"><td><a href="#t1346A">13:46</a></td><td class="ne">gpk</td><td>What's it like compared to SBCL binaries?</td></tr>
+<tr id="t1346A" class="h r"><td><a href="#t1346A">13:46</a></td><td class="ne">gpk</td><td>Those are actually fast enough even though they are huge</td></tr>
+<tr id="t1347A" class="h"><td><a href="#t1347A">13:47</a></td><td class="nd">justin_smith</td><td>it's not the size, it's the amount of work done on startup, and there's nothing outside of experimental unofficial forks that eliminate that startup work</td></tr>
+<tr id="t1347A" class="h"><td><a href="#t1347A">13:47</a></td><td class="ne">gpk</td><td>I'm wondering what project I'm going to rewrite to teach me clojure, by the way</td></tr>
+<tr id="t1350A"><td><a href="#t1350A">13:50</a></td><td class="ns">technomancy</td><td>sbcl just dumps its whole memory image, right?</td></tr>
+<tr id="t1350A" class="h r"><td><a href="#t1350A">13:50</a></td><td class="ns">technomancy</td><td>I don't think you can come close to that on the jvm</td></tr>
+<tr id="t1350A" class="h"><td><a href="#t1350A">13:50</a></td><td class="ne">gpk</td><td>Yeah</td></tr>
+<tr id="t1350A" class="h r"><td><a href="#t1350A">13:50</a></td><td class="ne">gpk</td><td>As far as I understand</td></tr>
+<tr id="t1351A" class="h"><td><a href="#t1351A">13:51</a></td><td class="ns">technomancy</td><td>gpk: do you have a use case in mind or is this more of just a general question?</td></tr>
+<tr id="t1353A" class="h"><td><a href="#t1353A">13:53</a></td><td class="ne">gpk</td><td>Just a general question... It would be nice to use Lisp instead of Python</td></tr>
+<tr id="t1353A" class="h r"><td><a href="#t1353A">13:53</a></td><td class="ne">gpk</td><td>But I write a lot of tiny things</td></tr>
+<tr id="t1353A" class="h"><td><a href="#t1353A">13:53</a></td><td class="ns">technomancy</td><td>IMO racket is a much better python replacement</td></tr>
+<tr id="t1354A" class="h r"><td><a href="#t1354A">13:54</a></td><td class="ns">technomancy</td><td>or hylang of course</td></tr>
+<tr id="t1354A" class="h"><td><a href="#t1354A">13:54</a></td><td class="ne">gpk</td><td>Unfortunately racket is not cool...</td></tr>
+<tr id="t1354A" class="h r"><td><a href="#t1354A">13:54</a></td><td class="ne">gpk</td><td>Sounds stupid, I know</td></tr>
+<tr id="t1355A" class="h"><td><a href="#t1355A">13:55</a></td><td class="ns">technomancy</td><td>racket is h*ckin' cool; you take that back</td></tr>
+<tr id="t1355A" class="h"><td><a href="#t1355A">13:55</a></td><td class="ne">gpk</td><td>*I* know it's cool</td></tr>
+<tr id="t1355A" class="h"><td><a href="#t1355A">13:55</a></td><td class="ns">technomancy</td><td>but if it's not cool enough you could always try...</td></tr>
+<tr id="t1355A" class="h r"><td><a href="#t1355A">13:55</a></td><td class="ns">technomancy</td><td>rackjure!</td></tr>
+<tr id="t1355A" class="h"><td><a href="#t1355A">13:55</a></td><td class="ne">gpk</td><td>Unfortunately nobody will pay me to write Racket</td></tr>
+<tr id="t1356A" class="h"><td><a href="#t1356A">13:56</a></td><td class="ns">technomancy</td><td><a href="http://docs.racket-lang.org/rackjure/index.html">http://docs.racket-lang.org/rackjure/index.html</a> &lt;- racket with sunglasses on</td></tr>
+<tr id="t1356A" class="h"><td><a href="#t1356A">13:56</a></td><td class="ne">gpk</td><td>*won't</td></tr>
+<tr id="t1358A" class="h r"><td><a href="#t1358A">13:58</a></td><td class="ne">gpk</td><td>So I think Clojure sits more where CL is</td></tr>
+<tr id="t1359A" class="h r"><td><a href="#t1359A">13:59</a></td><td class="ne">gpk</td><td>Which is good because it does some things better than CL I think</td></tr>
+<tr id="t1359A" class="h r"><td><a href="#t1359A">13:59</a></td><td class="ne">gpk</td><td>I always thought it would be cool to get paid to write Lisp as well</td></tr>
+<tr id="t1405A"><td><a href="#t1405A">14:05</a></td><td class="n7">osfameron</td><td>&lt;dysfun&gt; because specs are better than types &lt;-- oh?</td></tr>
+<tr id="t1407A" class="h"><td><a href="#t1407A">14:07</a></td><td class="nb">dysfun</td><td>osfameron: (not serious)</td></tr>
+<tr id="t1407A" class="h r"><td><a href="#t1407A">14:07</a></td><td class="nb">dysfun</td><td>it's one of my current pet peeves that people keep saying this when it blatantly isn't true</td></tr>
+<tr id="t1408A" class="h"><td><a href="#t1408A">14:08</a></td><td class="n7">osfameron</td><td>ah</td></tr>
+<tr id="t1409A" class="h"><td><a href="#t1409A">14:09</a></td><td class="ns">technomancy</td><td>huh; refactor-nrepl claims to be able to do slamhound-type things</td></tr>
+<tr id="t1409A" class="h r"><td><a href="#t1409A">14:09</a></td><td class="ns">technomancy</td><td>this looks pretty nice; does it work well?</td></tr>
+<tr id="t1411A" class="r"><td><a href="#t1411A">14:11</a></td><td class="ns">technomancy</td><td>apparently not?</td></tr>
+<tr id="t1411A" class="h"><td><a href="#t1411A">14:11</a></td><td class="nb">dysfun</td><td>you may be overestimating how many people have tried it</td></tr>
+<tr id="t1412A" class="h"><td><a href="#t1412A">14:12</a></td><td class="ns">technomancy</td><td>no, I mean I tried it and it doesn't work</td></tr>
+<tr id="t1412A" class="h"><td><a href="#t1412A">14:12</a></td><td class="nb">dysfun</td><td>oh, heh</td></tr>
+<tr id="t1412A" class="h"><td><a href="#t1412A">14:12</a></td><td class="ns">technomancy</td><td>why the heck would a query for find-usages require a namespace/name *and* a filename, line number, and column number?</td></tr>
+<tr id="t1413A" class="h"><td><a href="#t1413A">14:13</a></td><td class="np">Frozenlock</td><td>technomancy: slamhound?</td></tr>
+<tr id="t1413A" class="h r"><td><a href="#t1413A">14:13</a></td><td class="np">Frozenlock</td><td>oh <a href="https://github.com/technomancy/slamhound">https://github.com/technomancy/slamhound</a></td></tr>
+<tr id="t1414A" class="h"><td><a href="#t1414A">14:14</a></td><td class="n7">osfameron</td><td>&quot;Slamhound rips your ns form apart and reconstructs it. No Dutch surgeon required.&quot;  (I have no idea what that means, which makes the description a little bit less useful than something, er, descriptive, but it sounds cool, I guess)</td></tr>
+<tr id="t1414A" class="h"><td><a href="#t1414A">14:14</a></td><td class="nb">dysfun</td><td>osfameron: essentially it will rewrite your imports</td></tr>
+<tr id="t1415A" class="h"><td><a href="#t1415A">14:15</a></td><td class="ns">technomancy</td><td>the &quot;usage&quot; section has a demo</td></tr>
+<tr id="t1417A" class="h"><td><a href="#t1417A">14:17</a></td><td class="n7">osfameron</td><td>I think the first time I looked at the docs I gave up by then as I didn't know what problem it was trying to solve</td></tr>
+<tr id="t1423A" class="r"><td><a href="#t1423A">14:23</a></td><td class="n7">osfameron</td><td>ah I see, it's the &quot;tidy up imports&quot; function that some IDEs have</td></tr>
+<tr id="t1423A" class="h r"><td><a href="#t1423A">14:23</a></td><td class="n7">osfameron</td><td>I've occasionally wanted that, will try vim-slamhound</td></tr>
+<tr id="t1424A" class="h r"><td><a href="#t1424A">14:24</a></td><td class="n7">osfameron</td><td>(still don't think the project description sells it well though ;-)</td></tr>
+<tr id="t1426A" class="h"><td><a href="#t1426A">14:26</a></td><td class="ns">technomancy</td><td>it's not quite like Java's &quot;tidy up imports&quot; because the implementation is a brute-force recompile-all-the-things, so I felt a metaphor of violence was appropriate</td></tr>
+<tr id="t1426A" class="h"><td><a href="#t1426A">14:26</a></td><td class="np">Frozenlock</td><td>technomancy: refactor-nrepl did pretty well when I left it 'guess' namespaces. Granted it was always with the canned solutions (str -&gt; clojure.string) or with namespaces I was already using elsewhere in the project.</td></tr>
+<tr id="t1426A" class="h"><td><a href="#t1426A">14:26</a></td><td class="nd">TEttinger</td><td>dysfun: depends on what types you mean. I'm sure specs are better than some type systems. JS' for instance...</td></tr>
+<tr id="t1427A" class="h"><td><a href="#t1427A">14:27</a></td><td class="ns">technomancy</td><td>Frozenlock: I'm more interested in the find-usages</td></tr>
+<tr id="t1429A" class="h r"><td><a href="#t1429A">14:29</a></td><td class="ns">technomancy</td><td>so yeah... this just doesn't work as documented</td></tr>
+<tr id="t1429A" class="h r"><td><a href="#t1429A">14:29</a></td><td class="ns">technomancy</td><td>too bad</td></tr>
+<tr id="t1442A"><td><a href="#t1442A">14:42</a></td><td class="n6">lxsameer</td><td>which protocol is related to a derefable value ?</td></tr>
+<tr id="t1450A"><td><a href="#t1450A">14:50</a></td><td class="nd">justin_smith</td><td>lxsameer: the easiest way to check is with supers</td></tr>
+<tr id="t1451A" class="h r"><td><a href="#t1451A">14:51</a></td><td class="nd">justin_smith</td><td>eg. (supers (class (future))) and (supers (class (atom nil)))</td></tr>
+<tr id="t1451A" class="h"><td><a href="#t1451A">14:51</a></td><td class="ns">technomancy</td><td>boom; had lein refuse to download a transitive dependency that used a non-TLS repo which wasn't directly visible in project.clj</td></tr>
+<tr id="t1451A" class="h r"><td><a href="#t1451A">14:51</a></td><td class="ns">technomancy</td><td>woot</td></tr>
+<tr id="t1451A" class="h"><td><a href="#t1451A">14:51</a></td><td class="nd">justin_smith</td><td>nice</td></tr>
+<tr id="t1452A" class="h"><td><a href="#t1452A">14:52</a></td><td class="ns">technomancy</td><td>coincidentally nice that the first time this occurred I happened to be on coffee shop wifi</td></tr>
+<tr id="t1452A" class="h"><td><a href="#t1452A">14:52</a></td><td class="n6">lxsameer</td><td>justin_smith: thanks a lot man</td></tr>
+<tr id="t1454A" class="h"><td><a href="#t1454A">14:54</a></td><td class="np">Frozenlock</td><td>technomancy: living dangerously</td></tr>
+<tr id="t1455A" class="h"><td><a href="#t1455A">14:55</a></td><td class="ns">technomancy</td><td>Frozenlock: it would be dangerous, if I weren't using this new version of lein that refuses to do idiotic things for me =)</td></tr>
+<tr id="t1455A" class="h r"><td><a href="#t1455A">14:55</a></td><td class="ns">technomancy</td><td>idiotic things which every actually-released version of lein will happily go ahead and do =(</td></tr>
+<tr id="t1458A" class="h"><td><a href="#t1458A">14:58</a></td><td class="n6">lxsameer</td><td>is a custom type which defined with deftype</td></tr>
+<tr id="t1458A" class="h r"><td><a href="#t1458A">14:58</a></td><td class="n6">lxsameer</td><td>mutable ?</td></tr>
+<tr id="t1458A" class="h"><td><a href="#t1458A">14:58</a></td><td class="nd">justin_smith</td><td>types aren't mutable, but deftype fields can be</td></tr>
+<tr id="t1459A" class="h r"><td><a href="#t1459A">14:59</a></td><td class="nd">justin_smith</td><td>optionally</td></tr>
+<tr id="t1459A" class="h"><td><a href="#t1459A">14:59</a></td><td class="n6">lxsameer</td><td>justin_smith: ow, thanks</td></tr>
+<tr id="t1539A"><td><a href="#t1539A">15:39</a></td><td class="nf">ridcully_</td><td>osfameron: it also tries to do :refer etc.  e.g. write &gt;! somewhere, slamhound adds async with a refer.  or use str/join and it will require clojure.string as str etc</td></tr>
+<tr id="t1549A"><td><a href="#t1549A">15:49</a></td><td class="n7">osfameron</td><td>ah, it has a catalogue of common functions?</td></tr>
+<tr id="t1549A" class="h"><td><a href="#t1549A">15:49</a></td><td class="nf">ridcully_</td><td>dunno.  i'd guess it just looks around</td></tr>
+<tr id="t1550A" class="r"><td><a href="#t1550A">15:50</a></td><td class="nf">ridcully_</td><td>not sure, if it does the same thing for imports too</td></tr>
+<tr id="t1610A"><td><a href="#t1610A">16:10</a></td><td class="nz">octarinemole</td><td>hello everyone! i have this strange question: why is (&lt;= 0.1 1/10) true but all of (&lt; 0.1 1/10), (= 0.1 1/10) and (&gt; 0.1 1/10) are false?</td></tr>
+<tr id="t1611A" class="h"><td><a href="#t1611A">16:11</a></td><td class="nx">Para_</td><td>Clojure has fractional type support.</td></tr>
+<tr id="t1611A" class="h r"><td><a href="#t1611A">16:11</a></td><td class="nx">Para_</td><td>Or rather, rational.</td></tr>
+<tr id="t1611A" class="h r"><td><a href="#t1611A">16:11</a></td><td class="nx">Para_</td><td>,(type (/ 1 3))</td></tr>
+<tr id="t1611A" class="h"><td><a href="#t1611A">16:11</a></td><td class="nl">clojurebot</td><td>clojure.lang.Ratio</td></tr>
+<tr id="t1612A" class="h"><td><a href="#t1612A">16:12</a></td><td class="nz">octarinemole</td><td>,(&lt;= 0.1 1/10)</td></tr>
+<tr id="t1612A" class="h"><td><a href="#t1612A">16:12</a></td><td class="nl">clojurebot</td><td>true</td></tr>
+<tr id="t1612A" class="h"><td><a href="#t1612A">16:12</a></td><td class="nz">octarinemole</td><td>if that's true, shouldn't also one of the following be true?</td></tr>
+<tr id="t1612A" class="h"><td><a href="#t1612A">16:12</a></td><td class="nx">Para_</td><td>&quot;is equal&quot; of that part matches</td></tr>
+<tr id="t1612A" class="h"><td><a href="#t1612A">16:12</a></td><td class="nz">octarinemole</td><td>,(&lt; 0.1 1/10)</td></tr>
+<tr id="t1612A" class="h"><td><a href="#t1612A">16:12</a></td><td class="nl">clojurebot</td><td>false</td></tr>
+<tr id="t1612A" class="h"><td><a href="#t1612A">16:12</a></td><td class="nz">octarinemole</td><td>,(= 0.1 1/10)</td></tr>
+<tr id="t1612A" class="h"><td><a href="#t1612A">16:12</a></td><td class="nl">clojurebot</td><td>false</td></tr>
+<tr id="t1612A" class="h"><td><a href="#t1612A">16:12</a></td><td class="nx">Para_</td><td>No.</td></tr>
+<tr id="t1612A" class="h r"><td><a href="#t1612A">16:12</a></td><td class="nx">Para_</td><td>That's not how that works in any language :)</td></tr>
+<tr id="t1613A" class="h"><td><a href="#t1613A">16:13</a></td><td class="nz">octarinemole</td><td>why is that? (sorry, it just looks mathematically pleasing...)</td></tr>
+<tr id="t1613A" class="h"><td><a href="#t1613A">16:13</a></td><td class="nx">Para_</td><td>It reads out loud &quot;is equal OR smaller than&quot;</td></tr>
+<tr id="t1613A" class="h r"><td><a href="#t1613A">16:13</a></td><td class="nx">Para_</td><td>so it's (or (&lt; 0.1 1/10) (= 0.1 1/10))</td></tr>
+<tr id="t1613A" class="h r"><td><a href="#t1613A">16:13</a></td><td class="nx">Para_</td><td>,(or (&lt; 0.1 1/10) (= 0.1 1/10))</td></tr>
+<tr id="t1613A" class="h"><td><a href="#t1613A">16:13</a></td><td class="nl">clojurebot</td><td>false</td></tr>
+<tr id="t1613A" class="h"><td><a href="#t1613A">16:13</a></td><td class="nz">octarinemole</td><td>yes, so either (= 0.1 1/10) or (&lt; 0.1 1/10) should be true as well, shouldn't it?</td></tr>
+<tr id="t1614A" class="h"><td><a href="#t1614A">16:14</a></td><td class="nx">Para_</td><td>...well probably the other way around but anyhow</td></tr>
+<tr id="t1614A" class="h"><td><a href="#t1614A">16:14</a></td><td class="nz">octarinemole</td><td>there you go, you get</td></tr>
+<tr id="t1614A" class="h"><td><a href="#t1614A">16:14</a></td><td class="nf">ridcully_</td><td>,(== 0.1 1/10)</td></tr>
+<tr id="t1614A" class="h"><td><a href="#t1614A">16:14</a></td><td class="nl">clojurebot</td><td>true</td></tr>
+<tr id="t1614A" class="h"><td><a href="#t1614A">16:14</a></td><td class="nz">octarinemole</td><td>,(= (&lt;= 0.1 1/10) (or (&lt; 0.1 1/10) (= 0.1 1/10)))</td></tr>
+<tr id="t1614A" class="h"><td><a href="#t1614A">16:14</a></td><td class="nl">clojurebot</td><td>false</td></tr>
+<tr id="t1614A" class="h"><td><a href="#t1614A">16:14</a></td><td class="nx">Para_</td><td>,(or (= 0.1 1/10) (&lt; 0.1 1/10))</td></tr>
+<tr id="t1614A" class="h"><td><a href="#t1614A">16:14</a></td><td class="nl">clojurebot</td><td>false</td></tr>
+<tr id="t1614A" class="h"><td><a href="#t1614A">16:14</a></td><td class="nx">Para_</td><td>Hum.</td></tr>
+<tr id="t1614A" class="h r"><td><a href="#t1614A">16:14</a></td><td class="nx">Para_</td><td>Well anyway. The &lt;= is not decomposable.</td></tr>
+<tr id="t1615A" class="h r"><td><a href="#t1615A">16:15</a></td><td class="nx">Para_</td><td>&lt; and = are not the same as &lt;= in a sense; it goes into land of type coersions</td></tr>
+<tr id="t1615A" class="h"><td><a href="#t1615A">16:15</a></td><td class="nz">octarinemole</td><td>i see...</td></tr>
+<tr id="t1615A" class="h"><td><a href="#t1615A">16:15</a></td><td class="nx">Para_</td><td>Just read it out loud and don't think everything can be split into parts.</td></tr>
+<tr id="t1615A" class="h r"><td><a href="#t1615A">16:15</a></td><td class="nx">Para_</td><td>You're not Aristotle, atoms have already been discovered :)</td></tr>
+<tr id="t1615A" class="h"><td><a href="#t1615A">16:15</a></td><td class="nz">octarinemole</td><td>ok, well, thanks</td></tr>
+<tr id="t1616A" class="h"><td><a href="#t1616A">16:16</a></td><td class="nd">TEttinger</td><td>ridcully_ had it</td></tr>
+<tr id="t1616A" class="h"><td><a href="#t1616A">16:16</a></td><td class="nf">ridcully_</td><td>,(BigDecimal. 0.1)</td></tr>
+<tr id="t1616A" class="h"><td><a href="#t1616A">16:16</a></td><td class="nl">clojurebot</td><td>0.1000000000000000055511151231257827021181583404541015625M</td></tr>
+<tr id="t1616A" class="h"><td><a href="#t1616A">16:16</a></td><td class="nx">Para_</td><td>Yeah there's that.</td></tr>
+<tr id="t1616A" class="h"><td><a href="#t1616A">16:16</a></td><td class="nz">octarinemole</td><td>that is why i chose 0.1 in the first place...</td></tr>
+<tr id="t1616A" class="h"><td><a href="#t1616A">16:16</a></td><td class="nd">TEttinger</td><td>octarinemole: there's 0.1M for higher precision easily</td></tr>
+<tr id="t1616A" class="h"><td><a href="#t1616A">16:16</a></td><td class="nz">octarinemole</td><td>i just expected some properties of the comparison operators which are apparently not there</td></tr>
+<tr id="t1616A" class="h"><td><a href="#t1616A">16:16</a></td><td class="nd">TEttinger</td><td>but yeah == is mathematical equality</td></tr>
+<tr id="t1617A" class="h"><td><a href="#t1617A">16:17</a></td><td class="nx">Para_</td><td>Well it applies to all languages as well, if you care about fractions/ratios, make sure you work with compatible types at all points.</td></tr>
+<tr id="t1617A" class="h"><td><a href="#t1617A">16:17</a></td><td class="nd">TEttinger</td><td>I believe &lt;= is the or of &lt; and ==</td></tr>
+<tr id="t1617A" class="h"><td><a href="#t1617A">16:17</a></td><td class="ns">technomancy</td><td>Para_: most languages don't have ratios</td></tr>
+<tr id="t1617A" class="h"><td><a href="#t1617A">16:17</a></td><td class="nx">Para_</td><td>,(or (== 0.1 1/10) (&lt; 0.1 1/10))</td></tr>
+<tr id="t1617A" class="h"><td><a href="#t1617A">16:17</a></td><td class="nl">clojurebot</td><td>true</td></tr>
+<tr id="t1617A" class="h"><td><a href="#t1617A">16:17</a></td><td class="nx">Para_</td><td>technomancy: That's their downfall :)</td></tr>
+<tr id="t1617A" class="h"><td><a href="#t1617A">16:17</a></td><td class="nz">octarinemole</td><td>@TEttinger ok, thanks, i think that helps me a lot!</td></tr>
+<tr id="t1617A" class="h"><td><a href="#t1617A">16:17</a></td><td class="nd">TEttinger</td><td>since &lt;= is mathematical, not as general as =</td></tr>
+<tr id="t1617A" class="h"><td><a href="#t1617A">16:17</a></td><td class="ns">technomancy</td><td>Para_: I would say that having decimal literals default to floats is the downfall</td></tr>
+<tr id="t1618A" class="h r"><td><a href="#t1618A">16:18</a></td><td class="ns">technomancy</td><td>it's much better to default to accuracy and opt-in to speed</td></tr>
+<tr id="t1618A" class="h"><td><a href="#t1618A">16:18</a></td><td class="np">Frozenlock</td><td>indeed</td></tr>
+<tr id="t1619A" class="h r"><td><a href="#t1619A">16:19</a></td><td class="np">Frozenlock</td><td>Most people that first come to a computer won't have the reflex of saying &quot;hmm, I wonder if the computer will lie to me and NOT register the number as I entered it.&quot;</td></tr>
+<tr id="t1619A" class="h"><td><a href="#t1619A">16:19</a></td><td class="nz">octarinemole</td><td>:)</td></tr>
+<tr id="t1619A" class="h"><td><a href="#t1619A">16:19</a></td><td class="nx">Para_</td><td>technomancy: That's why Groovy defaults to BigDecimals with actual accurate precision, as well.</td></tr>
+<tr id="t1619A" class="h"><td><a href="#t1619A">16:19</a></td><td class="ns">technomancy</td><td>Para_: huh; that's the first sensible thing I've heard about it =)</td></tr>
+<tr id="t1619A" class="h"><td><a href="#t1619A">16:19</a></td><td class="nx">Para_</td><td>Frozenlock: Well most people are really technically inept as well.</td></tr>
+<tr id="t1619A" class="h r"><td><a href="#t1619A">16:19</a></td><td class="nx">Para_</td><td>&quot;WHERE IS THE FACEBOOK BUTTON&quot;</td></tr>
+<tr id="t1620A"><td><a href="#t1620A">16:20</a></td><td class="np">Frozenlock</td><td>Para_: right, so we shouldn't make it harder.</td></tr>
+<tr id="t1620A" class="h"><td><a href="#t1620A">16:20</a></td><td class="nx">Para_</td><td>They won't understand the difference or what it entails.</td></tr>
+<tr id="t1620A" class="h r"><td><a href="#t1620A">16:20</a></td><td class="nx">Para_</td><td>So don't waste your tiime.</td></tr>
+<tr id="t1634A"><td><a href="#t1634A">16:34</a></td><td class="nk">IamDrowsy</td><td>I just had a look at the Clojure source and actually (= 0.1 1/10) resulting to false has nothing todo with 0.1 not being exact</td></tr>
+<tr id="t1634A" class="h r"><td><a href="#t1634A">16:34</a></td><td class="nk">IamDrowsy</td><td>,(= 1/2 0.5)</td></tr>
+<tr id="t1634A" class="h"><td><a href="#t1634A">16:34</a></td><td class="nl">clojurebot</td><td>false</td></tr>
+<tr id="t1635A" class="h"><td><a href="#t1635A">16:35</a></td><td class="nk">IamDrowsy</td><td>equal (=) check for the category of a number (Integer, Floating, Ratio, Decimal) and will always give false when it doesn't match</td></tr>
+<tr id="t1636A" class="h"><td><a href="#t1636A">16:36</a></td><td class="ns">technomancy</td><td>IamDrowsy: depends how you define your terms; &quot;inexact&quot; is commonly used to describe types rather than values</td></tr>
+<tr id="t1636A" class="h"><td><a href="#t1636A">16:36</a></td><td class="nf">ridcully_</td><td>,(= 1M 1)</td></tr>
+<tr id="t1636A" class="h"><td><a href="#t1636A">16:36</a></td><td class="nl">clojurebot</td><td>false</td></tr>
+<tr id="t1637A" class="h"><td><a href="#t1637A">16:37</a></td><td class="nd">justin_smith</td><td>(= 1N 1)</td></tr>
+<tr id="t1637A" class="h r"><td><a href="#t1637A">16:37</a></td><td class="nd">justin_smith</td><td>,(= 1N 1)</td></tr>
+<tr id="t1637A" class="h"><td><a href="#t1637A">16:37</a></td><td class="nl">clojurebot</td><td>true</td></tr>
+<tr id="t1639A" class="h"><td><a href="#t1639A">16:39</a></td><td class="nz">octarinemole</td><td>,(== 0 (- 0.1 1/10))</td></tr>
+<tr id="t1639A" class="h"><td><a href="#t1639A">16:39</a></td><td class="nl">clojurebot</td><td>true</td></tr>
+<tr id="t1639A" class="h"><td><a href="#t1639A">16:39</a></td><td class="nz">octarinemole</td><td>,(== 0 (- 0.1 (BigDecimal. 0.1)))</td></tr>
+<tr id="t1639A" class="h"><td><a href="#t1639A">16:39</a></td><td class="nl">clojurebot</td><td>true</td></tr>
+<tr id="t1639A" class="h"><td><a href="#t1639A">16:39</a></td><td class="nd">justin_smith</td><td>there's also zero?</td></tr>
+<tr id="t1639A" class="h"><td><a href="#t1639A">16:39</a></td><td class="nf">ridcully_</td><td>,(= (BigInteger. &quot;1&quot;) 1N)</td></tr>
+<tr id="t1639A" class="h"><td><a href="#t1639A">16:39</a></td><td class="nl">clojurebot</td><td>true</td></tr>
+<tr id="t1639A" class="h"><td><a href="#t1639A">16:39</a></td><td class="nz">octarinemole</td><td>these look a bit funny to me... it is like 0.1 can act as exactly one tenth, but also as &quot;roughly&quot; one tenth</td></tr>
+<tr id="t1640A"><td><a href="#t1640A">16:40</a></td><td class="nd">justin_smith</td><td>,(zero? (- 0.1 1/10))</td></tr>
+<tr id="t1640A" class="h"><td><a href="#t1640A">16:40</a></td><td class="nl">clojurebot</td><td>true</td></tr>
+<tr id="t1640A" class="h"><td><a href="#t1640A">16:40</a></td><td class="nd">justin_smith</td><td>octarinemole: before you use a double in a calculation it's other because it's less precise, after you use it it is contagious, you get a double back</td></tr>
+<tr id="t1641A" class="h"><td><a href="#t1641A">16:41</a></td><td class="ns">technomancy</td><td>justin_smith: oh man that last one</td></tr>
+<tr id="t1641A" class="h"><td><a href="#t1641A">16:41</a></td><td class="nd">justin_smith</td><td>yup</td></tr>
+<tr id="t1642A" class="h"><td><a href="#t1642A">16:42</a></td><td class="nz">octarinemole</td><td>so... in (- 0.1 1/10) I should get a non-zero double, shouldn't I?</td></tr>
+<tr id="t1643A" class="h"><td><a href="#t1643A">16:43</a></td><td class="nf">ridcully_</td><td>,(+ 0.1 2/10)</td></tr>
+<tr id="t1643A" class="h"><td><a href="#t1643A">16:43</a></td><td class="nl">clojurebot</td><td>0.30000000000000004</td></tr>
+<tr id="t1644A" class="h"><td><a href="#t1644A">16:44</a></td><td class="nz">octarinemole</td><td>it casts the fraction to a double and then does the operation?</td></tr>
+<tr id="t1646A" class="h r"><td><a href="#t1646A">16:46</a></td><td class="nz">octarinemole</td><td>funny that</td></tr>
+<tr id="t1646A" class="h r"><td><a href="#t1646A">16:46</a></td><td class="nz">octarinemole</td><td>,(class (- 0.1 (BigDecimal. 0.1))</td></tr>
+<tr id="t1646A" class="h"><td><a href="#t1646A">16:46</a></td><td class="nl">clojurebot</td><td>#&lt;RuntimeException java.lang.RuntimeException: EOF while reading&gt;</td></tr>
+<tr id="t1647A" class="h"><td><a href="#t1647A">16:47</a></td><td class="nz">octarinemole</td><td>(class (- 0.1 (BigDecimal. 0.1)))</td></tr>
+<tr id="t1647A" class="h r"><td><a href="#t1647A">16:47</a></td><td class="nz">octarinemole</td><td>,(class (- 0.1 (BigDecimal. 0.1)))</td></tr>
+<tr id="t1647A" class="h"><td><a href="#t1647A">16:47</a></td><td class="nl">clojurebot</td><td>java.lang.Double</td></tr>
+<tr id="t1647A" class="h"><td><a href="#t1647A">16:47</a></td><td class="nz">octarinemole</td><td>so it also downgrades the bigdecimal to a double when possible</td></tr>
+<tr id="t1647A" class="h"><td><a href="#t1647A">16:47</a></td><td class="nb">dysfun</td><td>when it doesn't make sense to keep it as a rational, it will convert it to a double</td></tr>
+<tr id="t1647A" class="h"><td><a href="#t1647A">16:47</a></td><td class="nz">octarinemole</td><td>,(class (- 0.1M (BigDecimal. 0.1)))</td></tr>
+<tr id="t1647A" class="h"><td><a href="#t1647A">16:47</a></td><td class="nl">clojurebot</td><td>java.math.BigDecimal</td></tr>
+<tr id="t1648A" class="h"><td><a href="#t1648A">16:48</a></td><td class="nb">dysfun</td><td>and in this case, you gave it a double first</td></tr>
+<tr id="t1648A" class="h"><td><a href="#t1648A">16:48</a></td><td class="nz">octarinemole</td><td>ok, i think i'm starting to understand it enough</td></tr>
+<tr id="t1648A" class="h r"><td><a href="#t1648A">16:48</a></td><td class="nz">octarinemole</td><td>,(class (- (BigDecimal. 0.1) 0.1))</td></tr>
+<tr id="t1648A" class="h"><td><a href="#t1648A">16:48</a></td><td class="nl">clojurebot</td><td>java.lang.Double</td></tr>
+<tr id="t1648A" class="h"><td><a href="#t1648A">16:48</a></td><td class="nf">ridcully_</td><td>i think order has nothing to do?</td></tr>
+<tr id="t1648A" class="h"><td><a href="#t1648A">16:48</a></td><td class="nb">dysfun</td><td>ah so it is</td></tr>
+<tr id="t1649A" class="h"><td><a href="#t1649A">16:49</a></td><td class="nz">octarinemole</td><td>thanks everyone!</td></tr>
+<tr id="t1649A" class="h"><td><a href="#t1649A">16:49</a></td><td class="nf">ridcully_</td><td>it will use double once one of those is there, since it gives the most wrong result</td></tr>
+<tr id="t1649A" class="h"><td><a href="#t1649A">16:49</a></td><td class="nz">octarinemole</td><td>:-D</td></tr>
+<tr id="t1649A" class="h"><td><a href="#t1649A">16:49</a></td><td class="nb">dysfun</td><td>&quot;most wrong&quot; really depends on how much of it's being used</td></tr>
+<tr id="t1649A" class="h r"><td><a href="#t1649A">16:49</a></td><td class="nb">dysfun</td><td>i would have said the logical approach would be to do the opposite</td></tr>
+<tr id="t1650A"><td><a href="#t1650A">16:50</a></td><td class="ns">technomancy</td><td>using a not-double would give the mistaken appearance of precision</td></tr>
+<tr id="t1650A" class="h"><td><a href="#t1650A">16:50</a></td><td class="nf">ridcully_</td><td>is there even a way to get a Ratio from a double?</td></tr>
+<tr id="t1651A" class="h"><td><a href="#t1651A">16:51</a></td><td class="nb">dysfun</td><td>i think &quot;mistaken&quot; depends heavily on what you're doing</td></tr>
+<tr id="t1652A" class="h r"><td><a href="#t1652A">16:52</a></td><td class="nb">dysfun</td><td>i can envision several useful scenarious for the behaviour i descirbe</td></tr>
+<tr id="t1652A" class="h"><td><a href="#t1652A">16:52</a></td><td class="ns">technomancy</td><td>without knowing about the context, using the less-exact representation is the only safe choice</td></tr>
+<tr id="t1656A" class="h"><td><a href="#t1656A">16:56</a></td><td class="nb">dysfun</td><td>i don't know, it kind of offends me slightly because i've used so many languages that auto-upgrade to bignums</td></tr>
+<tr id="t1700A"><td><a href="#t1700A">17:00</a></td><td class="nz">octarinemole</td><td>ridcully_: you can write a function that extracts the nominator and denominator from BigDecimal, then pass that to the Ratio constructor... maybe this should be built in?</td></tr>
+<tr id="t1701A" class="h"><td><a href="#t1701A">17:01</a></td><td class="nb">dysfun</td><td>that doesn't do a rario from a double</td></tr>
+<tr id="t1701A" class="h"><td><a href="#t1701A">17:01</a></td><td class="ns">technomancy</td><td>(-&gt;&gt; (for [...] (future ...)) (map deref) doall) ; &lt;- is that even ... I mean</td></tr>
+<tr id="t1701A" class="h r"><td><a href="#t1701A">17:01</a></td><td class="ns">technomancy</td><td>you're derefing every single future as it's constructed</td></tr>
+<tr id="t1702A" class="h r"><td><a href="#t1702A">17:02</a></td><td class="ns">technomancy</td><td>so... you're completely defeating the purpose of futures?</td></tr>
+<tr id="t1702A" class="h"><td><a href="#t1702A">17:02</a></td><td class="nd">justin_smith</td><td>yeah, the doall should come first</td></tr>
+<tr id="t1702A" class="h"><td><a href="#t1702A">17:02</a></td><td class="nb">dysfun</td><td>there are infinite solutions for fractions, so the best you can do is multiply it until you've eliminated the point to get the numerator and denominator</td></tr>
+<tr id="t1702A" class="h"><td><a href="#t1702A">17:02</a></td><td class="nd">justin_smith</td><td>unless you only want to work with (chunk size) futures at a time?</td></tr>
+<tr id="t1702A" class="h"><td><a href="#t1702A">17:02</a></td><td class="ns">technomancy</td><td>I always try to come up with an explanation that isn't &quot;whoever wrote this was very confused&quot; but ...</td></tr>
+<tr id="t1702A" class="h"><td><a href="#t1702A">17:02</a></td><td class="nd">hiredman</td><td>it would make sense if the doall was before the map</td></tr>
+<tr id="t1703A" class="h"><td><a href="#t1703A">17:03</a></td><td class="nd">justin_smith</td><td>technomancy: &quot;I want either 1 or 32 futures to run at a time&quot;</td></tr>
+<tr id="t1703A" class="h"><td><a href="#t1703A">17:03</a></td><td class="nd">hiredman</td><td>lazy creating futures -&gt; forcing the lazily created futures -&gt; waiting for them all to compute</td></tr>
+<tr id="t1704A" class="h r"><td><a href="#t1704A">17:04</a></td><td class="nd">hiredman</td><td>that is almost certainly what they meant to do</td></tr>
+<tr id="t1704A" class="h"><td><a href="#t1704A">17:04</a></td><td class="ns">technomancy</td><td>yeah... and chunking accidentally makes it work sorta the way they meant?</td></tr>
+<tr id="t1704A" class="h"><td><a href="#t1704A">17:04</a></td><td class="nz">octarinemole</td><td>dysfun: well, the double has finite precision, so you can definitely represent it as a fraction that way, and the methods on BigDecimal can help a lot</td></tr>
+<tr id="t1706A" class="h"><td><a href="#t1706A">17:06</a></td><td class="nd">justin_smith</td><td>oh man, that's their only tweet</td></tr>
+<tr id="t1706A" class="h r"><td><a href="#t1706A">17:06</a></td><td class="nd">justin_smith</td><td>and they just made another one...</td></tr>
+<tr id="t1707A" class="h"><td><a href="#t1707A">17:07</a></td><td class="ns">technomancy</td><td>it's like being around for a birth. such a magical moment.</td></tr>
+<tr id="t1707A" class="h"><td><a href="#t1707A">17:07</a></td><td class="np">Frozenlock</td><td>with blood and shit everywhere</td></tr>
+<tr id="t1707A" class="h r"><td><a href="#t1707A">17:07</a></td><td class="np">Frozenlock</td><td>magical</td></tr>
+<tr id="t1709A" class="h"><td><a href="#t1709A">17:09</a></td><td class="n7">osfameron</td><td>what's the big hex string on their first tweet?</td></tr>
+<tr id="t1720A"><td><a href="#t1720A">17:20</a></td><td class="nz">octarinemole</td><td>ridcully_: found it:</td></tr>
+<tr id="t1720A" class="h"><td><a href="#t1720A">17:20</a></td><td class="nd">justin_smith</td><td>they're well typed Bröwer.</td></tr>
+<tr id="t1720A" class="h"><td><a href="#t1720A">17:20</a></td><td class="nz">octarinemole</td><td>,(clojure.lang.Numbers/toRatio (BigDecimal. 0.1))</td></tr>
+<tr id="t1721A" class="h"><td><a href="#t1721A">17:21</a></td><td class="nl">clojurebot</td><td>1000000000000000055511151231257827021181583404541015625/10000000000000000000000000000000000000000000000000000000</td></tr>
+<tr id="t1721A" class="h"><td><a href="#t1721A">17:21</a></td><td class="nd">justin_smith</td><td>lol</td></tr>
+<tr id="t1722A" class="h"><td><a href="#t1722A">17:22</a></td><td class="nz">octarinemole</td><td>and somewhat embarassingly...</td></tr>
+<tr id="t1722A" class="h r"><td><a href="#t1722A">17:22</a></td><td class="nz">octarinemole</td><td>,(clojure.lang.Numbers/toRatio 0.1)</td></tr>
+<tr id="t1722A" class="h"><td><a href="#t1722A">17:22</a></td><td class="nl">clojurebot</td><td>0/1</td></tr>
+<tr id="t1722A" class="h"><td><a href="#t1722A">17:22</a></td><td class="nd">justin_smith</td><td>well, it's a ratio</td></tr>
+<tr id="t1723A" class="h"><td><a href="#t1723A">17:23</a></td><td class="nz">octarinemole</td><td>true :)</td></tr>
+<tr id="t1728A" class="h"><td><a href="#t1728A">17:28</a></td><td class="nd">justin_smith</td><td>,(clojure.lang.Ratio. (biginteger 666) (biginteger 420))</td></tr>
+<tr id="t1728A" class="h"><td><a href="#t1728A">17:28</a></td><td class="nl">clojurebot</td><td>666/420</td></tr>
+<tr id="t1729A" class="h"><td><a href="#t1729A">17:29</a></td><td class="np">postpunkjustin</td><td>sick ratio</td></tr>
+<tr id="t1730A"><td><a href="#t1730A">17:30</a></td><td class="nz">octarinemole</td><td>yeah, and then the equals method is a bit odd...</td></tr>
+<tr id="t1732A" class="h r"><td><a href="#t1732A">17:32</a></td><td class="nz">octarinemole</td><td>i don't think the constructor is meant to be invoked directly as it doesn't normalize the fraction...</td></tr>
+<tr id="t1732A" class="h"><td><a href="#t1732A">17:32</a></td><td class="nd">justin_smith</td><td>yeah, I inferred the constructor wouldn't normalize when I saw the output for 0.1</td></tr>
+<tr id="t1733A" class="h"><td><a href="#t1733A">17:33</a></td><td class="nz">octarinemole</td><td>and then the equals method assumes they're normalized</td></tr>
+<tr id="t1733A" class="h r"><td><a href="#t1733A">17:33</a></td><td class="nz">octarinemole</td><td>,(== 12/14 (clojure.lang.Ratio. (biginteger 6) (biginteger 7)))</td></tr>
+<tr id="t1733A" class="h"><td><a href="#t1733A">17:33</a></td><td class="nl">clojurebot</td><td>true</td></tr>
+<tr id="t1733A" class="h"><td><a href="#t1733A">17:33</a></td><td class="nz">octarinemole</td><td>,(== 12/14 (clojure.lang.Ratio. (biginteger 12) (biginteger 14)))</td></tr>
+<tr id="t1733A" class="h"><td><a href="#t1733A">17:33</a></td><td class="nl">clojurebot</td><td>false</td></tr>
+<tr id="t1733A" class="h"><td><a href="#t1733A">17:33</a></td><td class="nz">octarinemole</td><td>so it's a no-no :)</td></tr>
+<tr id="t1735A" class="h"><td><a href="#t1735A">17:35</a></td><td class="n6">lxsameer</td><td>how can I get a function by name with out requiring the namespace ? in runtime</td></tr>
+<tr id="t1735A" class="h"><td><a href="#t1735A">17:35</a></td><td class="nd">justin_smith</td><td>resolve finds it, if any other code caused the code to be loaded at least</td></tr>
+<tr id="t1736A" class="h r"><td><a href="#t1736A">17:36</a></td><td class="nd">justin_smith</td><td>,(resolve 'clojure.java.io/file)</td></tr>
+<tr id="t1736A" class="h"><td><a href="#t1736A">17:36</a></td><td class="nl">clojurebot</td><td>#'clojure.java.io/file</td></tr>
+<tr id="t1736A" class="h"><td><a href="#t1736A">17:36</a></td><td class="nd">justin_smith</td><td>that finds the var</td></tr>
+<tr id="t1736A" class="h r"><td><a href="#t1736A">17:36</a></td><td class="nd">justin_smith</td><td>you can call a var, or deref to get the actual thing out of it</td></tr>
+<tr id="t1739A" class="h"><td><a href="#t1739A">17:39</a></td><td class="n6">lxsameer</td><td>justin_smith: but what if there were no file requiring that ns ?</td></tr>
+<tr id="t1739A" class="h"><td><a href="#t1739A">17:39</a></td><td class="ns">technomancy</td><td>lxsameer: leiningen has a resolve-require function</td></tr>
+<tr id="t1740A" class="r"><td><a href="#t1740A">17:40</a></td><td class="ns">technomancy</td><td>(defn resolve-require [x] (require (symbol (namespace x))) (resolve x))</td></tr>
+<tr id="t1740A" class="h"><td><a href="#t1740A">17:40</a></td><td class="nm">amalloy</td><td>lxsameer: why are you trying to do this? this is a weird thing to do</td></tr>
+<tr id="t1740A" class="h"><td><a href="#t1740A">17:40</a></td><td class="n6">lxsameer</td><td>technomancy: hmmm is that going to work on production ? i mean in a jar</td></tr>
+<tr id="t1740A" class="h"><td><a href="#t1740A">17:40</a></td><td class="ns">technomancy</td><td>lxsameer: yes, but it's better to have the call path known at compile-time if possible</td></tr>
+<tr id="t1740A" class="h"><td><a href="#t1740A">17:40</a></td><td class="n6">lxsameer</td><td>amalloy: indeed it is.</td></tr>
+<tr id="t1742A" class="h r"><td><a href="#t1742A">17:42</a></td><td class="n6">lxsameer</td><td>amalloy: i'm trying to point to a function from an edn data</td></tr>
+<tr id="t1742A" class="h"><td><a href="#t1742A">17:42</a></td><td class="np">Frozenlock</td><td>lxsameer: is this to make plugins?</td></tr>
+<tr id="t1742A" class="h"><td><a href="#t1742A">17:42</a></td><td class="nm">amalloy</td><td>how much do you trust the source of this edn data? if you let them call arbitrary functions, they can do pretty much anything</td></tr>
+<tr id="t1743A" class="h"><td><a href="#t1743A">17:43</a></td><td class="n6">lxsameer</td><td>Frozenlock: not a plugin but maybe concepts would be the same</td></tr>
+<tr id="t1743A" class="h r"><td><a href="#t1743A">17:43</a></td><td class="n6">lxsameer</td><td>amalloy: it's a trusted source</td></tr>
+<tr id="t1744A" class="h"><td><a href="#t1744A">17:44</a></td><td class="nd">justin_smith</td><td>so this is effectively DI via edn?</td></tr>
+<tr id="t1745A" class="h r"><td><a href="#t1745A">17:45</a></td><td class="nd">justin_smith</td><td>what if a consumer passed you a function instead?</td></tr>
+<tr id="t1745A" class="h"><td><a href="#t1745A">17:45</a></td><td class="n6">lxsameer</td><td>justin_smith: some how yes</td></tr>
+<tr id="t1745A" class="h r"><td><a href="#t1745A">17:45</a></td><td class="n6">lxsameer</td><td>justin_smith: over wire ?</td></tr>
+<tr id="t1745A" class="h r"><td><a href="#t1745A">17:45</a></td><td class="n6">lxsameer</td><td>justin_smith: basically this happens on wire</td></tr>
+<tr id="t1746A" class="h"><td><a href="#t1746A">17:46</a></td><td class="nd">justin_smith</td><td>OK - so they ask for some namespace, you might not have loaded it yet for whatever reason, but they trust you can find it if they ask for it?</td></tr>
+<tr id="t1746A" class="h"><td><a href="#t1746A">17:46</a></td><td class="n6">lxsameer</td><td>justin_smith: both side has several functions but i want to conditionally specify the callback</td></tr>
+<tr id="t1746A" class="h r"><td><a href="#t1746A">17:46</a></td><td class="n6">lxsameer</td><td>justin_smith: yeah exactly</td></tr>
+<tr id="t1747A" class="h"><td><a href="#t1747A">17:47</a></td><td class="nd">justin_smith</td><td>so it's a weird ad-hoc RPC thing</td></tr>
+<tr id="t1747A" class="h"><td><a href="#t1747A">17:47</a></td><td class="n6">lxsameer</td><td>justin_smith: yes</td></tr>
+<tr id="t1808A"><td><a href="#t1808A">18:08</a></td><td class="ns">technomancy</td><td>ad-hoc rpc isn't that weird</td></tr>
+<tr id="t1912A"><td><a href="#t1912A">19:12</a></td><td class="n0">assoc-in</td><td>Has anyone called a jar from clojure? I have a jar for an external resource and it looks like I could clojure.java.shell to call it, but I am not sure how I would close it.</td></tr>
+<tr id="t1924A"><td><a href="#t1924A">19:24</a></td><td class="nd">justin_smith</td><td>assoc-in: you could either invoke the jar's main from within your own vm, allowing you to access its api  that hopefully has some way to shut it down or cancel it, or launch a shell script via shell/sh that runs it async and returns the pid (that you can later reference to kil it via shell )</td></tr>
+<tr id="t1924A" class="h r"><td><a href="#t1924A">19:24</a></td><td class="nd">justin_smith</td><td>or, you can also use ProcessBuilder to create a Process, which has a method to shut it down (and has a lot of useful options that shell/sh doesn't)</td></tr>
+<tr id="t1925A" class="h r"><td><a href="#t1925A">19:25</a></td><td class="nd">justin_smith</td><td>there's a library called conch that wraps ProcessBuilder but I think using the real API is much less error prone</td></tr>
+<tr id="t1954A"><td><a href="#t1954A">19:54</a></td><td class="n0">assoc-in</td><td>Okay I was able to get it to work with this. It looks like you need to call sh again. (shell/sh &quot;sh&quot; &quot;-c&quot; &quot;java -jar ......&quot;)</td></tr>
+<tr id="t1954A" class="h"><td><a href="#t1954A">19:54</a></td><td class="nd">justin_smith</td><td>shell/sh doesn't us sh (despite the name)</td></tr>
+<tr id="t2108A"><td><a href="#t2108A">21:08</a></td><td class="nt">llsouder</td><td><a href="https://pastebin.com/M8CAHhEG">https://pastebin.com/M8CAHhEG</a></td></tr>
+<tr id="t2108A" class="h r"><td><a href="#t2108A">21:08</a></td><td class="nt">llsouder</td><td>what is this argument? <a href="https://pastebin.com/M8CAHhEG">https://pastebin.com/M8CAHhEG</a></td></tr>
+<tr id="t2108A" class="h r"><td><a href="#t2108A">21:08</a></td><td class="nt">llsouder</td><td>doh!</td></tr>
+<tr id="t2108A" class="h r"><td><a href="#t2108A">21:08</a></td><td class="nt">llsouder</td><td>[{{username &quot;username&quot; password &quot;password&quot; next &quot;next&quot;} :params</td></tr>
+<tr id="t2108A" class="h r"><td><a href="#t2108A">21:08</a></td><td class="nt">llsouder</td><td>                 session :session :as req}]</td></tr>
+<tr id="t2108A" class="h r"><td><a href="#t2108A">21:08</a></td><td class="nt">llsouder</td><td>this is a vector with a map</td></tr>
+<tr id="t2109A" class="h r"><td><a href="#t2109A">21:09</a></td><td class="nt">llsouder</td><td>and the first key of the map is a map????</td></tr>
+<tr id="t2109A" class="h r"><td><a href="#t2109A">21:09</a></td><td class="nt">llsouder</td><td>why cant my evil brain parse this?!?!?</td></tr>
+<tr id="t2110A" class="r"><td><a href="#t2110A">21:10</a></td><td class="nt">llsouder</td><td>(defn do-login</td></tr>
+<tr id="t2130A" class="r"><td><a href="#t2130A">21:30</a></td><td class="nt">llsouder</td><td>so while I was waiting I found the :as which told me it is destructuring</td></tr>
+<tr id="t2131A" class="h r"><td><a href="#t2131A">21:31</a></td><td class="nt">llsouder</td><td>so not the session :session makes sense to me.  the name session is bound to the value of the :session key</td></tr>
+<tr id="t2132A" class="h r"><td><a href="#t2132A">21:32</a></td><td class="nt">llsouder</td><td>so now*</td></tr>
+<tr id="t2132A" class="h r"><td><a href="#t2132A">21:32</a></td><td class="nt">llsouder</td><td>that username stuff is still hurting my brains</td></tr>
+<tr id="t2138A" class="h r"><td><a href="#t2138A">21:38</a></td><td class="nt">llsouder</td><td>ok, that took a while but I got it.  &quot;username&quot; is a key and binds to username etc</td></tr>
+<tr id="t2139A" class="h r"><td><a href="#t2139A">21:39</a></td><td class="nt">llsouder</td><td>yeah, thanks for letting me work that out LOL!  Clojure documentation test.... passed!</td></tr>
+<tr id="t2204A"><td><a href="#t2204A">22:04</a></td><td class="n0">assoc-in</td><td>justin_smith:Yes quite odd behavior. I think the documentation could be more clear about that</td></tr>
+</tbody></table></main></body></html>

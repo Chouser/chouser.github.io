@@ -1,0 +1,564 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#clojure – 2008-12-17</title><link rel="stylesheet" href="../style.css"></head><body>
+<header class="sh"><a class="st" href="../index.html">#clojure logs</a><nav class="dn"><a href="2008-12-16.html">&larr;</a><span>2008-12-17</span><a href="2008-12-18.html">&rarr;</a></nav></header>
+<main><p class="dh">2008-12-17</p><table class="lg"><tbody>
+<tr id="t0005A"><td><a href="#t0005A">00:05</a></td><td class="nv">bradbev</td><td>are def's evaluated at compile time when AOT compilation is used?</td></tr>
+<tr id="t0006A" class="h r"><td><a href="#t0006A">00:06</a></td><td class="nv">bradbev</td><td>I think they are, because one of my defs is (def foo (JFrame. &quot;foo&quot;)), and when compiling using ant I get problems because Swing can't be found</td></tr>
+<tr id="t0010A"><td><a href="#t0010A">00:10</a></td><td class="nk">Chouser</td><td>everything gets evaluated when you compile -- it's just like a normal run, except generated class files are saved out along the way.</td></tr>
+<tr id="t0011A" class="h"><td><a href="#t0011A">00:11</a></td><td class="nv">bradbev</td><td>so how does that actually work if I construct Java objects in defs - how do they get saved?</td></tr>
+<tr id="t0012A" class="h"><td><a href="#t0012A">00:12</a></td><td class="nd">hiredman</td><td>they don't</td></tr>
+<tr id="t0012A" class="h"><td><a href="#t0012A">00:12</a></td><td class="nk">Chouser</td><td>oh, good, because I didn't know.</td></tr>
+<tr id="t0012A" class="h r"><td><a href="#t0012A">00:12</a></td><td class="nk">Chouser</td><td>hiredman: the code to generate them gets compiled and then new ones are made when the compiled code gets run?</td></tr>
+<tr id="t0013A" class="h"><td><a href="#t0013A">00:13</a></td><td class="nd">hiredman</td><td>yeah</td></tr>
+<tr id="t0013A" class="h r"><td><a href="#t0013A">00:13</a></td><td class="nd">hiredman</td><td>mean, it must right?</td></tr>
+<tr id="t0013A" class="h r"><td><a href="#t0013A">00:13</a></td><td class="nd">hiredman</td><td>the other way is just crazy</td></tr>
+<tr id="t0013A" class="h"><td><a href="#t0013A">00:13</a></td><td class="nv">bradbev</td><td>which also means that at compile time the defs need to be able to execute</td></tr>
+<tr id="t0013A" class="h r"><td><a href="#t0013A">00:13</a></td><td class="nv">bradbev</td><td>my use-case is that I have a hash-map to describe a gui &amp; a couple of functions to load/show it</td></tr>
+<tr id="t0013A" class="h"><td><a href="#t0013A">00:13</a></td><td class="nd">hiredman</td><td>bradbev: there is some var that is set at compile time you can (if ) around</td></tr>
+<tr id="t0013A" class="h"><td><a href="#t0013A">00:13</a></td><td class="nv">bradbev</td><td>I construct the Swing objects in the def</td></tr>
+<tr id="t0016A" class="h"><td><a href="#t0016A">00:16</a></td><td class="nd">dhaya</td><td>this seems relevant <a href="http://groups.google.com/group/clojure/msg/169922392f950839">http://groups.google.com/group/clojure/msg/169922392f950839</a> (the note above print duping them and reading back later). So it does look like they get saved after all?</td></tr>
+<tr id="t0017A" class="h"><td><a href="#t0017A">00:17</a></td><td class="nd">hiredman</td><td>but rhickey did not go through and add print-dup ability to all java objects</td></tr>
+<tr id="t0017A" class="h r"><td><a href="#t0017A">00:17</a></td><td class="nd">hiredman</td><td>clojurebot: rhickey?</td></tr>
+<tr id="t0017A" class="h"><td><a href="#t0017A">00:17</a></td><td class="nl">clojurebot</td><td>he works hard so you don't have to</td></tr>
+<tr id="t0018A" class="h"><td><a href="#t0018A">00:18</a></td><td class="nv">bradbev</td><td>hmm, I'm not sure that's the same thing at all</td></tr>
+<tr id="t0018A" class="h"><td><a href="#t0018A">00:18</a></td><td class="nd">hiredman</td><td>print-dup is for clojure data structures I think, because certain clojure data structures can have different underlying impls</td></tr>
+<tr id="t0018A" class="h"><td><a href="#t0018A">00:18</a></td><td class="nv">bradbev</td><td>if the def was not evaluated at AOT, but was evaluated at load then I'd be fine</td></tr>
+<tr id="t0019A" class="h"><td><a href="#t0019A">00:19</a></td><td class="nd">dhaya</td><td>There is a *compile-files* flag that you can use to prevent evaluation during AOT compilation.</td></tr>
+<tr id="t0020A"><td><a href="#t0020A">00:20</a></td><td class="nd">hiredman</td><td>bradbev: *compile-files*  is true when you are compiling</td></tr>
+<tr id="t0020A" class="h"><td><a href="#t0020A">00:20</a></td><td class="nv">bradbev</td><td>OK</td></tr>
+<tr id="t0020A" class="h"><td><a href="#t0020A">00:20</a></td><td class="nd">hiredman</td><td>(def a (when-not *compile-files* (my-big-init)))</td></tr>
+<tr id="t0021A" class="h r"><td><a href="#t0021A">00:21</a></td><td class="nd">hiredman</td><td>dhaya: beat me</td></tr>
+<tr id="t0021A" class="h"><td><a href="#t0021A">00:21</a></td><td class="nv">bradbev</td><td>now, the other thing that is screwy is (defn frame (JFrame. &quot;foo&quot;)) also causes ant to break during compile</td></tr>
+<tr id="t0021A" class="h r"><td><a href="#t0021A">00:21</a></td><td class="nv">bradbev</td><td>that should be lazy evaled, right?</td></tr>
+<tr id="t0021A" class="h"><td><a href="#t0021A">00:21</a></td><td class="nd">hiredman</td><td>uh</td></tr>
+<tr id="t0021A" class="h r"><td><a href="#t0021A">00:21</a></td><td class="nd">hiredman</td><td>no</td></tr>
+<tr id="t0021A" class="h r"><td><a href="#t0021A">00:21</a></td><td class="nd">hiredman</td><td>oh</td></tr>
+<tr id="t0021A" class="h r"><td><a href="#t0021A">00:21</a></td><td class="nd">hiredman</td><td>defn not def</td></tr>
+<tr id="t0021A" class="h"><td><a href="#t0021A">00:21</a></td><td class="nv">bradbev</td><td>oh, crap - how did that even compile though?</td></tr>
+<tr id="t0021A" class="h"><td><a href="#t0021A">00:21</a></td><td class="nd">hiredman</td><td>*shrug*</td></tr>
+<tr id="t0022A" class="h r"><td><a href="#t0022A">00:22</a></td><td class="nd">hiredman</td><td>well it did nae compile did it?</td></tr>
+<tr id="t0022A" class="h"><td><a href="#t0022A">00:22</a></td><td class="nv">bradbev</td><td>heh, true</td></tr>
+<tr id="t0023A" class="h r"><td><a href="#t0023A">00:23</a></td><td class="nv">bradbev</td><td>ok, converting from a def to a defn &amp; a call fixes the issue</td></tr>
+<tr id="t0024A" class="h r"><td><a href="#t0024A">00:24</a></td><td class="nv">bradbev</td><td>though it does leave the problem that defs are evaled at compile time &amp; they may construct java objects</td></tr>
+<tr id="t0026A" class="h"><td><a href="#t0026A">00:26</a></td><td class="nd">hiredman</td><td>that is what *compile-files* is for</td></tr>
+<tr id="t0027A" class="h r"><td><a href="#t0027A">00:27</a></td><td class="nd">hiredman</td><td>compile and load are kind of the same thing, compile just also outputs class files</td></tr>
+<tr id="t0027A" class="h"><td><a href="#t0027A">00:27</a></td><td class="nv">bradbev</td><td>yeah, wrapping the def in (if (not *compile-files*)) works</td></tr>
+<tr id="t0028A" class="h r"><td><a href="#t0028A">00:28</a></td><td class="nv">bradbev</td><td>thanks for the help</td></tr>
+<tr id="t0028A" class="h"><td><a href="#t0028A">00:28</a></td><td class="nd">dhaya</td><td>bradbev: (when-not might more  idiomatic i think..</td></tr>
+<tr id="t0029A" class="h"><td><a href="#t0029A">00:29</a></td><td class="nv">bradbev</td><td>dhaya: thanks - I didn't know about that (I did know unless isn't there :))</td></tr>
+<tr id="t0030A"><td><a href="#t0030A">00:30</a></td><td class="nd">dhaya</td><td>I have no idea about unless. is that a CL thing?</td></tr>
+<tr id="t0031A" class="h"><td><a href="#t0031A">00:31</a></td><td class="nd">hiredman</td><td>ruby has it</td></tr>
+<tr id="t0031A" class="h"><td><a href="#t0031A">00:31</a></td><td class="nd">dhaya</td><td>ah..ok.</td></tr>
+<tr id="t0032A" class="h"><td><a href="#t0032A">00:32</a></td><td class="nv">bradbev</td><td>CL has it also</td></tr>
+<tr id="t0106A"><td><a href="#t0106A">01:06</a></td><td class="nb">wipewindows</td><td>which should I ask for as a christmas prsent, im a strange loop or GED?</td></tr>
+<tr id="t0111A"><td><a href="#t0111A">01:11</a></td><td class="nb">cads</td><td>wipewindows, I'd just download some of godel's papers, buy some escher prints, and enjoy some pirated bach</td></tr>
+<tr id="t0113A" class="h r"><td><a href="#t0113A">01:13</a></td><td class="nb">cads</td><td>it's a lot of dumbed down philosophy and the author tries to get across how wonderful and strange our consciousness (his consciousness) is</td></tr>
+<tr id="t0248A"><td><a href="#t0248A">02:48</a></td><td class="n6">dmiles</td><td>any DotLisp hackers in here atm?</td></tr>
+<tr id="t0250A" class="r"><td><a href="#t0250A">02:50</a></td><td class="n6">dmiles</td><td>trying to figure out where (Hex/DecodeHexString text) comes from</td></tr>
+<tr id="t0411A"><td><a href="#t0411A">04:11</a></td><td class="nn">AWizzArd</td><td>clojurebot: max people</td></tr>
+<tr id="t0411A" class="h"><td><a href="#t0411A">04:11</a></td><td class="nl">clojurebot</td><td>max people is 116</td></tr>
+<tr id="t1022A"><td><a href="#t1022A">10:22</a></td><td class="nu">rhickey</td><td>any contrib-ers out there? move to gc go ok?</td></tr>
+<tr id="t1024A" class="h"><td><a href="#t1024A">10:24</a></td><td class="nj">Chousuke</td><td>is everything in contrib EPL now?</td></tr>
+<tr id="t1032A"><td><a href="#t1032A">10:32</a></td><td class="nu">rhickey</td><td>Chousuke: yes</td></tr>
+<tr id="t1055A"><td><a href="#t1055A">10:55</a></td><td class="nr">RSchulz</td><td>I just checked it out and built it without a hitch.</td></tr>
+<tr id="t1057A" class="h"><td><a href="#t1057A">10:57</a></td><td class="nn">AWizzArd</td><td>rhickey: what again was the title of this book about concurrency in Java?</td></tr>
+<tr id="t1057A" class="h"><td><a href="#t1057A">10:57</a></td><td class="nu">rhickey</td><td>Java Concurrency in Practice</td></tr>
+<tr id="t1057A" class="h"><td><a href="#t1057A">10:57</a></td><td class="nn">AWizzArd</td><td>thx</td></tr>
+<tr id="t1058A" class="h"><td><a href="#t1058A">10:58</a></td><td class="nj">duck1123</td><td>reading chapter 6.2.5</td></tr>
+<tr id="t1059A" class="h"><td><a href="#t1059A">10:59</a></td><td class="n1">gnuvince</td><td>Wouldn't that be a section of chapter 6?</td></tr>
+<tr id="t1059A" class="h r"><td><a href="#t1059A">10:59</a></td><td class="n1">gnuvince</td><td>&lt;/anal&gt;</td></tr>
+<tr id="t1108A"><td><a href="#t1108A">11:08</a></td><td class="ne">kyleburton</td><td>/?</td></tr>
+<tr id="t1108A" class="h r"><td><a href="#t1108A">11:08</a></td><td class="ne">kyleburton</td><td>er, does there happen to be a way to know the name of the form being defined?</td></tr>
+<tr id="t1109A" class="h"><td><a href="#t1109A">11:09</a></td><td class="nu">rhickey</td><td>kyleburton: for what to know?</td></tr>
+<tr id="t1109A" class="h"><td><a href="#t1109A">11:09</a></td><td class="ne">kyleburton</td><td>well, I was toying with creating a log form</td></tr>
+<tr id="t1109A" class="h r"><td><a href="#t1109A">11:09</a></td><td class="ne">kyleburton</td><td>and it'd be nice to know the file name (if available), line number and fn name</td></tr>
+<tr id="t1109A" class="h"><td><a href="#t1109A">11:09</a></td><td class="nu">rhickey</td><td>Chouser: what's the alternative?</td></tr>
+<tr id="t1109A" class="h"><td><a href="#t1109A">11:09</a></td><td class="ne">kyleburton</td><td>so it could expand to including that in the log stmt</td></tr>
+<tr id="t1109A" class="h r"><td><a href="#t1109A">11:09</a></td><td class="ne">kyleburton</td><td>eg: (defn some-func [] (log-debug &quot;foo&quot;))</td></tr>
+<tr id="t1110A" class="r"><td><a href="#t1110A">11:10</a></td><td class="ne">kyleburton</td><td>it'd be nice if that could expand into something like:</td></tr>
+<tr id="t1110A" class="h r"><td><a href="#t1110A">11:10</a></td><td class="ne">kyleburton</td><td>(defn some-func [] (log/log-debug &quot;test.clj&quot; 107 &quot;some-func&quot; &quot;foo&quot;))</td></tr>
+<tr id="t1110A" class="h"><td><a href="#t1110A">11:10</a></td><td class="nt">wlr_</td><td>google code's clojure-contrib still has svn/trunk/CPL.txt</td></tr>
+<tr id="t1111A" class="h"><td><a href="#t1111A">11:11</a></td><td class="ne">kyleburton</td><td>well, really w/the args wraped in a lambda so they dont get computed unless the levle is that high</td></tr>
+<tr id="t1111A" class="h r"><td><a href="#t1111A">11:11</a></td><td class="ne">kyleburton</td><td>kind of like __pretty_function__, __LINE__ and __FILE__</td></tr>
+<tr id="t1111A" class="h r"><td><a href="#t1111A">11:11</a></td><td class="ne">kyleburton</td><td>well, exactly like those</td></tr>
+<tr id="t1112A" class="h"><td><a href="#t1112A">11:12</a></td><td class="nk">Chouser</td><td>rhickey: I don't suppose there's any way to display those rules on the &quot;new issue&quot; form?</td></tr>
+<tr id="t1113A" class="h"><td><a href="#t1113A">11:13</a></td><td class="nj">duck1123</td><td>Chouser: where are these rules?</td></tr>
+<tr id="t1113A" class="h"><td><a href="#t1113A">11:13</a></td><td class="nk">Chouser</td><td>duck1123: exactly.</td></tr>
+<tr id="t1114A" class="h"><td><a href="#t1114A">11:14</a></td><td class="nu">rhickey</td><td>Chouser: I can pre-fill the description box with text, some of the rules are there</td></tr>
+<tr id="t1115A" class="h"><td><a href="#t1115A">11:15</a></td><td class="nk">Chouser</td><td>ok.  I don't have a good alternative.  Maybe some firm policing will be sufficient.</td></tr>
+<tr id="t1116A" class="h r"><td><a href="#t1116A">11:16</a></td><td class="nk">Chouser</td><td>duck1123: rules: <a href="http://groups.google.com/group/clojure/browse_thread/thread/1a4fe97a957ec52a">http://groups.google.com/group/clojure/browse_thread/thread/1a4fe97a957ec52a</a></td></tr>
+<tr id="t1118A" class="h"><td><a href="#t1118A">11:18</a></td><td class="nu">rhickey</td><td>Chouser: ok, full set of rules now in the entry form</td></tr>
+<tr id="t1119A" class="h"><td><a href="#t1119A">11:19</a></td><td class="nj">duck1123</td><td>now that the issue tracker is being used, should clojurebot announce new tickets?</td></tr>
+<tr id="t1119A" class="h"><td><a href="#t1119A">11:19</a></td><td class="nk">Chouser</td><td>kyleburton: (defmacro log [msg] `(prn ~msg ~*file*))</td></tr>
+<tr id="t1120A"><td><a href="#t1120A">11:20</a></td><td class="nu">rhickey</td><td>duck1123: there is a dev feed, just trying to get it set up the way I want</td></tr>
+<tr id="t1120A" class="h"><td><a href="#t1120A">11:20</a></td><td class="ne">kyleburton</td><td>ok, *file* is good, is there a *line* and perhaps a *top-level-form-name*?</td></tr>
+<tr id="t1120A" class="h"><td><a href="#t1120A">11:20</a></td><td class="nk">Chouser</td><td>kyleburton: looks like there's currently no similar way to get to the line number.</td></tr>
+<tr id="t1120A" class="h"><td><a href="#t1120A">11:20</a></td><td class="ne">kyleburton</td><td>Chouser: thank you re: *file*</td></tr>
+<tr id="t1120A" class="h"><td><a href="#t1120A">11:20</a></td><td class="nk">Chouser</td><td>kyleburton: but both are available as metadata of the var -- 'some-func' in your example.</td></tr>
+<tr id="t1121A" class="h"><td><a href="#t1121A">11:21</a></td><td class="ne">kyleburton</td><td>Chouser: yes, but how can you get the name of the enclosing top level form so the macro can see it?</td></tr>
+<tr id="t1121A" class="h"><td><a href="#t1121A">11:21</a></td><td class="nk">Chouser</td><td>...but I don't think the name of that var is available to the expression being evaluated for the var's value.</td></tr>
+<tr id="t1121A" class="h"><td><a href="#t1121A">11:21</a></td><td class="nu">rhickey</td><td>Chouser: *file* isn't going to help there, as it's value at runtime will be nil</td></tr>
+<tr id="t1121A" class="h"><td><a href="#t1121A">11:21</a></td><td class="ne">kyleburton</td><td>rhickey: even if you expand with ~*file*?</td></tr>
+<tr id="t1122A" class="h"><td><a href="#t1122A">11:22</a></td><td class="nu">rhickey</td><td>i.e. a macro can use it, but to emit it doesn't help</td></tr>
+<tr id="t1122A" class="h"><td><a href="#t1122A">11:22</a></td><td class="ne">kyleburton</td><td>rhickey: doens't that get resolved at compile...</td></tr>
+<tr id="t1122A" class="h"><td><a href="#t1122A">11:22</a></td><td class="nk">Chouser</td><td>rhickey: sure, but in that macro I posted the compile-time value of *file* is inserted into the expression</td></tr>
+<tr id="t1122A" class="h"><td><a href="#t1122A">11:22</a></td><td class="nu">rhickey</td><td>that's all this is for? nevermind</td></tr>
+<tr id="t1122A" class="h"><td><a href="#t1122A">11:22</a></td><td class="n1">gnuvince</td><td>Does Java allow mutating final fields?</td></tr>
+<tr id="t1123A" class="h"><td><a href="#t1123A">11:23</a></td><td class="nk">Chouser</td><td>gnuvince: don't think so.  I think that's the point of them being final.</td></tr>
+<tr id="t1124A" class="h"><td><a href="#t1124A">11:24</a></td><td class="nn">AWizzArd</td><td>I think Clojure declares a lot of stuff as final under the hood, to come to its performance.</td></tr>
+<tr id="t1125A" class="h"><td><a href="#t1125A">11:25</a></td><td class="n1">gnuvince</td><td>Chouser: I wasn't sure what final meant for fields.</td></tr>
+<tr id="t1132A"><td><a href="#t1132A">11:32</a></td><td class="nr">RSchulz</td><td>A final field in Java cannot be assigned, but the object to which it refers (if it's not primitive) but nothing prevents invoking mutating methods on the instance referred to by that field.</td></tr>
+<tr id="t1132A" class="h r"><td><a href="#t1132A">11:32</a></td><td class="nr">RSchulz</td><td>It's not at all like C++ const.</td></tr>
+<tr id="t1132A" class="h r"><td><a href="#t1132A">11:32</a></td><td class="nr">RSchulz</td><td>Oops. That came out mangled.</td></tr>
+<tr id="t1132A" class="h"><td><a href="#t1132A">11:32</a></td><td class="nj">Chousuke</td><td>it's more like a const*</td></tr>
+<tr id="t1133A" class="h r"><td><a href="#t1133A">11:33</a></td><td class="nj">Chousuke</td><td>or is that *const? :P</td></tr>
+<tr id="t1133A" class="h"><td><a href="#t1133A">11:33</a></td><td class="nr">RSchulz</td><td>You can't reassing a final field after initialization, which must happen by the time the constructors exit.</td></tr>
+<tr id="t1133A" class="h r"><td><a href="#t1133A">11:33</a></td><td class="nr">RSchulz</td><td>But you can call any method on the values in such fields.</td></tr>
+<tr id="t1133A" class="h r"><td><a href="#t1133A">11:33</a></td><td class="nr">RSchulz</td><td>Chousuke: Yes, it's like *const.</td></tr>
+<tr id="t1144A"><td><a href="#t1144A">11:44</a></td><td class="n7">aperotte</td><td>Chouser: I figured out why I was getting different behavior when using (load-file ...) versus evaluating each form in the file</td></tr>
+<tr id="t1145A" class="h r"><td><a href="#t1145A">11:45</a></td><td class="n7">aperotte</td><td>Chouser: I traced it down to a function definition that used map, but was being used for side effects and the return value of the function wasn't being used for anything</td></tr>
+<tr id="t1146A" class="h r"><td><a href="#t1146A">11:46</a></td><td class="n7">aperotte</td><td>Chouser: I'm assuming that the map was evaluated lazily (?) when using (load-file) because it didn't need to print the result whereas at the repl it was forced because of the need to print (?)</td></tr>
+<tr id="t1150A"><td><a href="#t1150A">11:50</a></td><td class="nk">Chouser</td><td>aperotte: ah, very good!</td></tr>
+<tr id="t1150A" class="h r"><td><a href="#t1150A">11:50</a></td><td class="nk">Chouser</td><td>thanks for bringing me up-to-date.  That's likely to come up again.</td></tr>
+<tr id="t1151A" class="h"><td><a href="#t1151A">11:51</a></td><td class="n7">aperotte</td><td>No problem, thanks for the help</td></tr>
+<tr id="t1151A" class="h r"><td><a href="#t1151A">11:51</a></td><td class="n7">aperotte</td><td>RSchultz: Thanks for your help in trying to figure this out as well.</td></tr>
+<tr id="t1157A" class="h"><td><a href="#t1157A">11:57</a></td><td class="nj">Lau_of_DK</td><td>Good evening all</td></tr>
+<tr id="t1200A"><td><a href="#t1200A">12:00</a></td><td class="nz">ericthorsen</td><td>I have a clojure resource in a netbeans module that is calling (clojure.core/require &quot;a.properly.placed.namespace.file&quot;) which is referencing public java classes in the same module.  The clojure file gets loaded but cannot see the java classes.  Anyone have any insight as to how I might trouble shoot this?</td></tr>
+<tr id="t1202A" class="h"><td><a href="#t1202A">12:02</a></td><td class="nu">rhickey</td><td>the require is for a .clj file? not compiled?</td></tr>
+<tr id="t1202A" class="h"><td><a href="#t1202A">12:02</a></td><td class="nz">ericthorsen</td><td>rhickey: yes</td></tr>
+<tr id="t1203A" class="h"><td><a href="#t1203A">12:03</a></td><td class="nu">rhickey</td><td>ericthorsen: you might have a much easier time if you compiled it</td></tr>
+<tr id="t1204A" class="h r"><td><a href="#t1204A">12:04</a></td><td class="nu">rhickey</td><td>it's probably related to classloader that loaded Clojure doesn't have access to that module?</td></tr>
+<tr id="t1206A" class="h"><td><a href="#t1206A">12:06</a></td><td class="nz">ericthorsen</td><td>rhickey: yes...we are going down that path as well.</td></tr>
+<tr id="t1207A" class="h"><td><a href="#t1207A">12:07</a></td><td class="nu">rhickey</td><td>ericthorsen: AOT is motivated in part by trying to remove issues related to fancy classloader hierarchies like NB and dynamic classloading, by getting rid of the latter.</td></tr>
+<tr id="t1225A" class="r"><td><a href="#t1225A">12:25</a></td><td class="nu">rhickey</td><td><a href="http://groups.google.com/group/clojure-dev">http://groups.google.com/group/clojure-dev</a> - read-only via web/xml, will get all issue changes for clojure and contrib</td></tr>
+<tr id="t1232A" class="r"><td><a href="#t1232A">12:32</a></td><td class="nu">rhickey</td><td>hrm, wiki edits go in svn revision stream...</td></tr>
+<tr id="t1234A" class="h"><td><a href="#t1234A">12:34</a></td><td class="nr">RSchulz</td><td>aperotte: Sorry I missed that before. I'm glad you sorted out the problem. And thanks for letting us know what it was. It's something to keep in mind.</td></tr>
+<tr id="t1235A" class="h"><td><a href="#t1235A">12:35</a></td><td class="no">ffailla</td><td>I are trying to run the clojure.lang.Compile command from a command line, how do i export the clojure.compile.path system property on a bash shell</td></tr>
+<tr id="t1259A"><td><a href="#t1259A">12:59</a></td><td class="nj">tomhickey</td><td>rhickey: i see the wiki edits in the revision list on the site, but not in my svn client</td></tr>
+<tr id="t1300A"><td><a href="#t1300A">13:00</a></td><td class="nu">rhickey</td><td>tomhickey: you're probably just pulling trunk - the wiki is a sibling of trunk, not under it</td></tr>
+<tr id="t1301A" class="h"><td><a href="#t1301A">13:01</a></td><td class="nj">tomhickey</td><td>rhickey: ah, i see</td></tr>
+<tr id="t1332A"><td><a href="#t1332A">13:32</a></td><td class="nk">Chouser</td><td>success!</td></tr>
+<tr id="t1333A" class="h"><td><a href="#t1333A">13:33</a></td><td class="nu">rhickey</td><td>Not really, as I need patches/bug-reports to go there, getting lost in group traffic</td></tr>
+<tr id="t1333A" class="h"><td><a href="#t1333A">13:33</a></td><td class="nj">Lau_of_DK</td><td> Rich, it looks good, not scared :)</td></tr>
+<tr id="t1336A" class="h"><td><a href="#t1336A">13:36</a></td><td class="nr">RSchulz</td><td>rhickey: You asked us to discuss issues on the list before submitting issues, which of course makes complete sense. If an question doesn't come to resolution there, is it reasonable to submit an issue?</td></tr>
+<tr id="t1336A" class="h r"><td><a href="#t1336A">13:36</a></td><td class="nr">RSchulz</td><td>Case in point: How to get (shutdown-agents) to work without explicitly calling it. The list thread didn't end up with a resolution.</td></tr>
+<tr id="t1337A" class="h"><td><a href="#t1337A">13:37</a></td><td class="nu">rhickey</td><td>RSchulz: probably not, we should be able to resolve bug or desirable feature on the group</td></tr>
+<tr id="t1337A" class="h r"><td><a href="#t1337A">13:37</a></td><td class="nu">rhickey</td><td>As far as that one, I don't see why clojure should do something specific, you have shutdown-agents</td></tr>
+<tr id="t1337A" class="h"><td><a href="#t1337A">13:37</a></td><td class="nv">kotarak</td><td>RSchulz: maybe the Repl could be modified to allow shutdown-hooks?</td></tr>
+<tr id="t1338A" class="h"><td><a href="#t1338A">13:38</a></td><td class="nu">rhickey</td><td>but in any case, the issues list is not for advocacy</td></tr>
+<tr id="t1338A" class="h"><td><a href="#t1338A">13:38</a></td><td class="nr">RSchulz</td><td>I'm not asking for Clojure to do something, but there's a gap right now. There was the idea to use daemon threads for agents, though.</td></tr>
+<tr id="t1341A"><td><a href="#t1341A">13:41</a></td><td class="nu">rhickey</td><td>RSchulz: then people who set off their whole program to run in agents will complain their agent threads die, and why do they have to explicitly wait for them</td></tr>
+<tr id="t1343A" class="h"><td><a href="#t1343A">13:43</a></td><td class="nv">kotarak</td><td>When the Repl receives the ^D it reads eof and stops. Maybe one can install some shutdown hooks, which are executed after the eof is received.</td></tr>
+<tr id="t1343A" class="h"><td><a href="#t1343A">13:43</a></td><td class="nr">RSchulz</td><td>How would one create generic facilities that use agents behind the scenes without burdening the user of those facilitiees to use (shutdown-agents) before exiting?</td></tr>
+<tr id="t1343A" class="h r"><td><a href="#t1343A">13:43</a></td><td class="nr">RSchulz</td><td>rhickey: I don't understand what you're saying. My specific problem is that calling (shutdown-agents) in a JVM shutdown hook seems not to be working.</td></tr>
+<tr id="t1344A" class="h"><td><a href="#t1344A">13:44</a></td><td class="nk">Chouser</td><td>RSchulz: when to shutdown background threads is an application-wide question, not something that can be answered in smaller pieces, it seems to me.</td></tr>
+<tr id="t1344A" class="h"><td><a href="#t1344A">13:44</a></td><td class="nr">RSchulz</td><td>Right. And I'd like to make it work in a generic way: via JVM shutdown hooks. That seems eminently reasonable to me.</td></tr>
+<tr id="t1345A" class="h"><td><a href="#t1345A">13:45</a></td><td class="nk">Chouser</td><td>RSchulz: what makes you think the JVM shutdown hooks will run before all the threads have quit?</td></tr>
+<tr id="t1345A" class="h"><td><a href="#t1345A">13:45</a></td><td class="nu">rhickey</td><td>RSchulz: this is a pure Java problem - the agents just use the Executors framework</td></tr>
+<tr id="t1345A" class="h"><td><a href="#t1345A">13:45</a></td><td class="nr">RSchulz</td><td>Eh? I want it to run as part of the JVM shutdown processing. That's what they're for, right?</td></tr>
+<tr id="t1345A" class="h"><td><a href="#t1345A">13:45</a></td><td class="nu">rhickey</td><td>RSchulz: shutdown happens after all threads are done</td></tr>
+<tr id="t1346A" class="h"><td><a href="#t1346A">13:46</a></td><td class="nr">RSchulz</td><td>So what's the problem? Why do I hang upon CTRL-D from the REPL unless I call (shutdown-agents) _from_ the REPL?</td></tr>
+<tr id="t1346A" class="h r"><td><a href="#t1346A">13:46</a></td><td class="nr">RSchulz</td><td>So it's a chicken-and-egg thing?</td></tr>
+<tr id="t1346A" class="h"><td><a href="#t1346A">13:46</a></td><td class="nu">rhickey</td><td>ctrl-d works for me</td></tr>
+<tr id="t1346A" class="h"><td><a href="#t1346A">13:46</a></td><td class="nr">RSchulz</td><td>rhickey: When you've started agents?</td></tr>
+<tr id="t1346A" class="h"><td><a href="#t1346A">13:46</a></td><td class="nj">walters</td><td>the threads have to be daemon threads (see Thread.setDaemon)</td></tr>
+<tr id="t1346A" class="h"><td><a href="#t1346A">13:46</a></td><td class="nr">RSchulz</td><td>Agents that _have_ been (await ...) -ed?</td></tr>
+<tr id="t1347A" class="h"><td><a href="#t1347A">13:47</a></td><td class="nu">rhickey</td><td>RSchulz: there-s your problem - your awaiting and not geting your ctrl-d</td></tr>
+<tr id="t1347A" class="h"><td><a href="#t1347A">13:47</a></td><td class="nr">RSchulz</td><td>Eh?</td></tr>
+<tr id="t1347A" class="h r"><td><a href="#t1347A">13:47</a></td><td class="nr">RSchulz</td><td>Every agent I start gets awaited. Then later on when I CTRL-D, it hangs.</td></tr>
+<tr id="t1347A" class="h"><td><a href="#t1347A">13:47</a></td><td class="nu">rhickey</td><td>you're blocked in await and don't see eof</td></tr>
+<tr id="t1348A" class="h"><td><a href="#t1348A">13:48</a></td><td class="nr">RSchulz</td><td>I'm _not_ blocked in await. It returns. Otherwise I wouldnt' get the next REPL prompt.</td></tr>
+<tr id="t1348A" class="h r"><td><a href="#t1348A">13:48</a></td><td class="nr">RSchulz</td><td>I can do much stuff after returning from await and then when I CTRL-D, it hangs.</td></tr>
+<tr id="t1349A" class="h"><td><a href="#t1349A">13:49</a></td><td class="nu">rhickey</td><td>RSchulz: please write a small example program that demonstrates your problem. Debugging english descriptions is impossible</td></tr>
+<tr id="t1349A" class="h"><td><a href="#t1349A">13:49</a></td><td class="nr">RSchulz</td><td>And do what with it?</td></tr>
+<tr id="t1349A" class="h r"><td><a href="#t1349A">13:49</a></td><td class="nr">RSchulz</td><td>Send it to the list?</td></tr>
+<tr id="t1349A" class="h r"><td><a href="#t1349A">13:49</a></td><td class="nr">RSchulz</td><td>The reason I'm here now is that that thread on the list didn't get any resolution...</td></tr>
+<tr id="t1350A"><td><a href="#t1350A">13:50</a></td><td class="nu">rhickey</td><td>yeah, or paste here. You're saying you have a problem - help us replicate it. You didn't post code there either.</td></tr>
+<tr id="t1351A" class="h r"><td><a href="#t1351A">13:51</a></td><td class="nu">rhickey</td><td>can't replicate, can;t fix. Giving a verbal description puts the onus on others to write a test case to reproduce the problem</td></tr>
+<tr id="t1351A" class="h"><td><a href="#t1351A">13:51</a></td><td class="nk">Chouser</td><td>RSchulz: is this clojure.lang.Repl, or some other Repl?</td></tr>
+<tr id="t1351A" class="h"><td><a href="#t1351A">13:51</a></td><td class="nr">RSchulz</td><td>The Contrib REPL.</td></tr>
+<tr id="t1352A" class="h"><td><a href="#t1352A">13:52</a></td><td class="nk">Chouser</td><td>clojure.lang.Repl does a System/exit after ^D, which doesn't hang on the agent pools.</td></tr>
+<tr id="t1355A" class="h"><td><a href="#t1355A">13:55</a></td><td class="nn">AWizzArd</td><td>Can I find out the path in which my program was run? If yes, how?</td></tr>
+<tr id="t1400A"><td><a href="#t1400A">14:00</a></td><td class="nj">Lau_of_DK</td><td>Onus.... :)</td></tr>
+<tr id="t1401A" class="h"><td><a href="#t1401A">14:01</a></td><td class="nu">rhickey</td><td>Chouser: I wonder if this unifying patch still does that? <a href="http://groups.google.com/group/clojure/browse_frm/thread/2aeb7bdc789d5933#">http://groups.google.com/group/clojure/browse_frm/thread/2aeb7bdc789d5933#</a></td></tr>
+<tr id="t1402A" class="h"><td><a href="#t1402A">14:02</a></td><td class="nr">RSchulz</td><td>OK. There it is (on the list).</td></tr>
+<tr id="t1404A" class="h"><td><a href="#t1404A">14:04</a></td><td class="nk">Chouser</td><td>rhickey: that patch appears to remove the System/exit and not re-instate it anywhere.  I'm not in a position to test it directly right now.</td></tr>
+<tr id="t1405A" class="h r"><td><a href="#t1405A">14:05</a></td><td class="nk">Chouser</td><td>I've got completely hangled classloaders at the moment.</td></tr>
+<tr id="t1405A" class="h r"><td><a href="#t1405A">14:05</a></td><td class="nk">Chouser</td><td>mangled</td></tr>
+<tr id="t1423A"><td><a href="#t1423A">14:23</a></td><td class="nn">AWizzArd</td><td>Is there something like read-line for files, which returns a vector of strings (of the lines of that file)?</td></tr>
+<tr id="t1423A" class="h"><td><a href="#t1423A">14:23</a></td><td class="nk">Chouser</td><td>(doc line-seq)</td></tr>
+<tr id="t1423A" class="h"><td><a href="#t1423A">14:23</a></td><td class="nl">clojurebot</td><td>Returns the lines of text from rdr as a lazy sequence of strings.   rdr must implement java.io.BufferedReader.; arglists ([rdr])</td></tr>
+<tr id="t1423A" class="h"><td><a href="#t1423A">14:23</a></td><td class="nv">kotarak</td><td>There is line-seq.</td></tr>
+<tr id="t1424A" class="h"><td><a href="#t1424A">14:24</a></td><td class="nn">AWizzArd</td><td>Okay, so that is a bit closer to what I meant, thanks</td></tr>
+<tr id="t1425A" class="h r"><td><a href="#t1425A">14:25</a></td><td class="nn">AWizzArd</td><td>omg, I just saw <a href="http://www.roseindia.net/java/beginners/java-read-file-line-by-line.shtml">http://www.roseindia.net/java/beginners/java-read-file-line-by-line.shtml</a></td></tr>
+<tr id="t1425A" class="h r"><td><a href="#t1425A">14:25</a></td><td class="nn">AWizzArd</td><td>why not just say (map function (lines &quot;myfile.txt&quot;)) ?</td></tr>
+<tr id="t1426A" class="h r"><td><a href="#t1426A">14:26</a></td><td class="nn">AWizzArd</td><td>4x new in that file, uh!!</td></tr>
+<tr id="t1426A" class="h r"><td><a href="#t1426A">14:26</a></td><td class="nn">AWizzArd</td><td>&quot;new&quot;</td></tr>
+<tr id="t1426A" class="h"><td><a href="#t1426A">14:26</a></td><td class="nk">Chouser</td><td>to be fair, a couple of those are still needed with line-seq</td></tr>
+<tr id="t1427A" class="h r"><td><a href="#t1427A">14:27</a></td><td class="nk">Chouser</td><td>only with duck-streams to we start to rise above</td></tr>
+<tr id="t1427A" class="h"><td><a href="#t1427A">14:27</a></td><td class="nj">walters</td><td>that DataInputStream is unnecessary, you only need FileReader and BufferedReader</td></tr>
+<tr id="t1428A" class="h r"><td><a href="#t1428A">14:28</a></td><td class="nj">walters</td><td>(i'm not defending the bewildering lack of File.open() in the JDK, but it's not quite that bad)</td></tr>
+<tr id="t1430A"><td><a href="#t1430A">14:30</a></td><td class="nn">AWizzArd</td><td>I think the easiest really is to use the ds/reader + line-seq.</td></tr>
+<tr id="t1430A" class="h r"><td><a href="#t1430A">14:30</a></td><td class="nn">AWizzArd</td><td>But ds/reader is not lazy, right? So it will read the whole file, may it be 50 bytes or 3 GB, yes?</td></tr>
+<tr id="t1434A" class="h"><td><a href="#t1434A">14:34</a></td><td class="nk">Chouser</td><td>no, ds/reader just creates an appropriate java.io object, it doesn't actually read anything.</td></tr>
+<tr id="t1435A" class="h"><td><a href="#t1435A">14:35</a></td><td class="nn">AWizzArd</td><td>okay, and line-seq itself is lazy</td></tr>
+<tr id="t1435A" class="h r"><td><a href="#t1435A">14:35</a></td><td class="nn">AWizzArd</td><td>so if I just want the first 100 lines out of 21 millions it would take +/- as much time as if the file would only have these first 100 lines.</td></tr>
+<tr id="t1437A" class="h"><td><a href="#t1437A">14:37</a></td><td class="nu">rhickey</td><td>Chouser: nice post to code with line number in google code!</td></tr>
+<tr id="t1437A" class="h r"><td><a href="#t1437A">14:37</a></td><td class="nu">rhickey</td><td>very useful</td></tr>
+<tr id="t1438A" class="h"><td><a href="#t1438A">14:38</a></td><td class="nk">Chouser</td><td>I've been wanting to do that, but sf.net was just too slow to be useful.</td></tr>
+<tr id="t1439A" class="h r"><td><a href="#t1439A">14:39</a></td><td class="nk">Chouser</td><td>the rev number is in there too, so reading that thread a few weeks from now it should still make sense.</td></tr>
+<tr id="t1439A" class="h"><td><a href="#t1439A">14:39</a></td><td class="nu">rhickey</td><td>saw that, very nice</td></tr>
+<tr id="t1442A" class="r"><td><a href="#t1442A">14:42</a></td><td class="nu">rhickey</td><td>code browsing seems very peppy</td></tr>
+<tr id="t1445A" class="h"><td><a href="#t1445A">14:45</a></td><td class="nj">Lau_of_DK</td><td>rhickey: That &quot;issue tracker&quot; doesnt really seem to be the right tool for the job ?</td></tr>
+<tr id="t1446A" class="h"><td><a href="#t1446A">14:46</a></td><td class="nu">rhickey</td><td>Lau_of_DK: how so?</td></tr>
+<tr id="t1446A" class="h"><td><a href="#t1446A">14:46</a></td><td class="nr">RSchulz</td><td>Is there a way to get GC to colorize .clj files?</td></tr>
+<tr id="t1446A" class="h"><td><a href="#t1446A">14:46</a></td><td class="nj">Lau_of_DK</td><td>rhickey: It doesnt provide a very good overview I think. And when reading on &quot;pretty printing&quot; for instance, next to no info is providing in the underlying 3 links.</td></tr>
+<tr id="t1447A" class="h"><td><a href="#t1447A">14:47</a></td><td class="nv">kotarak</td><td>At least the template chooser could be more prominent. (And also marked as necessary for the type of issue)</td></tr>
+<tr id="t1458A"><td><a href="#t1458A">14:58</a></td><td class="nd">hiredman</td><td>so clojure svn is in google code now?</td></tr>
+<tr id="t1458A" class="h"><td><a href="#t1458A">14:58</a></td><td class="nk">Chouser</td><td>hiredman: yes</td></tr>
+<tr id="t1458A" class="h"><td><a href="#t1458A">14:58</a></td><td class="nd">hiredman</td><td>clojurebot: svn is svn checkout <a href="http://clojure.googlecode.com/svn/trunk/">http://clojure.googlecode.com/svn/trunk/</a> clojure-read-only</td></tr>
+<tr id="t1458A" class="h"><td><a href="#t1458A">14:58</a></td><td class="nl">clojurebot</td><td>You don't have to tell me twice.</td></tr>
+<tr id="t1459A" class="h"><td><a href="#t1459A">14:59</a></td><td class="nj">Lau_of_DK</td><td>Chouser: Have we switched away from Sourceforge to Googlecode?</td></tr>
+<tr id="t1459A" class="h"><td><a href="#t1459A">14:59</a></td><td class="nk">Chouser</td><td>yes</td></tr>
+<tr id="t1459A" class="h"><td><a href="#t1459A">14:59</a></td><td class="nj">Lau_of_DK</td><td>For what reason ?</td></tr>
+<tr id="t1500A"><td><a href="#t1500A">15:00</a></td><td class="nd">hiredman</td><td>sf is :(</td></tr>
+<tr id="t1500A" class="h"><td><a href="#t1500A">15:00</a></td><td class="nk">Chouser</td><td>more features, better response time</td></tr>
+<tr id="t1501A" class="h"><td><a href="#t1501A">15:01</a></td><td class="ni">danm_</td><td>google code sure is faster</td></tr>
+<tr id="t1502A" class="h"><td><a href="#t1502A">15:02</a></td><td class="nj">Lau_of_DK</td><td>Chouser: Am I to understand that we yet again missed a golden opportunity to switch to Git ? :)</td></tr>
+<tr id="t1502A" class="h"><td><a href="#t1502A">15:02</a></td><td class="nk">Chouser</td><td>nope. switching to git is still a dead subject (imo) until Rich brings it up.</td></tr>
+<tr id="t1503A" class="h"><td><a href="#t1503A">15:03</a></td><td class="nj">Lau_of_DK</td><td>Chouser: k</td></tr>
+<tr id="t1504A" class="h"><td><a href="#t1504A">15:04</a></td><td class="nd">hiredman</td><td>clojurebot: relocate is svn switch --relocate file:/$PWD  <a href="http://clojure.googlecode.com/svn/">http://clojure.googlecode.com/svn/</a></td></tr>
+<tr id="t1504A" class="h"><td><a href="#t1504A">15:04</a></td><td class="nl">clojurebot</td><td>c'est bon!</td></tr>
+<tr id="t1504A" class="h"><td><a href="#t1504A">15:04</a></td><td class="ni">jimm</td><td>The download link on clojure.org still points to Subversion. Is that intended?</td></tr>
+<tr id="t1505A" class="h"><td><a href="#t1505A">15:05</a></td><td class="nk">Chouser</td><td>that's the only place to get a .zip for now, I think.</td></tr>
+<tr id="t1505A" class="h"><td><a href="#t1505A">15:05</a></td><td class="nu">rhickey</td><td>jimm: that's where the download is until the next release</td></tr>
+<tr id="t1505A" class="h"><td><a href="#t1505A">15:05</a></td><td class="ni">jimm</td><td>rhickey: thank you</td></tr>
+<tr id="t1505A" class="h r"><td><a href="#t1505A">15:05</a></td><td class="ni">jimm</td><td>I see, the SVN link has been updated to google code</td></tr>
+<tr id="t1506A" class="h"><td><a href="#t1506A">15:06</a></td><td class="nd">hiredman</td><td>svn rev 1162</td></tr>
+<tr id="t1507A" class="h"><td><a href="#t1507A">15:07</a></td><td class="nl">clojurebot</td><td>svn rev 1162; EPL in header</td></tr>
+<tr id="t1507A" class="h r"><td><a href="#t1507A">15:07</a></td><td class="nl">clojurebot</td><td>svn rev 1168; Edited wiki page through web user interface.</td></tr>
+<tr id="t1507A" class="h r"><td><a href="#t1507A">15:07</a></td><td class="nl">clojurebot</td><td>svn rev 1169; Edited wiki page through web user interface.</td></tr>
+<tr id="t1507A" class="h r"><td><a href="#t1507A">15:07</a></td><td class="nl">clojurebot</td><td>svn rev 1170; Edited wiki page through web user interface.</td></tr>
+<tr id="t1507A" class="h r"><td><a href="#t1507A">15:07</a></td><td class="nl">clojurebot</td><td>svn rev 1171; Edited wiki page through web user interface.</td></tr>
+<tr id="t1507A" class="h r"><td><a href="#t1507A">15:07</a></td><td class="nl">clojurebot</td><td>svn rev 1172; Edited wiki page through web user interface.</td></tr>
+<tr id="t1507A" class="h"><td><a href="#t1507A">15:07</a></td><td class="nd">hiredman</td><td>eeep</td></tr>
+<tr id="t1509A" class="h"><td><a href="#t1509A">15:09</a></td><td class="nu">rhickey</td><td>I'll start putting comments on wiki edits since they're going in svn</td></tr>
+<tr id="t1511A"><td><a href="#t1511A">15:11</a></td><td class="nd">hiredman</td><td>maybe I should filter wiki edits out?</td></tr>
+<tr id="t1512A" class="h"><td><a href="#t1512A">15:12</a></td><td class="nk">Chouser</td><td>hiredman: it might be a bit noisy for a couple days, but I wouldn't be surprised if we appreciate the notification after a week or so</td></tr>
+<tr id="t1513A" class="h r"><td><a href="#t1513A">15:13</a></td><td class="nk">Chouser</td><td>that's very interesting, though -- the wiki is stored in the projects own svn repo.</td></tr>
+<tr id="t1513A" class="h"><td><a href="#t1513A">15:13</a></td><td class="nd">hiredman</td><td>it's cute</td></tr>
+<tr id="t1514A" class="h r"><td><a href="#t1514A">15:14</a></td><td class="nd">hiredman</td><td>gah, that svn relocate deal doesn't really work</td></tr>
+<tr id="t1517A" class="h"><td><a href="#t1517A">15:17</a></td><td class="nl">clojurebot</td><td>svn rev 1168; Edited wiki page through web user interface.</td></tr>
+<tr id="t1517A" class="h r"><td><a href="#t1517A">15:17</a></td><td class="nl">clojurebot</td><td>svn rev 1169; Edited wiki page through web user interface.</td></tr>
+<tr id="t1517A" class="h r"><td><a href="#t1517A">15:17</a></td><td class="nl">clojurebot</td><td>svn rev 1170; Edited wiki page through web user interface.</td></tr>
+<tr id="t1517A" class="h r"><td><a href="#t1517A">15:17</a></td><td class="nl">clojurebot</td><td>svn rev 1171; Edited wiki page through web user interface.</td></tr>
+<tr id="t1517A" class="h r"><td><a href="#t1517A">15:17</a></td><td class="nl">clojurebot</td><td>svn rev 1172; Edited wiki page through web user interface.</td></tr>
+<tr id="t1517A" class="h"><td><a href="#t1517A">15:17</a></td><td class="nd">hiredman</td><td>clojurebot: stop that</td></tr>
+<tr id="t1517A" class="h"><td><a href="#t1517A">15:17</a></td><td class="nl">clojurebot</td><td>I don't understand.</td></tr>
+<tr id="t1538A"><td><a href="#t1538A">15:38</a></td><td class="na">holmak</td><td>Apparently it is not acceptable to use the #() anonymous function form inside (-&gt; ...)  -- is this expected?</td></tr>
+<tr id="t1538A" class="h"><td><a href="#t1538A">15:38</a></td><td class="nv">kotarak</td><td>holmak: you have to take care (-&gt; x (#(do-something %)))</td></tr>
+<tr id="t1539A" class="h"><td><a href="#t1539A">15:39</a></td><td class="na">holmak</td><td>ah</td></tr>
+<tr id="t1539A" class="h"><td><a href="#t1539A">15:39</a></td><td class="nk">Chouser</td><td>hm.</td></tr>
+<tr id="t1539A" class="h"><td><a href="#t1539A">15:39</a></td><td class="na">holmak</td><td>I guess -&gt; was interacting poorly with the #() macro.</td></tr>
+<tr id="t1540A"><td><a href="#t1540A">15:40</a></td><td class="nk">Chouser</td><td>indeed, the item to the left of #() is used as the name of the anonymous function</td></tr>
+<tr id="t1540A" class="h"><td><a href="#t1540A">15:40</a></td><td class="na">holmak</td><td>I thought since #(...) makes a function, -&gt; ought to treat it as a non-list, and turn it into (#(...) arg)</td></tr>
+<tr id="t1540A" class="h r"><td><a href="#t1540A">15:40</a></td><td class="na">holmak</td><td>That's obviously not what happens, given the macro expansions</td></tr>
+<tr id="t1542A" class="h"><td><a href="#t1542A">15:42</a></td><td class="nk">Chouser</td><td>(-&gt; foo #(+ % 2) (apply [3]))  ==&gt;  5</td></tr>
+<tr id="t1542A" class="h r"><td><a href="#t1542A">15:42</a></td><td class="nk">Chouser</td><td>-&gt; is easy to abuse.</td></tr>
+<tr id="t1542A" class="h"><td><a href="#t1542A">15:42</a></td><td class="na">holmak</td><td>I will use caution, then.</td></tr>
+<tr id="t1542A" class="h"><td><a href="#t1542A">15:42</a></td><td class="nk">Chouser</td><td>(-&gt; [i 3] (dotimes (prn i)))</td></tr>
+<tr id="t1542A" class="h"><td><a href="#t1542A">15:42</a></td><td class="nd">hiredman</td><td>cute</td></tr>
+<tr id="t1543A" class="h"><td><a href="#t1543A">15:43</a></td><td class="na">holmak</td><td>You're making it look downright dangerous</td></tr>
+<tr id="t1543A" class="h r"><td><a href="#t1543A">15:43</a></td><td class="na">holmak</td><td>&quot;-&gt; considered harmful&quot;</td></tr>
+<tr id="t1543A" class="h"><td><a href="#t1543A">15:43</a></td><td class="nv">kotarak</td><td>bah, -&gt; is cool. :)</td></tr>
+<tr id="t1543A" class="h"><td><a href="#t1543A">15:43</a></td><td class="nk">Chouser</td><td>well, just don't use it in circumstances where it makes things harder to read.</td></tr>
+<tr id="t1544A" class="h"><td><a href="#t1544A">15:44</a></td><td class="nv">kotarak</td><td>But it should really work as in: (-&gt; 5 #(inc %))...</td></tr>
+<tr id="t1544A" class="h"><td><a href="#t1544A">15:44</a></td><td class="nk">Chouser</td><td>I would suggest both my above examples fall in the &quot;don't you dare&quot; category.</td></tr>
+<tr id="t1544A" class="h"><td><a href="#t1544A">15:44</a></td><td class="nd">hiredman</td><td>cool like riding a motorcycle with no helmet</td></tr>
+<tr id="t1544A" class="h"><td><a href="#t1544A">15:44</a></td><td class="nv">kotarak</td><td>after the &quot;here be dragons&quot; sign</td></tr>
+<tr id="t1545A" class="h"><td><a href="#t1545A">15:45</a></td><td class="na">holmak</td><td>I'm thinking I should find another way of writing the section of code.</td></tr>
+<tr id="t1546A" class="h"><td><a href="#t1546A">15:46</a></td><td class="nk">Chouser</td><td>-&gt; is brilliant for expressions like: (-&gt; &quot;tmp.txt&quot; File. FileReader. BufferedReader. line-seq)</td></tr>
+<tr id="t1547A" class="h"><td><a href="#t1547A">15:47</a></td><td class="nj">Chousuke</td><td>I see it as a generalised ..</td></tr>
+<tr id="t1547A" class="h"><td><a href="#t1547A">15:47</a></td><td class="nd">hiredman</td><td>yes</td></tr>
+<tr id="t1547A" class="h"><td><a href="#t1547A">15:47</a></td><td class="nv">kotarak</td><td>or: (-&gt; (var reduce) meta :ns ns-name name)</td></tr>
+<tr id="t1547A" class="h r"><td><a href="#t1547A">15:47</a></td><td class="nv">kotarak</td><td>very handy indeed</td></tr>
+<tr id="t1547A" class="h"><td><a href="#t1547A">15:47</a></td><td class="na">holmak</td><td>My problem is that (let [dbl #(* 2 %)] (-&gt; 42 dbl)) is not the same as (-&gt; 42 #(* 2 %))</td></tr>
+<tr id="t1548A" class="h"><td><a href="#t1548A">15:48</a></td><td class="nv">kotarak</td><td>(-&gt; 42 (* 2)) ?</td></tr>
+<tr id="t1548A" class="h"><td><a href="#t1548A">15:48</a></td><td class="nj">Chousuke</td><td>holmak: the reason for that is simple, though</td></tr>
+<tr id="t1548A" class="h r"><td><a href="#t1548A">15:48</a></td><td class="nj">Chousuke</td><td>since #(* 2 %) expands to a list</td></tr>
+<tr id="t1548A" class="h"><td><a href="#t1548A">15:48</a></td><td class="na">holmak</td><td>Oh, I understand why, but substitution like that feels like it should work.</td></tr>
+<tr id="t1549A" class="h"><td><a href="#t1549A">15:49</a></td><td class="nj">Chousuke</td><td>I don't see a simple way to make it work though.</td></tr>
+<tr id="t1549A" class="h"><td><a href="#t1549A">15:49</a></td><td class="nd">hiredman</td><td>holmak: <a href="http://www.thelastcitadel.com/blag/pipe_macro">http://www.thelastcitadel.com/blag/pipe_macro</a></td></tr>
+<tr id="t1549A" class="h"><td><a href="#t1549A">15:49</a></td><td class="nj">Chousuke</td><td>besides some special handling for #() :/</td></tr>
+<tr id="t1549A" class="h"><td><a href="#t1549A">15:49</a></td><td class="na">holmak</td><td>The other thing is that the error was extremely unhelpful.</td></tr>
+<tr id="t1549A" class="h"><td><a href="#t1549A">15:49</a></td><td class="nd">hiredman</td><td>I think that maybe an icky macro</td></tr>
+<tr id="t1550A"><td><a href="#t1550A">15:50</a></td><td class="na">holmak</td><td>That's the bigger problem: java.lang.ClassCastException: java.lang.Integer cannot be cast to clojure.lang.ISeq</td></tr>
+<tr id="t1550A" class="h"><td><a href="#t1550A">15:50</a></td><td class="nv">kotarak</td><td>I think the problem is, that #() is expanded by the reader.</td></tr>
+<tr id="t1551A" class="h"><td><a href="#t1551A">15:51</a></td><td class="na">holmak</td><td>Maybe the documentation should have a warning about using #() with -&gt; ?</td></tr>
+<tr id="t1553A" class="h r"><td><a href="#t1553A">15:53</a></td><td class="na">holmak</td><td>hiredman: That pipe macro is interesting.</td></tr>
+<tr id="t1553A" class="h"><td><a href="#t1553A">15:53</a></td><td class="nd">hiredman</td><td>&quot;# signals a reader macro, there be dragons&quot;</td></tr>
+<tr id="t1553A" class="h"><td><a href="#t1553A">15:53</a></td><td class="nr">RSchulz</td><td>holmak: Clojure's error diagnostics are meant as a form of aversive therapy to accelerate your learning and deter incorrect ussage.</td></tr>
+<tr id="t1553A" class="h"><td><a href="#t1553A">15:53</a></td><td class="na">holmak</td><td>&quot;Don't get errors, because they will be completely and utterly unhelpful&quot; ?</td></tr>
+<tr id="t1553A" class="h r"><td><a href="#t1553A">15:53</a></td><td class="na">holmak</td><td>:D</td></tr>
+<tr id="t1555A" class="h"><td><a href="#t1555A">15:55</a></td><td class="nr">RSchulz</td><td>Yeah. something like that.</td></tr>
+<tr id="t1555A" class="h"><td><a href="#t1555A">15:55</a></td><td class="nk">Chouser</td><td>what should the error be, in that case, and how would the code detect it?</td></tr>
+<tr id="t1556A" class="h"><td><a href="#t1556A">15:56</a></td><td class="na">holmak</td><td>I have no idea, there's really nothing that can be done, probably. I was just really puzzled.</td></tr>
+<tr id="t1556A" class="h"><td><a href="#t1556A">15:56</a></td><td class="nd">hiredman</td><td>&quot;I've noticed you are using -&gt;, I bet you think you're clever don't you? EXCEPTION!&quot;</td></tr>
+<tr id="t1557A" class="h"><td><a href="#t1557A">15:57</a></td><td class="nr">RSchulz</td><td>I think, very generally speaking, the extreme parsimony of a language like Clojure is an impediment to error diagnostics. In a language like Java which is so verbose, there are more (in some sense) redundant queues that the compiler / interpreter can use to clarify their error messages.</td></tr>
+<tr id="t1557A" class="h"><td><a href="#t1557A">15:57</a></td><td class="na">holmak</td><td>Clearly what is needed is an ExcessiveClevernessException</td></tr>
+<tr id="t1557A" class="h"><td><a href="#t1557A">15:57</a></td><td class="nr">RSchulz</td><td>&quot;My master told me I was clever. I thought it was a complement. He meant it as an insult.&quot;</td></tr>
+<tr id="t1558A" class="h r"><td><a href="#t1558A">15:58</a></td><td class="nr">RSchulz</td><td>(Or &quot;compliment,&quot; as the case may be...)</td></tr>
+<tr id="t1558A" class="h"><td><a href="#t1558A">15:58</a></td><td class="na">holmak</td><td>RShulz: I agree completely. It's kind of hard to write an actual invalid form in Clojure. You just end up writing something valid, but nonsensical.</td></tr>
+<tr id="t1603A"><td><a href="#t1603A">16:03</a></td><td class="nw">lisppaste8</td><td>kotarak pasted &quot;Voodoo -&gt;?&quot; at <a href="http://paste.lisp.org/display/72311">http://paste.lisp.org/display/72311</a></td></tr>
+<tr id="t1605A" class="h"><td><a href="#t1605A">16:05</a></td><td class="nd">hiredman</td><td>it's a recursive macro, I guess</td></tr>
+<tr id="t1605A" class="h"><td><a href="#t1605A">16:05</a></td><td class="nr">RSchulz</td><td>holmak: Or something the error of which is detected a distant point of execution.</td></tr>
+<tr id="t1606A" class="h"><td><a href="#t1606A">16:06</a></td><td class="nv">kotarak</td><td>&quot;Debugging code is harder than programming it. So if you code as clever as you can - by definition - you wont be able to debug it.&quot; (Free after Kernighan? maybe?)</td></tr>
+<tr id="t1609A" class="h"><td><a href="#t1609A">16:09</a></td><td class="nd">hiredman</td><td>which is why you need a repl</td></tr>
+<tr id="t1609A" class="h"><td><a href="#t1609A">16:09</a></td><td class="nv">kotarak</td><td>Earnestly: can we use fn* as marker for #()? One isn't supposed to use it anyway.</td></tr>
+<tr id="t1610A"><td><a href="#t1610A">16:10</a></td><td class="nr">RSchulz</td><td>Should we not avoid using undocumented forms?</td></tr>
+<tr id="t1612A" class="h"><td><a href="#t1612A">16:12</a></td><td class="nv">kotarak</td><td>We don't use it. Just as a marker. (but in the end this is still a bad idea...)</td></tr>
+<tr id="t1623A"><td><a href="#t1623A">16:23</a></td><td class="nj">drewr</td><td>What is the value of *ns* supposed to be if I've declared (ns foo.bar) right before referencing it?</td></tr>
+<tr id="t1623A" class="h r"><td><a href="#t1623A">16:23</a></td><td class="nj">drewr</td><td>I keep getting clojure.core.</td></tr>
+<tr id="t1623A" class="h r"><td><a href="#t1623A">16:23</a></td><td class="nj">drewr</td><td>I'd rather get foo.bar.</td></tr>
+<tr id="t1625A" class="h"><td><a href="#t1625A">16:25</a></td><td class="nd">hiredman</td><td>I get foo.bar</td></tr>
+<tr id="t1625A" class="h"><td><a href="#t1625A">16:25</a></td><td class="nk">Chouser</td><td>drewr: in the next top-level form, *ns* should be foo.bar</td></tr>
+<tr id="t1626A" class="h"><td><a href="#t1626A">16:26</a></td><td class="nd">hiredman</td><td>hiredman.clojurebot=&gt; (do (ns foo.bar) (prn *ns*) (in-ns 'hiredman.clojurebot))</td></tr>
+<tr id="t1626A" class="h r"><td><a href="#t1626A">16:26</a></td><td class="nd">hiredman</td><td>#&lt;Namespace foo.bar&gt;</td></tr>
+<tr id="t1626A" class="h r"><td><a href="#t1626A">16:26</a></td><td class="nd">hiredman</td><td>#&lt;Namespace hiredman.clojurebot&gt;</td></tr>
+<tr id="t1626A" class="h r"><td><a href="#t1626A">16:26</a></td><td class="nd">hiredman</td><td>hiredman.clojurebot=&gt;</td></tr>
+<tr id="t1628A" class="h"><td><a href="#t1628A">16:28</a></td><td class="nj">drewr</td><td>It's inside of a defn and a let.</td></tr>
+<tr id="t1629A" class="h"><td><a href="#t1629A">16:29</a></td><td class="nd">hiredman</td><td>juggling namespaces inside a defn does not sound like a good idea</td></tr>
+<tr id="t1629A" class="h r"><td><a href="#t1629A">16:29</a></td><td class="nd">hiredman</td><td>and you'll never get me to admit that I do it</td></tr>
+<tr id="t1630A"><td><a href="#t1630A">16:30</a></td><td class="nr">RSchulz</td><td>Not an open-source kinda' guy?</td></tr>
+<tr id="t1631A" class="h"><td><a href="#t1631A">16:31</a></td><td class="nd">hiredman</td><td>just in denial</td></tr>
+<tr id="t1633A" class="h"><td><a href="#t1633A">16:33</a></td><td class="nx">danlarkin</td><td>drewr: the ns macro is designed to be used once per file at the top</td></tr>
+<tr id="t1633A" class="h r"><td><a href="#t1633A">16:33</a></td><td class="nx">danlarkin</td><td>not in a function or a let</td></tr>
+<tr id="t1633A" class="h"><td><a href="#t1633A">16:33</a></td><td class="nj">drewr</td><td>I see. *ns* is the current namespace of the *caller* of a fn.</td></tr>
+<tr id="t1634A" class="h"><td><a href="#t1634A">16:34</a></td><td class="nr">RSchulz</td><td>Open source kind of undermines the plausibility of one's denials...</td></tr>
+<tr id="t1634A" class="h"><td><a href="#t1634A">16:34</a></td><td class="nd">hiredman</td><td>RSchulz: I am in denial about that</td></tr>
+<tr id="t1634A" class="h"><td><a href="#t1634A">16:34</a></td><td class="nj">drewr</td><td>How can I get to the enclosing namespace of a fn?</td></tr>
+<tr id="t1635A" class="h"><td><a href="#t1635A">16:35</a></td><td class="nr">RSchulz</td><td>^#'find-doc</td></tr>
+<tr id="t1635A" class="h r"><td><a href="#t1635A">16:35</a></td><td class="nr">RSchulz</td><td>(Using find-doc as an example)</td></tr>
+<tr id="t1636A" class="h r"><td><a href="#t1636A">16:36</a></td><td class="nr">RSchulz</td><td>drewr: To be explicit, the namespace is an element of the metadata of the Var holding the entity in question.</td></tr>
+<tr id="t1636A" class="h"><td><a href="#t1636A">16:36</a></td><td class="nj">drewr</td><td>OK, it's in the meta, but then I need to know the name of the function. :-/</td></tr>
+<tr id="t1636A" class="h r"><td><a href="#t1636A">16:36</a></td><td class="nj">drewr</td><td>Is there no way to say &quot;give me the namespace that owns the fn I'm in?&quot;</td></tr>
+<tr id="t1637A" class="h"><td><a href="#t1637A">16:37</a></td><td class="nr">RSchulz</td><td>It's like buying a household appliance that will tell you the address of the house in which you've installed it.</td></tr>
+<tr id="t1637A" class="h r"><td><a href="#t1637A">16:37</a></td><td class="nr">RSchulz</td><td>(which is my clever way of saying that's static information.)</td></tr>
+<tr id="t1637A" class="h"><td><a href="#t1637A">16:37</a></td><td class="nc">alphazero</td><td>hi all.</td></tr>
+<tr id="t1638A" class="h"><td><a href="#t1638A">16:38</a></td><td class="nk">Chouser</td><td>drewr: you want this info at runtime?</td></tr>
+<tr id="t1638A" class="h"><td><a href="#t1638A">16:38</a></td><td class="nc">alphazero</td><td>I'm trying to run ants.clj and am getting Exception in thread &quot;main&quot; java.lang.Exception: Unable to resolve symbol: setColor in this context (ants.clj:234)</td></tr>
+<tr id="t1638A" class="h"><td><a href="#t1638A">16:38</a></td><td class="nj">drewr</td><td>Chouser: Yep.</td></tr>
+<tr id="t1638A" class="h"><td><a href="#t1638A">16:38</a></td><td class="nc">alphazero</td><td>(defn fill-cell [#^Graphics g x y c]</td></tr>
+<tr id="t1638A" class="h r"><td><a href="#t1638A">16:38</a></td><td class="nc">alphazero</td><td>  (doto g</td></tr>
+<tr id="t1638A" class="h r"><td><a href="#t1638A">16:38</a></td><td class="nc">alphazero</td><td>    (setColor c)</td></tr>
+<tr id="t1638A" class="h r"><td><a href="#t1638A">16:38</a></td><td class="nc">alphazero</td><td>    (fillRect (* x scale) (* y scale) scale scale)))</td></tr>
+<tr id="t1639A" class="h"><td><a href="#t1639A">16:39</a></td><td class="nk">Chouser</td><td>alphazero: try .setColor and .fillRect (note the dots)</td></tr>
+<tr id="t1639A" class="h"><td><a href="#t1639A">16:39</a></td><td class="nc">alphazero</td><td>running from svn 1162</td></tr>
+<tr id="t1639A" class="h"><td><a href="#t1639A">16:39</a></td><td class="nd">hiredman</td><td>old doto syntax</td></tr>
+<tr id="t1639A" class="h"><td><a href="#t1639A">16:39</a></td><td class="nc">alphazero</td><td>Chouser:  Thanks, I'll do that.</td></tr>
+<tr id="t1643A"><td><a href="#t1643A">16:43</a></td><td class="nu">rhickey</td><td>alphazero: the ants.clj on the Google Group has that change already</td></tr>
+<tr id="t1643A" class="h"><td><a href="#t1643A">16:43</a></td><td class="nk">Chouser</td><td>heh. didn't recognize the code.</td></tr>
+<tr id="t1643A" class="h"><td><a href="#t1643A">16:43</a></td><td class="nu">rhickey</td><td><a href="http://clojure.googlegroups.com/web/ants.clj">http://clojure.googlegroups.com/web/ants.clj</a></td></tr>
+<tr id="t1643A" class="h"><td><a href="#t1643A">16:43</a></td><td class="nc">alphazero</td><td>rhickey:  thanks!  that saves time!</td></tr>
+<tr id="t1645A" class="h r"><td><a href="#t1645A">16:45</a></td><td class="nc">alphazero</td><td>excuse the newb q, but typing clj ants.clj puts up the frame and the blue square but then nothing.</td></tr>
+<tr id="t1646A" class="h r"><td><a href="#t1646A">16:46</a></td><td class="nc">alphazero</td><td>nevermind, just saw the (comment ..)</td></tr>
+<tr id="t1650A" class="r"><td><a href="#t1650A">16:50</a></td><td class="nc">alphazero</td><td>hmm.  changed the /Users/rich/.. to load local file ./ants.clj. and have uncommented the demo block</td></tr>
+<tr id="t1650A" class="h r"><td><a href="#t1650A">16:50</a></td><td class="nc">alphazero</td><td>now it simply keeps flashing the frame, my dual cores going at ~ 60% each.  no ants :(</td></tr>
+<tr id="t1652A" class="h r"><td><a href="#t1652A">16:52</a></td><td class="nc">alphazero</td><td>this is the beginning of a very long stack trace:</td></tr>
+<tr id="t1652A" class="h r"><td><a href="#t1652A">16:52</a></td><td class="nc">alphazero</td><td>Exception in thread &quot;main&quot; java.lang.OutOfMemoryError: PermGen space (ants.clj:215)</td></tr>
+<tr id="t1652A" class="h r"><td><a href="#t1652A">16:52</a></td><td class="nc">alphazero</td><td>        at clojure.lang.Compiler.analyzeSeq(Compiler.java:4113)</td></tr>
+<tr id="t1652A" class="h r"><td><a href="#t1652A">16:52</a></td><td class="nc">alphazero</td><td>        at clojure.lang.Compiler.analyze(Compiler.java:3935)</td></tr>
+<tr id="t1652A" class="h r"><td><a href="#t1652A">16:52</a></td><td class="nc">alphazero</td><td>        at clojure.lang.Compiler.analyzeSeq(Compiler.java:4094)</td></tr>
+<tr id="t1652A" class="h r"><td><a href="#t1652A">16:52</a></td><td class="nc">alphazero</td><td>        at clojure.lang.Compiler.analyze(Compiler.java:3935)</td></tr>
+<tr id="t1652A" class="h r"><td><a href="#t1652A">16:52</a></td><td class="nc">alphazero</td><td>        at clojure.lang.Compiler.analyze(Compiler.java:3908)</td></tr>
+<tr id="t1652A" class="h r"><td><a href="#t1652A">16:52</a></td><td class="nc">alphazero</td><td>        at clojure.lang.Compiler$NewExpr$Parser.parse(Compiler.java:2150)</td></tr>
+<tr id="t1652A" class="h r"><td><a href="#t1652A">16:52</a></td><td class="nc">alphazero</td><td>        at clojure.lang.Compiler.analyzeSeq(Compiler.java:4106)</td></tr>
+<tr id="t1652A" class="h r"><td><a href="#t1652A">16:52</a></td><td class="nc">alphazero</td><td>Running on Mac OS X 10.4 with 1132MB of free mem.</td></tr>
+<tr id="t1652A" class="h"><td><a href="#t1652A">16:52</a></td><td class="nj">Chousuke</td><td>alphazero: next time, please use pastebin :)</td></tr>
+<tr id="t1653A" class="h r"><td><a href="#t1653A">16:53</a></td><td class="nj">Chousuke</td><td>lisppaste8: url</td></tr>
+<tr id="t1653A" class="h"><td><a href="#t1653A">16:53</a></td><td class="nw">lisppaste8</td><td>To use the lisppaste bot, visit <a href="http://paste.lisp.org/new/clojure">http://paste.lisp.org/new/clojure</a> and enter your paste.</td></tr>
+<tr id="t1653A" class="h"><td><a href="#t1653A">16:53</a></td><td class="nj">Chousuke</td><td>there</td></tr>
+<tr id="t1653A" class="h"><td><a href="#t1653A">16:53</a></td><td class="nc">alphazero</td><td>Chousuke: Sorry, will do.</td></tr>
+<tr id="t1654A" class="h"><td><a href="#t1654A">16:54</a></td><td class="nw">lisppaste8</td><td>alphazero pasted &quot;stack trace ants.clj svn 1162 mac os x 10.4 std clj shell script&quot; at <a href="http://paste.lisp.org/display/72318">http://paste.lisp.org/display/72318</a></td></tr>
+<tr id="t1654A" class="h"><td><a href="#t1654A">16:54</a></td><td class="nj">Chousuke</td><td>alphazero: anyway; the default java heap size is limited, you might want to try running java with the -server  option</td></tr>
+<tr id="t1654A" class="h"><td><a href="#t1654A">16:54</a></td><td class="nc">alphazero</td><td>Chousuke:  k, let me try that.</td></tr>
+<tr id="t1654A" class="h"><td><a href="#t1654A">16:54</a></td><td class="nr">RSchulz</td><td>Chousuke: I don't know about Java on the Mac, but I don't think -server will change the heap allocation. That'x -XmxNNN</td></tr>
+<tr id="t1655A" class="h"><td><a href="#t1655A">16:55</a></td><td class="nj">Chousuke</td><td>IIRC -server raises it to 128MB</td></tr>
+<tr id="t1655A" class="h r"><td><a href="#t1655A">16:55</a></td><td class="nj">Chousuke</td><td>from 64 or something</td></tr>
+<tr id="t1655A" class="h"><td><a href="#t1655A">16:55</a></td><td class="nr">RSchulz</td><td>Really? I didn't know that.</td></tr>
+<tr id="t1656A" class="h"><td><a href="#t1656A">16:56</a></td><td class="nj">walters</td><td>permgen space is special</td></tr>
+<tr id="t1656A" class="h"><td><a href="#t1656A">16:56</a></td><td class="nb">rsynnott</td><td>'-server' is a very poorly named option</td></tr>
+<tr id="t1656A" class="h"><td><a href="#t1656A">16:56</a></td><td class="nj">walters</td><td>if you search for &quot;java permgen&quot; you'll get a lot of hits, <a href="http://blogs.sun.com/fkieviet/entry/classloader_leaks_the_dreaded_java">http://blogs.sun.com/fkieviet/entry/classloader_leaks_the_dreaded_java</a> is one</td></tr>
+<tr id="t1657A" class="h"><td><a href="#t1657A">16:57</a></td><td class="nj">Chousuke</td><td>RSchulz: &quot;There is not a distinct server VM for Mac OS X. Although you may use the -server flag when invoking java, it does not start up a different VM, instead it starts the client VM that has been tuned for use in a server environment.&quot; and heap size is included in the tuned parameters :)</td></tr>
+<tr id="t1657A" class="h"><td><a href="#t1657A">16:57</a></td><td class="nj">walters</td><td>basically it's the area where class code is loaded; in most GCs it's a fixed size, and you need special options to enable collecting it</td></tr>
+<tr id="t1657A" class="h"><td><a href="#t1657A">16:57</a></td><td class="nr">RSchulz</td><td>Great. Thanks.</td></tr>
+<tr id="t1657A" class="h r"><td><a href="#t1657A">16:57</a></td><td class="nr">RSchulz</td><td>I knew they were integrated, but the default heap size adjustment had escaped my notice.</td></tr>
+<tr id="t1659A" class="h"><td><a href="#t1659A">16:59</a></td><td class="nc">alphazero</td><td>Well, -server seemed to have pushed cpu util to ~80% but basically same behavior.  not a single ant even showed up, just flashing the screen with a blue box.</td></tr>
+<tr id="t1702A"><td><a href="#t1702A">17:02</a></td><td class="nj">Chousuke</td><td>hmm</td></tr>
+<tr id="t1703A" class="h"><td><a href="#t1703A">17:03</a></td><td class="nu">rhickey</td><td>alphazero: the code in the comments is not supposed to be uncommented, then loaded (will recursively load itself if you do that. It's meant for a demo - load the file (which the first commented line does), then eval the other lines</td></tr>
+<tr id="t1703A" class="h r"><td><a href="#t1703A">17:03</a></td><td class="nu">rhickey</td><td>it's not an executable script</td></tr>
+<tr id="t1704A" class="h"><td><a href="#t1704A">17:04</a></td><td class="nj">Chousuke</td><td>apparently I can't wget stuff from google code easily :/</td></tr>
+<tr id="t1704A" class="h"><td><a href="#t1704A">17:04</a></td><td class="nb">rsynnott</td><td>alphazero: I think -server is far more aggressive about JITing, which may help to explain the extra processor usage</td></tr>
+<tr id="t1704A" class="h"><td><a href="#t1704A">17:04</a></td><td class="nj">Chousuke</td><td>the file link takes me to some stupid clickthrough page :P</td></tr>
+<tr id="t1704A" class="h"><td><a href="#t1704A">17:04</a></td><td class="nc">alphazero</td><td>rhickey: so how do I run ants.clj?  from Repl?</td></tr>
+<tr id="t1704A" class="h"><td><a href="#t1704A">17:04</a></td><td class="nj">Chousuke</td><td>alphazero: emacs &amp; slime works very well :)</td></tr>
+<tr id="t1705A" class="h r"><td><a href="#t1705A">17:05</a></td><td class="nj">Chousuke</td><td>you can eval the entire file and then just eval the code inside the comment separately</td></tr>
+<tr id="t1705A" class="h"><td><a href="#t1705A">17:05</a></td><td class="nc">alphazero</td><td>Chousuke:  damn it, I'm drawing the line at (((((()))))) .. ;)</td></tr>
+<tr id="t1705A" class="h"><td><a href="#t1705A">17:05</a></td><td class="nu">rhickey</td><td>alphazero: I load it into emacs, then run each line in the comments one by one, for demo</td></tr>
+<tr id="t1706A" class="h r"><td><a href="#t1706A">17:06</a></td><td class="nu">rhickey</td><td>but your problem definitely is that it is loading itself infinitely recursively</td></tr>
+<tr id="t1706A" class="h r"><td><a href="#t1706A">17:06</a></td><td class="nu">rhickey</td><td>blowing permgen on compilation</td></tr>
+<tr id="t1706A" class="h"><td><a href="#t1706A">17:06</a></td><td class="nc">alphazero</td><td>rhickey:  well, i'm not setup for that yet.  so no way to run this simply from Repl?</td></tr>
+<tr id="t1707A" class="h"><td><a href="#t1707A">17:07</a></td><td class="nk">Chouser</td><td>alphazero: yes</td></tr>
+<tr id="t1707A" class="h r"><td><a href="#t1707A">17:07</a></td><td class="nk">Chouser</td><td>java -cp clojure.jar clojure.lang.Repl ants.clj</td></tr>
+<tr id="t1707A" class="h r"><td><a href="#t1707A">17:07</a></td><td class="nk">Chouser</td><td>then paste each of the lines from the comment section into the repl, one by one</td></tr>
+<tr id="t1708A" class="h"><td><a href="#t1708A">17:08</a></td><td class="nj">Chousuke</td><td>you really should consider using emacs. it's worth it just for slime :P</td></tr>
+<tr id="t1708A" class="h"><td><a href="#t1708A">17:08</a></td><td class="nk">Chouser</td><td>middle-click-paste on X-windows makes this a breeze, but I imagine MacOS will let you do what you need to with Command-V</td></tr>
+<tr id="t1709A" class="h"><td><a href="#t1709A">17:09</a></td><td class="ni">triddell</td><td>alphazero: if the REPL is already started the first line in the comments is (load-file ...</td></tr>
+<tr id="t1709A" class="h r"><td><a href="#t1709A">17:09</a></td><td class="ni">triddell</td><td>just point to your ants.clj</td></tr>
+<tr id="t1709A" class="h r"><td><a href="#t1709A">17:09</a></td><td class="ni">triddell</td><td>then run the other lines in comments</td></tr>
+<tr id="t1709A" class="h"><td><a href="#t1709A">17:09</a></td><td class="nc">alphazero</td><td>Chouser:  that's what I have been doing.  sorry being dense.  + installed acquamacs and went through the whole clojure-mode thing.  but the whole C-c (type type type type) thing just to do simple stuff.  So much fun ..</td></tr>
+<tr id="t1712A" class="r"><td><a href="#t1712A">17:12</a></td><td class="nc">alphazero</td><td>Hey, success!  Thank ya'll for your patience.</td></tr>
+<tr id="t1712A" class="h"><td><a href="#t1712A">17:12</a></td><td class="nk">Chouser</td><td>Chousuke: I'm glad you find slime worth while. I'll refrain from saying anything else.</td></tr>
+<tr id="t1714A" class="h"><td><a href="#t1714A">17:14</a></td><td class="nj">Chousuke</td><td>heh</td></tr>
+<tr id="t1714A" class="h r"><td><a href="#t1714A">17:14</a></td><td class="nj">Chousuke</td><td>well I can handle editing in emacs with viper :P</td></tr>
+<tr id="t1715A" class="h r"><td><a href="#t1715A">17:15</a></td><td class="nj">Chousuke</td><td>though I do use some of the less offensive emacs shortcuts too.</td></tr>
+<tr id="t1715A" class="h r"><td><a href="#t1715A">17:15</a></td><td class="nj">Chousuke</td><td>having caps lock as control really help</td></tr>
+<tr id="t1715A" class="h r"><td><a href="#t1715A">17:15</a></td><td class="nj">Chousuke</td><td>s</td></tr>
+<tr id="t1717A" class="h"><td><a href="#t1717A">17:17</a></td><td class="nk">Chouser</td><td>I guess the only other thing I'll say about emacs here is that I hope people's advocacy of emacs+slime+swank and of using the latest svn (which also then requires svn, ant, javac) doesn't turn people off</td></tr>
+<tr id="t1717A" class="h r"><td><a href="#t1717A">17:17</a></td><td class="nk">Chouser</td><td>...when all they really need is their favorite text editor, clojure.jar, and a JVM.</td></tr>
+<tr id="t1717A" class="h r"><td><a href="#t1717A">17:17</a></td><td class="nk">Chouser</td><td>at least to get started.</td></tr>
+<tr id="t1717A" class="h"><td><a href="#t1717A">17:17</a></td><td class="nj">Chousuke</td><td>well, I guess we can start recommending 1.0 after it's out</td></tr>
+<tr id="t1718A" class="h"><td><a href="#t1718A">17:18</a></td><td class="ni">danm_</td><td>although, writing lisp in an editor which doesn't speak parens is somewhat frustrating</td></tr>
+<tr id="t1718A" class="h"><td><a href="#t1718A">17:18</a></td><td class="nk">Chouser</td><td>Chousuke: only if there's a perfectly-matched slime setup for 1.0 available, right?</td></tr>
+<tr id="t1718A" class="h"><td><a href="#t1718A">17:18</a></td><td class="nj">Chousuke</td><td>well, there is that clojurebox thing</td></tr>
+<tr id="t1718A" class="h"><td><a href="#t1718A">17:18</a></td><td class="nk">Chouser</td><td>for Windows</td></tr>
+<tr id="t1719A" class="h r"><td><a href="#t1719A">17:19</a></td><td class="nk">Chouser</td><td>...and still you're going to spend time learning emacs instead of clojure</td></tr>
+<tr id="t1720A"><td><a href="#t1720A">17:20</a></td><td class="nj">Chousuke</td><td>I suppose.</td></tr>
+<tr id="t1720A" class="h r"><td><a href="#t1720A">17:20</a></td><td class="nj">Chousuke</td><td>now if I could figure out why my aquamacs insists on opening two windows on startup I'd be happy.</td></tr>
+<tr id="t1720A" class="h"><td><a href="#t1720A">17:20</a></td><td class="nd">hiredman</td><td>clojurebot: emacs?</td></tr>
+<tr id="t1720A" class="h"><td><a href="#t1720A">17:20</a></td><td class="nl">clojurebot</td><td>but I like using notepad++!</td></tr>
+<tr id="t1721A" class="h"><td><a href="#t1721A">17:21</a></td><td class="nd">hiredman</td><td>actaully I did a few euler problems in notepad++</td></tr>
+<tr id="t1723A" class="h"><td><a href="#t1723A">17:23</a></td><td class="nn">gnuvince_</td><td>You wrote the solution in notepad++ or you actually used notepad++ to solve them?</td></tr>
+<tr id="t1725A" class="h"><td><a href="#t1725A">17:25</a></td><td class="nd">hiredman</td><td>a solution using clojure in notepad++</td></tr>
+<tr id="t1725A" class="h"><td><a href="#t1725A">17:25</a></td><td class="nk">Chouser</td><td>now, writing notepad++ using a solution in clojure, why that'd be something.</td></tr>
+<tr id="t1726A" class="h"><td><a href="#t1726A">17:26</a></td><td class="nn">gnuvince_</td><td>;)</td></tr>
+<tr id="t1812A"><td><a href="#t1812A">18:12</a></td><td class="ni">triddell</td><td>Using a java library class I've slurped up some file contents into a java.util.Hashmap. Is this object a seq? Can I use standard clojure functions on a java Hashap?</td></tr>
+<tr id="t1812A" class="h r"><td><a href="#t1812A">18:12</a></td><td class="ni">triddell</td><td>this was created: #=(java.util.HashMap. {&quot;key1&quot; &quot;value1&quot;, &quot;key2&quot; &quot;value2&quot;})</td></tr>
+<tr id="t1814A" class="h r"><td><a href="#t1814A">18:14</a></td><td class="ni">triddell</td><td>if this object is represented by *config* how would I access the values, etc.?</td></tr>
+<tr id="t1815A" class="h"><td><a href="#t1815A">18:15</a></td><td class="nu">rhickey</td><td>triddell: if you seq it you will get a seq of Map.Entry, but loys of things work on them, like, key, val, and destructuring:</td></tr>
+<tr id="t1815A" class="h r"><td><a href="#t1815A">18:15</a></td><td class="nu">rhickey</td><td>(map (fn [[k v]] [k v]) #=(java.util.HashMap. {&quot;key1&quot; &quot;value1&quot;, &quot;key2&quot; &quot;value2&quot;}))</td></tr>
+<tr id="t1815A" class="h r"><td><a href="#t1815A">18:15</a></td><td class="nu">rhickey</td><td>([&quot;key1&quot; &quot;value1&quot;] [&quot;key2&quot; &quot;value2&quot;])</td></tr>
+<tr id="t1817A" class="h r"><td><a href="#t1817A">18:17</a></td><td class="nu">rhickey</td><td>also:</td></tr>
+<tr id="t1817A" class="h r"><td><a href="#t1817A">18:17</a></td><td class="nu">rhickey</td><td>user=&gt; (for [[k v] #=(java.util.HashMap. {&quot;key1&quot; &quot;value1&quot;, &quot;key2&quot; &quot;value2&quot;})] [k v])</td></tr>
+<tr id="t1817A" class="h r"><td><a href="#t1817A">18:17</a></td><td class="nu">rhickey</td><td>([&quot;key1&quot; &quot;value1&quot;] [&quot;key2&quot; &quot;value2&quot;])</td></tr>
+<tr id="t1817A" class="h r"><td><a href="#t1817A">18:17</a></td><td class="nu">rhickey</td><td>user=&gt; (keys #=(java.util.HashMap. {&quot;key1&quot; &quot;value1&quot;, &quot;key2&quot; &quot;value2&quot;}))</td></tr>
+<tr id="t1817A" class="h r"><td><a href="#t1817A">18:17</a></td><td class="nu">rhickey</td><td>(&quot;key1&quot; &quot;key2&quot;)</td></tr>
+<tr id="t1817A" class="h r"><td><a href="#t1817A">18:17</a></td><td class="nu">rhickey</td><td>etc</td></tr>
+<tr id="t1818A" class="h"><td><a href="#t1818A">18:18</a></td><td class="ni">triddell</td><td>thanks rich!</td></tr>
+<tr id="t1818A" class="h"><td><a href="#t1818A">18:18</a></td><td class="nv">meredydd</td><td>Is #= new?</td></tr>
+<tr id="t1818A" class="h"><td><a href="#t1818A">18:18</a></td><td class="nn">fyuryu</td><td>triddell: if you want to turn it into a persistent hash map: (into {} your-hashmap)</td></tr>
+<tr id="t1819A" class="h"><td><a href="#t1819A">18:19</a></td><td class="nu">rhickey</td><td>meredydd: don't use #= in your code</td></tr>
+<tr id="t1819A" class="h"><td><a href="#t1819A">18:19</a></td><td class="nn">fyuryu</td><td>triddell: less noise on the repl</td></tr>
+<tr id="t1819A" class="h"><td><a href="#t1819A">18:19</a></td><td class="nv">meredydd</td><td>You just used it in a fragment there. What does it do?</td></tr>
+<tr id="t1820A"><td><a href="#t1820A">18:20</a></td><td class="ni">triddell</td><td>fyuryu: I'll try that</td></tr>
+<tr id="t1820A" class="h"><td><a href="#t1820A">18:20</a></td><td class="nu">rhickey</td><td>meredydd: nothing that (java.util.HashMap. {&quot;key1&quot; &quot;value1&quot;, &quot;key2&quot; &quot;value2&quot;}) doesn't, I just grabbed it from his output</td></tr>
+<tr id="t1821A" class="h r"><td><a href="#t1821A">18:21</a></td><td class="nu">rhickey</td><td>it's a print-dup format for serialization - you won't see them at the repl at all soon</td></tr>
+<tr id="t1823A" class="h"><td><a href="#t1823A">18:23</a></td><td class="nv">meredydd</td><td>ah...a quick google suggests you're doing something with generic-ising the print functions</td></tr>
+<tr id="t1955A"><td><a href="#t1955A">19:55</a></td><td class="nl">clojurebot</td><td>svn rev 1173; updated readme with run and build lines</td></tr>
+<tr id="t2004A"><td><a href="#t2004A">20:04</a></td><td class="ni">triddell</td><td>another simple question... I have a map which I can read a key from like (get *YAML-config* &quot;context-root&quot;)... and this is true: (contains? *YAML-config* &quot;context-root&quot;)... but why cant I do this (:context-root *YAML-config*)</td></tr>
+<tr id="t2006A" class="h"><td><a href="#t2006A">20:06</a></td><td class="nk">Chouser</td><td>the string &quot;context-root&quot; is different from the keyword :context-root</td></tr>
+<tr id="t2007A" class="h"><td><a href="#t2007A">20:07</a></td><td class="ni">triddell</td><td>right, I'm trying to understand the &quot;maps of their keys&quot; piece</td></tr>
+<tr id="t2007A" class="h r"><td><a href="#t2007A">20:07</a></td><td class="ni">triddell</td><td>I mean functions of their keys</td></tr>
+<tr id="t2007A" class="h"><td><a href="#t2007A">20:07</a></td><td class="nk">Chouser</td><td>oh, that's just (*YAML-config* &quot;context-root&quot;)</td></tr>
+<tr id="t2007A" class="h"><td><a href="#t2007A">20:07</a></td><td class="nq">phf</td><td>triddell: functions of their keys should be opposed order</td></tr>
+<tr id="t2007A" class="h r"><td><a href="#t2007A">20:07</a></td><td class="nq">phf</td><td>what Chouser said</td></tr>
+<tr id="t2009A" class="h"><td><a href="#t2009A">20:09</a></td><td class="ni">triddell</td><td>ah, ok, thanks</td></tr>
+<tr id="t2023A"><td><a href="#t2023A">20:23</a></td><td class="nu">rhickey</td><td>New release: <a href="http://clojure.googlecode.com/files/clojure_20081217.zip">http://clojure.googlecode.com/files/clojure_20081217.zip</a> (for your friends that aren't on SVN yet)</td></tr>
+<tr id="t2024A" class="h"><td><a href="#t2024A">20:24</a></td><td class="nj">Chousuke</td><td>hooray. now the release version will actually work with most of the examples in the wiki and other sources :)</td></tr>
+<tr id="t2024A" class="h"><td><a href="#t2024A">20:24</a></td><td class="nu">rhickey</td><td>I could use some help going over the docs/examples looking for inaccuracies or anachronisms</td></tr>
+<tr id="t2024A" class="h r"><td><a href="#t2024A">20:24</a></td><td class="nu">rhickey</td><td>e.g. trying every example</td></tr>
+<tr id="t2035A"><td><a href="#t2035A">20:35</a></td><td class="nk">qebab</td><td>Hi. I've decided to spend some time during christmas picking up clojure. Could anyone tell me something about how it'd feel for someone who usually programs python but hacks scheme and C on the side? :)</td></tr>
+<tr id="t2036A" class="h"><td><a href="#t2036A">20:36</a></td><td class="nd">hiredman</td><td>of those three it is most like scheme</td></tr>
+<tr id="t2036A" class="h"><td><a href="#t2036A">20:36</a></td><td class="nk">Chouser</td><td>qebab: it feels like a fresh sea breeze on a stifling hot day</td></tr>
+<tr id="t2038A" class="h"><td><a href="#t2038A">20:38</a></td><td class="nk">qebab</td><td>hiredman: unsurprising, since it's the only lisp in that list :) I noticed an example on clojure.org that seems to use pattern-matching. how does that relate to pattern matching in languages like haskell?</td></tr>
+<tr id="t2038A" class="h"><td><a href="#t2038A">20:38</a></td><td class="nk">Chouser</td><td>Clojure does not have haskell-like pattern matching, but it does have handy destructuring.</td></tr>
+<tr id="t2038A" class="h"><td><a href="#t2038A">20:38</a></td><td class="nk">qebab</td><td>Chouser: that is good to hear, it's been a long half year with 3 very boring classes, so I need something to motivate myself for further hacking next year</td></tr>
+<tr id="t2039A" class="h r"><td><a href="#t2039A">20:39</a></td><td class="nk">qebab</td><td>aha, so that's what it is</td></tr>
+<tr id="t2039A" class="h"><td><a href="#t2039A">20:39</a></td><td class="nq">phf</td><td>qebab: there's also dispatch on the number of arguments</td></tr>
+<tr id="t2039A" class="h"><td><a href="#t2039A">20:39</a></td><td class="nk">qebab</td><td>does it work on all datastructures that have builtin syntax?</td></tr>
+<tr id="t2039A" class="h"><td><a href="#t2039A">20:39</a></td><td class="nq">phf</td><td>but i think that's mostly a mapping to java world</td></tr>
+<tr id="t2039A" class="h"><td><a href="#t2039A">20:39</a></td><td class="nk">Chouser</td><td>qebab: yes</td></tr>
+<tr id="t2039A" class="h"><td><a href="#t2039A">20:39</a></td><td class="nk">qebab</td><td>cool</td></tr>
+<tr id="t2040A"><td><a href="#t2040A">20:40</a></td><td class="nd">hiredman</td><td>clojure has dispatching on any function of the arguments to a function</td></tr>
+<tr id="t2040A" class="h"><td><a href="#t2040A">20:40</a></td><td class="nk">Chouser</td><td>qebab: if you don't mind the format, watch one of the screencasts -- probably the one on sequences</td></tr>
+<tr id="t2040A" class="h r"><td><a href="#t2040A">20:40</a></td><td class="nk">Chouser</td><td>that'll get you motivated.</td></tr>
+<tr id="t2040A" class="h"><td><a href="#t2040A">20:40</a></td><td class="nk">qebab</td><td>my first impression is that this is common-lisp with a whole bunch of bad design choices removed, and lots of good ideas added</td></tr>
+<tr id="t2041A" class="h"><td><a href="#t2041A">20:41</a></td><td class="nj">Chousuke</td><td>that's not a bad first impression I guess.</td></tr>
+<tr id="t2041A" class="h r"><td><a href="#t2041A">20:41</a></td><td class="nj">Chousuke</td><td>not optimal either though.</td></tr>
+<tr id="t2041A" class="h"><td><a href="#t2041A">20:41</a></td><td class="nk">Chouser</td><td>yeah, it doesn't feel like common lisp to me.</td></tr>
+<tr id="t2042A" class="h"><td><a href="#t2042A">20:42</a></td><td class="nk">qebab</td><td>well, I prefer scheme to common lisp, but find the latter more practical... I'm hoping that clojure will be both practical and nice :)</td></tr>
+<tr id="t2042A" class="h"><td><a href="#t2042A">20:42</a></td><td class="nj">Chousuke</td><td>the java interop is perhaps underappreciated. a lot of clojure &quot;Just Works&quot; with java.</td></tr>
+<tr id="t2043A" class="h"><td><a href="#t2043A">20:43</a></td><td class="nk">qebab</td><td>yeah, looks like a very nice feature</td></tr>
+<tr id="t2043A" class="h"><td><a href="#t2043A">20:43</a></td><td class="nd">hiredman</td><td>which is really nice</td></tr>
+<tr id="t2045A" class="h"><td><a href="#t2045A">20:45</a></td><td class="nk">qebab</td><td>there are tons of cool examples, that's for sure</td></tr>
+<tr id="t2046A" class="h r"><td><a href="#t2046A">20:46</a></td><td class="nk">qebab</td><td>is there a handy documentation searching function?</td></tr>
+<tr id="t2046A" class="h"><td><a href="#t2046A">20:46</a></td><td class="nj">Chousuke</td><td>(doc find-doc)</td></tr>
+<tr id="t2046A" class="h"><td><a href="#t2046A">20:46</a></td><td class="nl">clojurebot</td><td>Prints documentation for any var whose documentation or name  contains a match for re-string-or-pattern; arglists ([re-string-or-pattern])</td></tr>
+<tr id="t2047A" class="h"><td><a href="#t2047A">20:47</a></td><td class="nk">qebab</td><td>something like help() without parameters does in python (Let's you search in docstrings and module documentation and things like that)</td></tr>
+<tr id="t2047A" class="h r"><td><a href="#t2047A">20:47</a></td><td class="nk">qebab</td><td>oh, neat</td></tr>
+<tr id="t2047A" class="h r"><td><a href="#t2047A">20:47</a></td><td class="nk">qebab</td><td>thanks</td></tr>
+<tr id="t2047A" class="h"><td><a href="#t2047A">20:47</a></td><td class="nj">Chousuke</td><td>it's not very easily browseable though.</td></tr>
+<tr id="t2048A" class="h"><td><a href="#t2048A">20:48</a></td><td class="nd">hiredman</td><td>bookmark clojure.org/api</td></tr>
+<tr id="t2048A" class="h"><td><a href="#t2048A">20:48</a></td><td class="nj">Chousuke</td><td>it should be pretty straightforward to use find-doc as a basis for some kind of function that uses clojure.inspector for browsing the results.</td></tr>
+<tr id="t2049A" class="h"><td><a href="#t2049A">20:49</a></td><td class="nk">qebab</td><td>this works nicely for now, I'm basically just working out what the functions I'm used to from scheme/cl are called here</td></tr>
+<tr id="t2050A"><td><a href="#t2050A">20:50</a></td><td class="nj">Chousuke</td><td>the wikibook tutorials and tips section has something about that.</td></tr>
+<tr id="t2050A" class="h r"><td><a href="#t2050A">20:50</a></td><td class="nj">Chousuke</td><td>the book is in pretty bad shape still, but hopefully it will improve :P</td></tr>
+<tr id="t2051A" class="h"><td><a href="#t2051A">20:51</a></td><td class="nd">hiredman</td><td>clojurebot: map?</td></tr>
+<tr id="t2051A" class="h"><td><a href="#t2051A">20:51</a></td><td class="nl">clojurebot</td><td>map is *LAZY*</td></tr>
+<tr id="t2053A" class="h"><td><a href="#t2053A">20:53</a></td><td class="nq">phf</td><td>which allows for some ... interesting debugging situations in combination with local bindings</td></tr>
+<tr id="t2053A" class="h"><td><a href="#t2053A">20:53</a></td><td class="nk">qebab</td><td>ohh, map is lazy :o</td></tr>
+<tr id="t2054A" class="h"><td><a href="#t2054A">20:54</a></td><td class="nj">Chousuke</td><td>qebab: most of the seq-consuming functions in clojure are</td></tr>
+<tr id="t2054A" class="h r"><td><a href="#t2054A">20:54</a></td><td class="nj">Chousuke</td><td>be aware of this when dealing with functions that have side-effects :)</td></tr>
+<tr id="t2055A" class="h"><td><a href="#t2055A">20:55</a></td><td class="nk">qebab</td><td>Chousuke: I've programmed a fair bit of haskell (Of course, there you have the type-system babysitter, but still...), so I should do fine on that count :)</td></tr>
+<tr id="t2055A" class="h"><td><a href="#t2055A">20:55</a></td><td class="nj">Chousuke</td><td>to avoid mapping #(println &quot;hello&quot; %) over a collection and wondering why it does nothing</td></tr>
+<tr id="t2055A" class="h"><td><a href="#t2055A">20:55</a></td><td class="nk">qebab</td><td>gah</td></tr>
+<tr id="t2055A" class="h r"><td><a href="#t2055A">20:55</a></td><td class="nk">qebab</td><td>I just managed to pour coffee on my desk</td></tr>
+<tr id="t2058A" class="h"><td><a href="#t2058A">20:58</a></td><td class="nr">RSchulz</td><td>Pouring coffee on your desk is a challenge, so you should feel proud!</td></tr>
+<tr id="t2059A" class="h"><td><a href="#t2059A">20:59</a></td><td class="nd">hiredman</td><td>clojurebot: qebab likes haskell</td></tr>
+<tr id="t2059A" class="h"><td><a href="#t2059A">20:59</a></td><td class="nl">clojurebot</td><td>excusez-moi</td></tr>
+<tr id="t2059A" class="h"><td><a href="#t2059A">20:59</a></td><td class="nd">hiredman</td><td>damn it</td></tr>
+<tr id="t2100A" class="r"><td><a href="#t2100A">21:00</a></td><td class="nd">hiredman</td><td>hmmm</td></tr>
+<tr id="t2100A" class="h"><td><a href="#t2100A">21:00</a></td><td class="nk">qebab</td><td>clojurebot: help</td></tr>
+<tr id="t2100A" class="h"><td><a href="#t2100A">21:00</a></td><td class="nl">clojurebot</td><td>I don't understand.</td></tr>
+<tr id="t2100A" class="h"><td><a href="#t2100A">21:00</a></td><td class="nk">qebab</td><td>what can it do?</td></tr>
+<tr id="t2101A" class="h"><td><a href="#t2101A">21:01</a></td><td class="nd">hiredman</td><td>what would you say if I told you qebab likes haskell?</td></tr>
+<tr id="t2101A" class="h r"><td><a href="#t2101A">21:01</a></td><td class="nd">hiredman</td><td>clojurebot: what would you say if I told you qebab likes haskell?</td></tr>
+<tr id="t2101A" class="h"><td><a href="#t2101A">21:01</a></td><td class="nl">clojurebot</td><td>Yo dawg, I heard you like Haskell, so I put a lazy thunk inside a lazy thunk so you don't have to compute while you compute.</td></tr>
+<tr id="t2101A" class="h"><td><a href="#t2101A">21:01</a></td><td class="nd">hiredman</td><td>qebab: not much</td></tr>
+<tr id="t2101A" class="h"><td><a href="#t2101A">21:01</a></td><td class="nk">qebab</td><td>okay</td></tr>
+<tr id="t2102A" class="h"><td><a href="#t2102A">21:02</a></td><td class="nd">hiredman</td><td>does docs</td></tr>
+<tr id="t2102A" class="h r"><td><a href="#t2102A">21:02</a></td><td class="nd">hiredman</td><td>(doc trampoline)</td></tr>
+<tr id="t2102A" class="h"><td><a href="#t2102A">21:02</a></td><td class="nl">clojurebot</td><td>trampoline can be used to convert algorithms requiring mutual   recursion without stack consumption. Calls f with supplied args, if   any. If f returns a fn, calls that fn with no arguments, and   continues to repeat, until the return value is not a fn, then   returns that non-fn value. Note that if you want to return a fn as a   final value, you must wrap it in some data structure and unpack it   after trampoline returns</td></tr>
+<tr id="t2102A" class="h"><td><a href="#t2102A">21:02</a></td><td class="nk">qebab</td><td>that's useful</td></tr>
+<tr id="t2103A" class="h r"><td><a href="#t2103A">21:03</a></td><td class="nk">qebab</td><td>oh, you can optionally name lambdas so they can recurse?</td></tr>
+<tr id="t2103A" class="h"><td><a href="#t2103A">21:03</a></td><td class="nd">hiredman</td><td>yes</td></tr>
+<tr id="t2104A" class="h r"><td><a href="#t2104A">21:04</a></td><td class="nd">hiredman</td><td>(fn a [x] (a x))</td></tr>
+<tr id="t2104A" class="h"><td><a href="#t2104A">21:04</a></td><td class="nk">qebab</td><td>that's pretty awesome</td></tr>
+<tr id="t2127A"><td><a href="#t2127A">21:27</a></td><td class="nr">RSchulz</td><td>qebab: Whether a fn / lambda has a name or not (is the binding of a Var) changes nothing about how or where it may be used / invoked in Clojure.</td></tr>
+<tr id="t2148A"><td><a href="#t2148A">21:48</a></td><td class="ni">triddell</td><td>what's the best way to recode a switch statement in clojure/lisp?</td></tr>
+<tr id="t2148A" class="h"><td><a href="#t2148A">21:48</a></td><td class="n5">durka</td><td>look at cond</td></tr>
+<tr id="t2149A" class="h"><td><a href="#t2149A">21:49</a></td><td class="ni">triddell</td><td>got it, thx</td></tr>
+<tr id="t2300A"><td><a href="#t2300A">23:00</a></td><td class="ny">timothypratley</td><td>is there a way to search for a value in a vector... like (contains? \e &quot;efg&quot;)   &lt;-- but that wont work because it works on maps</td></tr>
+<tr id="t2301A" class="h"><td><a href="#t2301A">23:01</a></td><td class="nk">Chouser</td><td>(some #{:c} [:a :b :c :d :e])</td></tr>
+<tr id="t2305A" class="h"><td><a href="#t2305A">23:05</a></td><td class="ny">timothypratley</td><td>ah... so</td></tr>
+<tr id="t2305A" class="h r"><td><a href="#t2305A">23:05</a></td><td class="ny">timothypratley</td><td>user=&gt; (some #(= %1 \e) &quot;efg&quot;)</td></tr>
+<tr id="t2305A" class="h r"><td><a href="#t2305A">23:05</a></td><td class="ny">timothypratley</td><td>true</td></tr>
+<tr id="t2305A" class="h r"><td><a href="#t2305A">23:05</a></td><td class="ny">timothypratley</td><td>user=&gt; (some #(= %1 \e) &quot;afg&quot;)</td></tr>
+<tr id="t2305A" class="h r"><td><a href="#t2305A">23:05</a></td><td class="ny">timothypratley</td><td>nil</td></tr>
+<tr id="t2305A" class="h r"><td><a href="#t2305A">23:05</a></td><td class="ny">timothypratley</td><td>thanks</td></tr>
+<tr id="t2307A" class="h"><td><a href="#t2307A">23:07</a></td><td class="nk">Chouser</td><td>or (some #{\f} &quot;efg&quot;)</td></tr>
+<tr id="t2308A" class="h"><td><a href="#t2308A">23:08</a></td><td class="ny">timothypratley</td><td>even better!</td></tr>
+<tr id="t2354A"><td><a href="#t2354A">23:54</a></td><td class="ni">triddell</td><td>Anybody here use the html generation features of Compojure?</td></tr>
+<tr id="t2356A" class="h r"><td><a href="#t2356A">23:56</a></td><td class="ni">triddell</td><td>It's based on nested vector syntax and I have a need to create some repeating blocks of html/xml.... but I need to open a new file for each repeated block... hopefully that is possible.</td></tr>
+<tr id="t2358A" class="h r"><td><a href="#t2358A">23:58</a></td><td class="ni">triddell</td><td>Would one typically use a for comprehension to process a list of files?</td></tr>
+<tr id="t2359A" class="h"><td><a href="#t2359A">23:59</a></td><td class="nd">dhaya</td><td>triddell: side effects are typically done with doseq</td></tr>
+</tbody></table></main></body></html>

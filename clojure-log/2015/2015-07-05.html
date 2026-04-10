@@ -1,0 +1,325 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>#clojure – 2015-07-05</title><link rel="stylesheet" href="../style.css"></head><body>
+<header class="sh"><a class="st" href="../index.html">#clojure logs</a><nav class="dn"><a href="2015-07-04.html">&larr;</a><span>2015-07-05</span><a href="2015-07-06.html">&rarr;</a></nav></header>
+<main><p class="dh">2015-07-05</p><table class="lg"><tbody>
+<tr id="t0006A"><td><a href="#t0006A">00:06</a></td><td class="nd">justin_smith</td><td>rhg135: does the server start asynchronously? if so you may be sending the message before the server is ready to read it...</td></tr>
+<tr id="t0007A" class="h"><td><a href="#t0007A">00:07</a></td><td class="n4">rhg135</td><td>it might be but I doubt it. Even so this hangs indefinetely after the client connects</td></tr>
+<tr id="t0010A"><td><a href="#t0010A">00:10</a></td><td class="nc">Bronsa</td><td>justin_smith: do you ever sleep? I feel like you're ever-present here</td></tr>
+<tr id="t0011A" class="h"><td><a href="#t0011A">00:11</a></td><td class="nd">justin_smith</td><td>haha</td></tr>
+<tr id="t0011A" class="h r"><td><a href="#t0011A">00:11</a></td><td class="nd">justin_smith</td><td>I sleep very reasonable hours actually, I just wake up earlier and turn in earlier than most</td></tr>
+<tr id="t0012A" class="h r"><td><a href="#t0012A">00:12</a></td><td class="nd">justin_smith</td><td>also I don't have much of a life</td></tr>
+<tr id="t0013A" class="h"><td><a href="#t0013A">00:13</a></td><td class="nc">Bronsa</td><td>I must sleep on such an odd schedule that probably mine matches your timezone then</td></tr>
+<tr id="t0039A"><td><a href="#t0039A">00:39</a></td><td class="np">irctc</td><td>If I have a long-running function that calls lots of other functions and has side effects (io, db, http requests) what is the best way to handle that? In this case I'll never need to track the results in the main program thread. I tried looking at future but the code never seems to execute.</td></tr>
+<tr id="t0041A"><td><a href="#t0041A">00:41</a></td><td class="nm">amalloy</td><td>the code in a future runs as soon as the future is created, so you must have had some other problem that you are ascribing to future</td></tr>
+<tr id="t0046A" class="h"><td><a href="#t0046A">00:46</a></td><td class="nd">justin_smith</td><td>irctc: remember that you won't see errors inside a failed future until you attempt to deref</td></tr>
+<tr id="t0046A" class="h r"><td><a href="#t0046A">00:46</a></td><td class="nd">justin_smith</td><td>irctc: see stuartsierra's blog post of threads and error handling</td></tr>
+<tr id="t0047A" class="h r"><td><a href="#t0047A">00:47</a></td><td class="nd">justin_smith</td><td>irctc: <a href="http://stuartsierra.com/2015/05/27/clojure-uncaught-exceptions">http://stuartsierra.com/2015/05/27/clojure-uncaught-exceptions</a></td></tr>
+<tr id="t0050A"><td><a href="#t0050A">00:50</a></td><td class="np">irctc</td><td>I did check it for errors by running it all without future. The situation is that I'm using lein test to make sure it's running ok. I thought maybe the tests stopped before the thread stopped (I wasn't seeing the DB update I was expecting). So I put a Thread/sleep in for several minutes (twice as long as it normally seems to take) but no luck.</td></tr>
+<tr id="t0051A" class="h r"><td><a href="#t0051A">00:51</a></td><td class="np">irctc</td><td>(let [arg &quot;argument&quot;] (future (long-running-func arg))  (println &quot;Check database later!&quot;))</td></tr>
+<tr id="t0051A" class="h r"><td><a href="#t0051A">00:51</a></td><td class="np">irctc</td><td>I assume it's ok to just leave it without being assigned a var for later dereferencing? I won't need that information.</td></tr>
+<tr id="t0053A" class="h"><td><a href="#t0053A">00:53</a></td><td class="nd">justin_smith</td><td>if you never deref the future, its body should be wrapped in try/catch</td></tr>
+<tr id="t0053A" class="h r"><td><a href="#t0053A">00:53</a></td><td class="nd">justin_smith</td><td>otherwise all failures will be totally silent</td></tr>
+<tr id="t0054A" class="h r"><td><a href="#t0054A">00:54</a></td><td class="nd">justin_smith</td><td>and of course the try/catch should do something verbose in the catch part</td></tr>
+<tr id="t0056A" class="h"><td><a href="#t0056A">00:56</a></td><td class="np">irctc</td><td>good idea</td></tr>
+<tr id="t0057A" class="h"><td><a href="#t0057A">00:57</a></td><td class="nd">justin_smith</td><td>irctc: eg. try  (do (future (/ 1 0)) nil)</td></tr>
+<tr id="t0057A" class="h r"><td><a href="#t0057A">00:57</a></td><td class="nd">justin_smith</td><td>in your repl</td></tr>
+<tr id="t0057A" class="h r"><td><a href="#t0057A">00:57</a></td><td class="nd">justin_smith</td><td>doesn't work with the bots here, since they don't let you create futures</td></tr>
+<tr id="t0058A" class="h r"><td><a href="#t0058A">00:58</a></td><td class="nd">justin_smith</td><td>irctc: the do/nil is because even if you don't deref the future, you can see the error state in the printed form, at least as of clj 1.7</td></tr>
+<tr id="t0100A"><td><a href="#t0100A">01:00</a></td><td class="np">irctc</td><td>ok</td></tr>
+<tr id="t0100A" class="h r"><td><a href="#t0100A">01:00</a></td><td class="np">irctc</td><td>thanks</td></tr>
+<tr id="t0103A" class="h"><td><a href="#t0103A">01:03</a></td><td class="ng">zacts</td><td>clojure is so etymologically complicatedly symbolicmolationally awesome</td></tr>
+<tr id="t0103A" class="h"><td><a href="#t0103A">01:03</a></td><td class="nd">justin_smith</td><td>complicatedly?</td></tr>
+<tr id="t0103A" class="h"><td><a href="#t0103A">01:03</a></td><td class="ng">zacts</td><td>there I've said something on this channel that has never been said, probably anywhere on earth, in history</td></tr>
+<tr id="t0103A" class="h"><td><a href="#t0103A">01:03</a></td><td class="nd">justin_smith</td><td>haha</td></tr>
+<tr id="t0103A" class="h r"><td><a href="#t0103A">01:03</a></td><td class="nd">justin_smith</td><td>,(java.util.UUID/randomUUID)</td></tr>
+<tr id="t0104A" class="h"><td><a href="#t0104A">01:04</a></td><td class="ng">zacts</td><td>I'm just trying to do that proof of george carlin</td></tr>
+<tr id="t0104A" class="h"><td><a href="#t0104A">01:04</a></td><td class="nl">clojurebot</td><td>#uuid &quot;7b94c77b-1b3f-4143-b5fa-7f1f7b45fc31&quot;</td></tr>
+<tr id="t0104A" class="h"><td><a href="#t0104A">01:04</a></td><td class="ng">zacts</td><td>that the saying &quot;everything has been said before already&quot;</td></tr>
+<tr id="t0104A" class="h r"><td><a href="#t0104A">01:04</a></td><td class="ng">zacts</td><td>is logically false</td></tr>
+<tr id="t0104A" class="h r"><td><a href="#t0104A">01:04</a></td><td class="ng">zacts</td><td>(I'm just being silly)</td></tr>
+<tr id="t0104A" class="h r"><td><a href="#t0104A">01:04</a></td><td class="ng">zacts</td><td>a proof by contradiction</td></tr>
+<tr id="t0104A" class="h"><td><a href="#t0104A">01:04</a></td><td class="nd">justin_smith</td><td>zacts: clojurebot just said something that probably won't ever be said again (unless it's being quoted), and probably wasn't said before</td></tr>
+<tr id="t0104A" class="h"><td><a href="#t0104A">01:04</a></td><td class="ng">zacts</td><td>oops</td></tr>
+<tr id="t0104A" class="h r"><td><a href="#t0104A">01:04</a></td><td class="ng">zacts</td><td>proof by counterexample</td></tr>
+<tr id="t0104A" class="h"><td><a href="#t0104A">01:04</a></td><td class="nd">justin_smith</td><td>sure</td></tr>
+<tr id="t0106A" class="h"><td><a href="#t0106A">01:06</a></td><td class="ng">zacts</td><td>oh and what was that TV show... ugh...</td></tr>
+<tr id="t0106A" class="h r"><td><a href="#t0106A">01:06</a></td><td class="ng">zacts</td><td>he did borat</td></tr>
+<tr id="t0106A" class="h r"><td><a href="#t0106A">01:06</a></td><td class="ng">zacts</td><td>but also he did this other one</td></tr>
+<tr id="t0106A" class="h r"><td><a href="#t0106A">01:06</a></td><td class="ng">zacts</td><td>he would say technologically like technomologically</td></tr>
+<tr id="t0106A" class="h r"><td><a href="#t0106A">01:06</a></td><td class="ng">zacts</td><td>I think I just saw a youtube clip of it recently, and it was in my subconcious</td></tr>
+<tr id="t0106A" class="h r"><td><a href="#t0106A">01:06</a></td><td class="ng">zacts</td><td>oh well.</td></tr>
+<tr id="t0106A" class="h r"><td><a href="#t0106A">01:06</a></td><td class="ng">zacts</td><td>:-)</td></tr>
+<tr id="t0106A" class="h r"><td><a href="#t0106A">01:06</a></td><td class="ng">zacts</td><td>laters</td></tr>
+<tr id="t0205A"><td><a href="#t0205A">02:05</a></td><td class="ne">jefelante</td><td>is there an alternative to the page object model for using selenium webdriver w/ clojure?</td></tr>
+<tr id="t0547A"><td><a href="#t0547A">05:47</a></td><td class="n6">rritoch</td><td>Hi, whats the best way to make a &quot;hybrid&quot; uberjar which only includes select dependencies in the jar?</td></tr>
+<tr id="t0548A" class="h r"><td><a href="#t0548A">05:48</a></td><td class="n6">rritoch</td><td>Is there some profile that is only applied during uberjar, or something similar I can use.</td></tr>
+<tr id="t0549A" class="h r"><td><a href="#t0549A">05:49</a></td><td class="n6">rritoch</td><td>Some dependencies are needed during compilation, but not needed in the generated uberjar.</td></tr>
+<tr id="t0557A" class="r"><td><a href="#t0557A">05:57</a></td><td class="n6">rritoch</td><td>Nevermind, I figured it out, if I put my compile time dependencies which aren't needed in the uberjar into the dev profile they're excluded from the uberjar.</td></tr>
+<tr id="t0622A"><td><a href="#t0622A">06:22</a></td><td class="n9">retrogradeorbit</td><td>hi everyone. I hope someone can point me in the right direction</td></tr>
+<tr id="t0623A" class="h r"><td><a href="#t0623A">06:23</a></td><td class="n9">retrogradeorbit</td><td>Im looking for the right mutable type to use. atom vs ref vs var</td></tr>
+<tr id="t0623A" class="h r"><td><a href="#t0623A">06:23</a></td><td class="n9">retrogradeorbit</td><td>I have two threads</td></tr>
+<tr id="t0623A" class="h r"><td><a href="#t0623A">06:23</a></td><td class="n9">retrogradeorbit</td><td>one is polling some data every 5 seconds and (swap! myatom assoc mytime data)</td></tr>
+<tr id="t0624A" class="h r"><td><a href="#t0624A">06:24</a></td><td class="n9">retrogradeorbit</td><td>the other thread I want to poll occasionally and look at the size of myatom</td></tr>
+<tr id="t0624A" class="h r"><td><a href="#t0624A">06:24</a></td><td class="n9">retrogradeorbit</td><td>amd when it goes over a certain amount</td></tr>
+<tr id="t0624A" class="h r"><td><a href="#t0624A">06:24</a></td><td class="n9">retrogradeorbit</td><td>I want it to swap! the atom with {} and write the old atom to a file</td></tr>
+<tr id="t0624A" class="h r"><td><a href="#t0624A">06:24</a></td><td class="n9">retrogradeorbit</td><td>so I did that, and it works great, but now im thinking</td></tr>
+<tr id="t0624A" class="h r"><td><a href="#t0624A">06:24</a></td><td class="n9">retrogradeorbit</td><td>is an atom right here?</td></tr>
+<tr id="t0625A" class="h r"><td><a href="#t0625A">06:25</a></td><td class="n9">retrogradeorbit</td><td>The swap! fn that writes the file may be called more than once, is that right?</td></tr>
+<tr id="t0625A" class="h r"><td><a href="#t0625A">06:25</a></td><td class="n9">retrogradeorbit</td><td>and if so, the second call may blat the first?</td></tr>
+<tr id="t0625A" class="h r"><td><a href="#t0625A">06:25</a></td><td class="n9">retrogradeorbit</td><td>should I be using refs and dosync here to make sure the file only writes once?</td></tr>
+<tr id="t0626A" class="h r"><td><a href="#t0626A">06:26</a></td><td class="n9">retrogradeorbit</td><td>or is there some nice way to do in an uncorordinated way with atoms?</td></tr>
+<tr id="t0627A" class="h"><td><a href="#t0627A">06:27</a></td><td class="n6">rritoch</td><td>retrogradeorbit: To start with, if you use an atom or a ref you'll typically keep them in a var either way unless your entire functionality is contained within a single form.</td></tr>
+<tr id="t0628A" class="h"><td><a href="#t0628A">06:28</a></td><td class="n9">retrogradeorbit</td><td>ok. yeah I have it in a var</td></tr>
+<tr id="t0628A" class="h r"><td><a href="#t0628A">06:28</a></td><td class="n9">retrogradeorbit</td><td>an atom at the moment</td></tr>
+<tr id="t0629A" class="h r"><td><a href="#t0629A">06:29</a></td><td class="n9">retrogradeorbit</td><td>is the atom semantics Compare And Swap?</td></tr>
+<tr id="t0629A" class="h"><td><a href="#t0629A">06:29</a></td><td class="n6">rritoch</td><td>retrogradeoribit: Your operations on atoms should not have any side effects (Such as writing to files) because they can run multiple times. Considering you just want to perform some action based on your stored value, I suggest you use an atom to get into the habbit of thread safety, even though in this case you only need on thread.</td></tr>
+<tr id="t0629A" class="h r"><td><a href="#t0629A">06:29</a></td><td class="n6">rritoch</td><td>retrogradeorbit: The reason you only need one thread is that you should be using add-watch, <a href="https://clojuredocs.org/clojure.core/add-watch">https://clojuredocs.org/clojure.core/add-watch</a></td></tr>
+<tr id="t0630A"><td><a href="#t0630A">06:30</a></td><td class="n9">retrogradeorbit</td><td>aaaaaawwww</td></tr>
+<tr id="t0630A" class="h r"><td><a href="#t0630A">06:30</a></td><td class="n9">retrogradeorbit</td><td>yeah right!</td></tr>
+<tr id="t0630A" class="h r"><td><a href="#t0630A">06:30</a></td><td class="n9">retrogradeorbit</td><td>I didnt think of that</td></tr>
+<tr id="t0630A" class="h r"><td><a href="#t0630A">06:30</a></td><td class="n9">retrogradeorbit</td><td>so I can add a watch to the atom, and do my size comparison in that?</td></tr>
+<tr id="t0630A" class="h r"><td><a href="#t0630A">06:30</a></td><td class="n9">retrogradeorbit</td><td>so the add-watch fn can have side effects?</td></tr>
+<tr id="t0631A" class="h r"><td><a href="#t0631A">06:31</a></td><td class="n9">retrogradeorbit</td><td>is it only run when the swap succeeds?</td></tr>
+<tr id="t0631A" class="h"><td><a href="#t0631A">06:31</a></td><td class="n6">rritoch</td><td>retrogradeorbit: Let me recheck the atom source code, but I believe the watches are only called when the transaction is successful.</td></tr>
+<tr id="t0632A" class="h r"><td><a href="#t0632A">06:32</a></td><td class="n6">rritoch</td><td>retrogradeorbit: Yes, the watches are only called when the state of the atom has been successfully updated, so your watches can have side-effects.</td></tr>
+<tr id="t0639A" class="h r"><td><a href="#t0639A">06:39</a></td><td class="n6">rritoch</td><td>retrogradeorbit: One thing of note based on this code, it looks like watches will block your update until after the watch operation completes. If your watch logic is going to take a long time to run, you may want to use a &quot;future&quot;</td></tr>
+<tr id="t0640A" class="r"><td><a href="#t0640A">06:40</a></td><td class="n6">rritoch</td><td>retrogradeorbit: One thing of note based on this code, it looks like watches will block your update until after the watch operation completes. If your watch logic is going to take a long time to run, you may want to use a &quot;future&quot;</td></tr>
+<tr id="t0642A" class="h"><td><a href="#t0642A">06:42</a></td><td class="n9">retrogradeorbit</td><td>hmm. Im worried about the watcher updating the atom</td></tr>
+<tr id="t0642A" class="h r"><td><a href="#t0642A">06:42</a></td><td class="n9">retrogradeorbit</td><td>it shouldnt take long, and blocking would be fine</td></tr>
+<tr id="t0642A" class="h"><td><a href="#t0642A">06:42</a></td><td class="n6">rritoch</td><td>retrogradeorbit: Why would the watcher update the atom?</td></tr>
+<tr id="t0642A" class="h"><td><a href="#t0642A">06:42</a></td><td class="n9">retrogradeorbit</td><td>Im trying to archive off the hashmap when its over a size, and reset it to empty</td></tr>
+<tr id="t0642A" class="h r"><td><a href="#t0642A">06:42</a></td><td class="n9">retrogradeorbit</td><td>so the atom builds and builds</td></tr>
+<tr id="t0643A" class="h r"><td><a href="#t0643A">06:43</a></td><td class="n9">retrogradeorbit</td><td>sitting in ram</td></tr>
+<tr id="t0643A" class="h r"><td><a href="#t0643A">06:43</a></td><td class="n9">retrogradeorbit</td><td>and at a certain size, it gets serialised to disk, and reset to empty to continue</td></tr>
+<tr id="t0643A" class="h"><td><a href="#t0643A">06:43</a></td><td class="n6">rritoch</td><td>retrogradeorbit: I see, a watch + future would be perfect than</td></tr>
+<tr id="t0643A" class="h r"><td><a href="#t0643A">06:43</a></td><td class="n6">rritoch</td><td>But the re-update is a problem</td></tr>
+<tr id="t0644A" class="h"><td><a href="#t0644A">06:44</a></td><td class="n9">retrogradeorbit</td><td>yeah. another update to the atom could happen at any time</td></tr>
+<tr id="t0644A" class="h r"><td><a href="#t0644A">06:44</a></td><td class="n9">retrogradeorbit</td><td>maybe I need coordination with refs?</td></tr>
+<tr id="t0644A" class="h"><td><a href="#t0644A">06:44</a></td><td class="n6">rritoch</td><td>Here is what I would suggest, and it is mildly complicated.</td></tr>
+<tr id="t0644A" class="h"><td><a href="#t0644A">06:44</a></td><td class="n9">retrogradeorbit</td><td>Im all ears</td></tr>
+<tr id="t0645A" class="h"><td><a href="#t0645A">06:45</a></td><td class="nc">FarzadBekran</td><td>guys has anyone been able to get <a href="https://github.com/raph-amiard/clojurescript-lua">https://github.com/raph-amiard/clojurescript-lua</a> running?</td></tr>
+<tr id="t0645A" class="h"><td><a href="#t0645A">06:45</a></td><td class="n6">rritoch</td><td>Have your watcher launch a future ONLY when the size of the atom == the max size, because you don't want it running more than once.</td></tr>
+<tr id="t0646A" class="h r"><td><a href="#t0646A">06:46</a></td><td class="n6">rritoch</td><td>Now, when your future runs, have it only strip off the max number, leaving any others behind, using your typical swap! syntax.</td></tr>
+<tr id="t0646A" class="h"><td><a href="#t0646A">06:46</a></td><td class="n9">retrogradeorbit</td><td>ah ok. will that free up all the memory?</td></tr>
+<tr id="t0646A" class="h r"><td><a href="#t0646A">06:46</a></td><td class="n9">retrogradeorbit</td><td>if I dissoc a bunch of keys?</td></tr>
+<tr id="t0647A" class="h"><td><a href="#t0647A">06:47</a></td><td class="n6">rritoch</td><td>retrogradeorbit: If your data is indexed, than the process would be simple, you just deref your atom, grab the last X keys, and then swap! dissoc the keys your archiving.</td></tr>
+<tr id="t0648A" class="h"><td><a href="#t0648A">06:48</a></td><td class="n9">retrogradeorbit</td><td>yeah its indexed by timestamp</td></tr>
+<tr id="t0648A" class="h"><td><a href="#t0648A">06:48</a></td><td class="n6">rritoch</td><td>retrogradeorbit: You will probably also want to add a &quot;shutdown&quot; hook to save any remaining data in the atom when your application closes normally.</td></tr>
+<tr id="t0649A" class="h"><td><a href="#t0649A">06:49</a></td><td class="n9">retrogradeorbit</td><td>That sounds good. How would I go about adding a shutdown hook?</td></tr>
+<tr id="t0649A" class="h r"><td><a href="#t0649A">06:49</a></td><td class="n9">retrogradeorbit</td><td>I suppose I should go read up on clojure and signals</td></tr>
+<tr id="t0650A" class="r"><td><a href="#t0650A">06:50</a></td><td class="n9">retrogradeorbit</td><td>catch a SIGTERM</td></tr>
+<tr id="t0650A" class="h"><td><a href="#t0650A">06:50</a></td><td class="n6">rritoch</td><td>retrogradeorbit: Good question, I'm not sure what the clojure way is.</td></tr>
+<tr id="t0650A" class="h"><td><a href="#t0650A">06:50</a></td><td class="n9">retrogradeorbit</td><td>cool. np.</td></tr>
+<tr id="t0650A" class="h"><td><a href="#t0650A">06:50</a></td><td class="n6">rritoch</td><td>It's basically the same as the Java way</td></tr>
+<tr id="t0650A" class="h r"><td><a href="#t0650A">06:50</a></td><td class="n6">rritoch</td><td>See: <a href="http://stackoverflow.com/questions/11709639/how-to-catch-ctrlc-in-clojure">http://stackoverflow.com/questions/11709639/how-to-catch-ctrlc-in-clojure</a></td></tr>
+<tr id="t0651A" class="h"><td><a href="#t0651A">06:51</a></td><td class="n9">retrogradeorbit</td><td>let me try the watcher method first, and then I'll add the shutdown hook</td></tr>
+<tr id="t0651A" class="h r"><td><a href="#t0651A">06:51</a></td><td class="n9">retrogradeorbit</td><td>at the moment Im running it all in cider in emacs anyway</td></tr>
+<tr id="t0651A" class="h r"><td><a href="#t0651A">06:51</a></td><td class="n9">retrogradeorbit</td><td>so when I wrap it into an actual application I'll work on the shutdown</td></tr>
+<tr id="t0652A" class="h r"><td><a href="#t0652A">06:52</a></td><td class="n9">retrogradeorbit</td><td>thanks heaps rritoch. You've been most helpful</td></tr>
+<tr id="t0705A"><td><a href="#t0705A">07:05</a></td><td class="n6">rritoch</td><td>retrogradeorbit: One more thing that came to mind, in your future task, be sure to include a loop that repeats for as long as the number of keys is greater than your maximum, otherwise you have a potential bug if it takes longer to write the max entries than it takes to collect the max entries.</td></tr>
+<tr id="t0706A" class="h r"><td><a href="#t0706A">07:06</a></td><td class="n6">rritoch</td><td>retrogradeorbit: It seems to be a rare case, but it could happen if it's running on a heavily loaded server.</td></tr>
+<tr id="t0714A" class="r"><td><a href="#t0714A">07:14</a></td><td class="n6">rritoch</td><td>retrogradeorbit: If you remove the values before you save, it won't be a problem, because a second thread will handle it, but if you remove them after, than you'll need to run again while number is &gt; max.</td></tr>
+<tr id="t0819A"><td><a href="#t0819A">08:19</a></td><td class="n7">crocket</td><td>Is there a decent gitlab/github alternative written in clojure?</td></tr>
+<tr id="t0820A" class="r"><td><a href="#t0820A">08:20</a></td><td class="n7">crocket</td><td>I found an alternative written in scala.</td></tr>
+<tr id="t0820A" class="h r"><td><a href="#t0820A">08:20</a></td><td class="n7">crocket</td><td>GitBucket in scala</td></tr>
+<tr id="t0852A"><td><a href="#t0852A">08:52</a></td><td class="n6">deadghost</td><td>I kind of feel like learning another language</td></tr>
+<tr id="t0852A" class="h r"><td><a href="#t0852A">08:52</a></td><td class="n6">deadghost</td><td>what's something that will complement my clojure?</td></tr>
+<tr id="t0855A" class="h"><td><a href="#t0855A">08:55</a></td><td class="nd">justin_smith</td><td>deadghost: there's a lot to learn in haskell (whether that's a good thing is up to you of course)</td></tr>
+<tr id="t0857A" class="h"><td><a href="#t0857A">08:57</a></td><td class="n7">crocket</td><td>Ok, I decided to replace GitLab with GitBucket for easier maintenance.</td></tr>
+<tr id="t0858A" class="h"><td><a href="#t0858A">08:58</a></td><td class="n6">deadghost</td><td>crocket, if it doesn't have to be clojure</td></tr>
+<tr id="t0858A" class="h r"><td><a href="#t0858A">08:58</a></td><td class="n6">deadghost</td><td>I quite like gogs</td></tr>
+<tr id="t0858A" class="h r"><td><a href="#t0858A">08:58</a></td><td class="n6">deadghost</td><td>much much lower memory footprint than gitlab</td></tr>
+<tr id="t0859A" class="h r"><td><a href="#t0859A">08:59</a></td><td class="n6">deadghost</td><td>my needs are simple though</td></tr>
+<tr id="t0859A" class="h"><td><a href="#t0859A">08:59</a></td><td class="n7">crocket</td><td>deadghost, Gogs vs GitBucket</td></tr>
+<tr id="t0859A" class="h r"><td><a href="#t0859A">08:59</a></td><td class="n7">crocket</td><td>GitBucket is also simple.</td></tr>
+<tr id="t0859A" class="h"><td><a href="#t0859A">08:59</a></td><td class="n6">deadghost</td><td>I just need a git webui that lets me have push to deploy scripts</td></tr>
+<tr id="t0900A"><td><a href="#t0900A">09:00</a></td><td class="n7">crocket</td><td>But, GitBucket is not exactly light. It consumes 610MB.</td></tr>
+<tr id="t0900A" class="h r"><td><a href="#t0900A">09:00</a></td><td class="n7">crocket</td><td>While Go is not a terrible language, I think Go is not a good language.</td></tr>
+<tr id="t0901A" class="h r"><td><a href="#t0901A">09:01</a></td><td class="n7">crocket</td><td>It feels mediocre.</td></tr>
+<tr id="t0901A" class="h r"><td><a href="#t0901A">09:01</a></td><td class="n7">crocket</td><td>Scala manages to be barely better than mediocre, but clojure is elegant.</td></tr>
+<tr id="t0903A" class="h r"><td><a href="#t0903A">09:03</a></td><td class="n7">crocket</td><td>deadghost, Its low memory footprint is definitely desirable.</td></tr>
+<tr id="t0904A" class="h r"><td><a href="#t0904A">09:04</a></td><td class="n7">crocket</td><td>GitLab is complex, slow, and greedy of memory.</td></tr>
+<tr id="t0904A" class="h"><td><a href="#t0904A">09:04</a></td><td class="n6">deadghost</td><td>yes</td></tr>
+<tr id="t0904A" class="h r"><td><a href="#t0904A">09:04</a></td><td class="n6">deadghost</td><td>very much yes</td></tr>
+<tr id="t0904A" class="h r"><td><a href="#t0904A">09:04</a></td><td class="n6">deadghost</td><td>I used gitlab previously</td></tr>
+<tr id="t0905A" class="h"><td><a href="#t0905A">09:05</a></td><td class="n7">crocket</td><td>Maintaining GitLab natively on ArchLinux is a nightmare.</td></tr>
+<tr id="t0905A" class="h r"><td><a href="#t0905A">09:05</a></td><td class="n7">crocket</td><td>Every upgrade of ruby in ArchLinux breaks GitLab.</td></tr>
+<tr id="t0905A" class="h r"><td><a href="#t0905A">09:05</a></td><td class="n7">crocket</td><td>GitLab is fragile.</td></tr>
+<tr id="t0907A" class="h"><td><a href="#t0907A">09:07</a></td><td class="n6">rritoch</td><td>Does anyone know if *use-context-classloader* is true or false by default, and if it's not true, whats the best way to set it to true from Java?</td></tr>
+<tr id="t0907A" class="h"><td><a href="#t0907A">09:07</a></td><td class="n7">crocket</td><td>deadghost, Do you run gogs in a docker container?</td></tr>
+<tr id="t0907A" class="h"><td><a href="#t0907A">09:07</a></td><td class="n6">deadghost</td><td>nope</td></tr>
+<tr id="t0907A" class="h"><td><a href="#t0907A">09:07</a></td><td class="nd">justin_smith</td><td>rritoch: it's true in my repl.</td></tr>
+<tr id="t0908A" class="h r"><td><a href="#t0908A">09:08</a></td><td class="nd">justin_smith</td><td>1.7</td></tr>
+<tr id="t0909A" class="h"><td><a href="#t0909A">09:09</a></td><td class="n5">kitallis</td><td>I'm trying to split my defroutes (compojure-api) into multiple files because it's getting large. I now reconcile them in a single file under (defapi) and (swaggered), this seems to want to re-require all the files that each defroutes macro required internally outside as well – is there a way to get around this?</td></tr>
+<tr id="t0909A" class="h"><td><a href="#t0909A">09:09</a></td><td class="n6">deadghost</td><td>crocket, my gogs shows 23348kb</td></tr>
+<tr id="t0909A" class="h"><td><a href="#t0909A">09:09</a></td><td class="n7">crocket</td><td>deadghost, If I replace GitLab with either GitBucket or Gogs, I'll be freed of maintenance nightmares.</td></tr>
+<tr id="t0909A" class="h"><td><a href="#t0909A">09:09</a></td><td class="n6">deadghost</td><td>0.6% server mem usage</td></tr>
+<tr id="t0909A" class="h"><td><a href="#t0909A">09:09</a></td><td class="n7">crocket</td><td>Do you use SQLite3?</td></tr>
+<tr id="t0910A"><td><a href="#t0910A">09:10</a></td><td class="n6">deadghost</td><td>was that an option for gogs?</td></tr>
+<tr id="t0910A" class="h r"><td><a href="#t0910A">09:10</a></td><td class="n6">deadghost</td><td>I think I went with a sql</td></tr>
+<tr id="t0910A" class="h"><td><a href="#t0910A">09:10</a></td><td class="n6">rritoch</td><td>justin_smith: Thanks, I hope that's the default. My loggs say that when the OSGI activator ran the contextClassloader was the system classloader, so hopefuly that's the source of this bug.</td></tr>
+<tr id="t0910A" class="h"><td><a href="#t0910A">09:10</a></td><td class="n6">deadghost</td><td>yeah I went with postgresql</td></tr>
+<tr id="t0911A" class="h"><td><a href="#t0911A">09:11</a></td><td class="nd">justin_smith</td><td>kitallis: what do you mean by &quot;this seems to want to re-require&quot; ?</td></tr>
+<tr id="t0911A" class="h"><td><a href="#t0911A">09:11</a></td><td class="nv">Deraen</td><td>kitallis: You need to use new version (where swaggered is deprecated) and defroutes*</td></tr>
+<tr id="t0913A" class="h"><td><a href="#t0913A">09:13</a></td><td class="n7">crocket</td><td>deadghost, SQLite3 is the  default in gogs.</td></tr>
+<tr id="t0913A" class="h r"><td><a href="#t0913A">09:13</a></td><td class="n7">crocket</td><td>You don't need a database server to run gogs.</td></tr>
+<tr id="t0913A" class="h r"><td><a href="#t0913A">09:13</a></td><td class="n7">crocket</td><td>Even simpler if you don't need performance.</td></tr>
+<tr id="t0914A" class="h"><td><a href="#t0914A">09:14</a></td><td class="n6">deadghost</td><td>crocket, I heard they tend to have issues crop up for sqlite in the past</td></tr>
+<tr id="t0914A" class="h"><td><a href="#t0914A">09:14</a></td><td class="n5">kitallis</td><td>justin_smith, a.clj has dep x and (defroutes* a); b.clj has dep y and (defroutes* b); i refer to both of these in handler.clj as dep a and dep b –– this fails handler.clj as it wants dep x and y as well</td></tr>
+<tr id="t0914A" class="h"><td><a href="#t0914A">09:14</a></td><td class="nv">Deraen</td><td>kitallis: justin_smith: In old versions swaggered didn't do namespace resolution so if some code referred some var using alias, the route file had to have the same alias even if route was included from other namespace</td></tr>
+<tr id="t0914A" class="h"><td><a href="#t0914A">09:14</a></td><td class="n5">kitallis</td><td>I'm sorry if that's confusing</td></tr>
+<tr id="t0915A" class="h r"><td><a href="#t0915A">09:15</a></td><td class="n5">kitallis</td><td>Deraen, I had no idea this was the case</td></tr>
+<tr id="t0915A" class="h"><td><a href="#t0915A">09:15</a></td><td class="nv">Deraen</td><td>kitallis: What version of compojure-api are you using?</td></tr>
+<tr id="t0915A" class="h"><td><a href="#t0915A">09:15</a></td><td class="nd">justin_smith</td><td>Deraen: oh, that's a terrible design</td></tr>
+<tr id="t0916A" class="h"><td><a href="#t0916A">09:16</a></td><td class="n5">kitallis</td><td>I just checked the docs, it is indeed gone, I'm using 0.15.0</td></tr>
+<tr id="t0916A" class="h"><td><a href="#t0916A">09:16</a></td><td class="n6">deadghost</td><td>crocket, I'm generally satisfied with gogs</td></tr>
+<tr id="t0916A" class="h"><td><a href="#t0916A">09:16</a></td><td class="nv">Deraen</td><td>kitallis: this was changed in 0.20, that's why docs don't warn about this anymore</td></tr>
+<tr id="t0916A" class="h"><td><a href="#t0916A">09:16</a></td><td class="n6">deadghost</td><td>until recently development consistently ticked along</td></tr>
+<tr id="t0916A" class="h r"><td><a href="#t0916A">09:16</a></td><td class="n6">deadghost</td><td>but it's still missing some niceties like deploy keys</td></tr>
+<tr id="t0917A" class="h"><td><a href="#t0917A">09:17</a></td><td class="n5">kitallis</td><td>I wish compojure-api was just regular functions</td></tr>
+<tr id="t0917A" class="h"><td><a href="#t0917A">09:17</a></td><td class="nv">Deraen</td><td>justin_smith: Yeah compojure is not exactly designed to be extended, that's by compojure-api does loads of complicated macro magic</td></tr>
+<tr id="t0918A" class="h r"><td><a href="#t0918A">09:18</a></td><td class="nv">Deraen</td><td>kitallis: Unfortunately it isn't possible without rewriting compojure completely</td></tr>
+<tr id="t0918A" class="h r"><td><a href="#t0918A">09:18</a></td><td class="nv">Deraen</td><td>kitallis: But we are thinking about writing a bidi adapter for ring-swagger</td></tr>
+<tr id="t0919A" class="h"><td><a href="#t0919A">09:19</a></td><td class="n7">crocket</td><td>deadghost, It seems GitBucket is easier to set up and upgrade than gogs.</td></tr>
+<tr id="t0919A" class="h r"><td><a href="#t0919A">09:19</a></td><td class="n7">crocket</td><td>I can't figure out how to configure gogs.</td></tr>
+<tr id="t0920A"><td><a href="#t0920A">09:20</a></td><td class="n6">deadghost</td><td>gogs config was one file</td></tr>
+<tr id="t0920A" class="h r"><td><a href="#t0920A">09:20</a></td><td class="n6">deadghost</td><td>I don't have xp with gitbucket but w/e works</td></tr>
+<tr id="t0920A" class="h"><td><a href="#t0920A">09:20</a></td><td class="nv">Deraen</td><td>kitallis: Yada (<a href="http://yada.juxt.pro/index.html)">http://yada.juxt.pro/index.html)</a> already combines bidis data based routing with swagger docs</td></tr>
+<tr id="t0921A" class="h"><td><a href="#t0921A">09:21</a></td><td class="n6">deadghost</td><td>I used to be on a 2gb mem server so I prioritized mem consumption</td></tr>
+<tr id="t0921A" class="h"><td><a href="#t0921A">09:21</a></td><td class="n5">kitallis</td><td>yeah, I remember specifically picking compojure-api over bidi last year because of swagger integration</td></tr>
+<tr id="t0922A" class="h r"><td><a href="#t0922A">09:22</a></td><td class="n5">kitallis</td><td>this should be good.</td></tr>
+<tr id="t0925A" class="h"><td><a href="#t0925A">09:25</a></td><td class="n7">crocket</td><td>deadghost, Oh, I was just confused at first.</td></tr>
+<tr id="t0925A" class="h r"><td><a href="#t0925A">09:25</a></td><td class="n7">crocket</td><td>Gogs generates config files for me.</td></tr>
+<tr id="t0926A" class="h r"><td><a href="#t0926A">09:26</a></td><td class="n7">crocket</td><td>And, it uses SQLite3 by default.</td></tr>
+<tr id="t0930A" class="r"><td><a href="#t0930A">09:30</a></td><td class="n7">crocket</td><td>deadghost, One advantage of GitBucket is it has an intergrated SSH server so that you don't have to set up a system user account for ssh access as you have to do with gogs.</td></tr>
+<tr id="t0932A" class="h r"><td><a href="#t0932A">09:32</a></td><td class="n7">crocket</td><td>deadghost, Why don't you use SQLite3 for even less memory footprint?</td></tr>
+<tr id="t0932A" class="h"><td><a href="#t0932A">09:32</a></td><td class="n6">deadghost</td><td>because I heard there were previous problems that cropped up with sqlite3 w/ gogs</td></tr>
+<tr id="t0932A" class="h r"><td><a href="#t0932A">09:32</a></td><td class="n6">deadghost</td><td>might be resolved now idk</td></tr>
+<tr id="t0932A" class="h r"><td><a href="#t0932A">09:32</a></td><td class="n6">deadghost</td><td>and 0.3% server mem usage is satisfactory for me</td></tr>
+<tr id="t0933A" class="h r"><td><a href="#t0933A">09:33</a></td><td class="n6">deadghost</td><td>I don't even remember how much gitlab used</td></tr>
+<tr id="t0933A" class="h r"><td><a href="#t0933A">09:33</a></td><td class="n6">deadghost</td><td>but it was a lot</td></tr>
+<tr id="t0933A" class="h r"><td><a href="#t0933A">09:33</a></td><td class="n6">deadghost</td><td>0.5gb-1gb</td></tr>
+<tr id="t0934A" class="h r"><td><a href="#t0934A">09:34</a></td><td class="n6">deadghost</td><td>crocket, at this point I'd have more memory savings optimizing for my clojure programs</td></tr>
+<tr id="t0934A" class="h"><td><a href="#t0934A">09:34</a></td><td class="n7">crocket</td><td>deadghost, When did the issue occur? Can you refer me to the issues so that I can check if they are closed by now?</td></tr>
+<tr id="t0935A" class="h r"><td><a href="#t0935A">09:35</a></td><td class="n7">crocket</td><td>deadghost, clojure runs on JVM, so you can't save a lot of memory as you do on other natively compiled languages.</td></tr>
+<tr id="t0935A" class="h"><td><a href="#t0935A">09:35</a></td><td class="n6">deadghost</td><td>crocket, <a href="https://github.com/gogits/gogs/issues/805">https://github.com/gogits/gogs/issues/805</a></td></tr>
+<tr id="t0935A" class="h r"><td><a href="#t0935A">09:35</a></td><td class="n6">deadghost</td><td>&gt;Hmm, SQLite is always the troublemaker.</td></tr>
+<tr id="t0935A" class="h r"><td><a href="#t0935A">09:35</a></td><td class="n6">deadghost</td><td>that's enough for me to sidestep the issue entirely</td></tr>
+<tr id="t0936A" class="h"><td><a href="#t0936A">09:36</a></td><td class="n6">rritoch</td><td>Is there any way to get lein uberjar to use the dev profile during the compilation phase? I'm getting errors if I try to &quot;lein uberjar&quot; without running &quot;lein javac&quot; first.</td></tr>
+<tr id="t0936A" class="h"><td><a href="#t0936A">09:36</a></td><td class="n6">deadghost</td><td>crocket, see I have no idea how jvm memory stuff works</td></tr>
+<tr id="t0937A" class="h"><td><a href="#t0937A">09:37</a></td><td class="n7">crocket</td><td>deadghost, JVM simply doesn't return memory to OS.</td></tr>
+<tr id="t0937A" class="h"><td><a href="#t0937A">09:37</a></td><td class="n6">deadghost</td><td>until recently I just let my programs start the jvm with the default</td></tr>
+<tr id="t0937A" class="h r"><td><a href="#t0937A">09:37</a></td><td class="n6">deadghost</td><td>which iirc is 0.5gb</td></tr>
+<tr id="t0937A" class="h"><td><a href="#t0937A">09:37</a></td><td class="n7">crocket</td><td>Garbage collection happens in JVM, and JVM doesn't return unused memory space to OS.</td></tr>
+<tr id="t0937A" class="h r"><td><a href="#t0937A">09:37</a></td><td class="n7">crocket</td><td>This is a problem if you're optimizing for memory usage.</td></tr>
+<tr id="t0937A" class="h"><td><a href="#t0937A">09:37</a></td><td class="n6">deadghost</td><td>crocket, right but you can start the jvm to grab less memory initially yeah?</td></tr>
+<tr id="t0938A" class="h"><td><a href="#t0938A">09:38</a></td><td class="n7">crocket</td><td>deadghost, The best options that I know of are -Xms and -Xmx.</td></tr>
+<tr id="t0938A" class="h"><td><a href="#t0938A">09:38</a></td><td class="n6">deadghost</td><td>right now I'm also running multiple sites with the same deps in separate jvms</td></tr>
+<tr id="t0939A" class="h r"><td><a href="#t0939A">09:39</a></td><td class="n6">deadghost</td><td>I suspect I can just dump them in one jvm or something</td></tr>
+<tr id="t0939A" class="h"><td><a href="#t0939A">09:39</a></td><td class="n7">crocket</td><td>deadghost, Do you mean a servlet container?</td></tr>
+<tr id="t0939A" class="h r"><td><a href="#t0939A">09:39</a></td><td class="n7">crocket</td><td>Forget about application servers.</td></tr>
+<tr id="t0939A" class="h r"><td><a href="#t0939A">09:39</a></td><td class="n7">crocket</td><td>They are too complex</td></tr>
+<tr id="t0939A" class="h"><td><a href="#t0939A">09:39</a></td><td class="n6">deadghost</td><td>I was actually going to use wildfly</td></tr>
+<tr id="t0939A" class="h r"><td><a href="#t0939A">09:39</a></td><td class="n6">deadghost</td><td>since I'm on immutant</td></tr>
+<tr id="t0940A" class="r"><td><a href="#t0940A">09:40</a></td><td class="n6">deadghost</td><td>and yes the xml config is complex</td></tr>
+<tr id="t0940A" class="h"><td><a href="#t0940A">09:40</a></td><td class="n7">crocket</td><td>The true complexity lies in managing classpaths of multiple applications in a single JVM instance.</td></tr>
+<tr id="t0940A" class="h r"><td><a href="#t0940A">09:40</a></td><td class="n7">crocket</td><td>This is a mess.</td></tr>
+<tr id="t0941A" class="h r"><td><a href="#t0941A">09:41</a></td><td class="n7">crocket</td><td>Instead, you want to make each web application as light as possible.</td></tr>
+<tr id="t0944A" class="h r"><td><a href="#t0944A">09:44</a></td><td class="n7">crocket</td><td>deadghost, Is SQLite a trouble in other situations?</td></tr>
+<tr id="t0945A" class="h"><td><a href="#t0945A">09:45</a></td><td class="n6">deadghost</td><td>crocket, don't know</td></tr>
+<tr id="t0945A" class="h r"><td><a href="#t0945A">09:45</a></td><td class="n6">deadghost</td><td>but that comment suggests that at some point it was</td></tr>
+<tr id="t0953A"><td><a href="#t0953A">09:53</a></td><td class="n6">rritoch</td><td>Anyhow, I'm nearly at &quot;proof of concept&quot; with the clj-osgi-namespaces project.  It successfully bundles clojure with an OSGI activator and a bundleListener which facilitates swapping of clojure namespaces.  I still need to test it against a real clojure bundle, but it looks like this may work based on my logs.</td></tr>
+<tr id="t1003A"><td><a href="#t1003A">10:03</a></td><td class="ne">jefelante</td><td>does anyone have any experience with clj-webdriver and could help with this question? <a href="https://groups.google.com/forum/#!topic/clj-webdriver/xJL0fsJG6o0">https://groups.google.com/forum/#!topic/clj-webdriver/xJL0fsJG6o0</a></td></tr>
+<tr id="t1006A" class="h"><td><a href="#t1006A">10:06</a></td><td class="n7">crocket</td><td>What a pain...</td></tr>
+<tr id="t1012A"><td><a href="#t1012A">10:12</a></td><td class="n1">dstockton</td><td>just to get an idea, how many people are using component library to organise their applications?</td></tr>
+<tr id="t1042A"><td><a href="#t1042A">10:42</a></td><td class="n7">crocket</td><td>What is a component library?</td></tr>
+<tr id="t1108A"><td><a href="#t1108A">11:08</a></td><td class="nd">justin_smith</td><td>crocket: stuartsierra/component</td></tr>
+<tr id="t1108A" class="h r"><td><a href="#t1108A">11:08</a></td><td class="nd">justin_smith</td><td>dstockton: I use it and try to spread the good news</td></tr>
+<tr id="t1114A"><td><a href="#t1114A">11:14</a></td><td class="n0">sveri</td><td>+1 on component</td></tr>
+<tr id="t1114A" class="h r"><td><a href="#t1114A">11:14</a></td><td class="n0">sveri</td><td>or a similar library</td></tr>
+<tr id="t1123A"><td><a href="#t1123A">11:23</a></td><td class="n1">dstockton</td><td>thanks justin_smith and sveri</td></tr>
+<tr id="t1134A"><td><a href="#t1134A">11:34</a></td><td class="n9">digiorgi</td><td>I am learning STM and in some point appeared the &quot;write skew&quot; problem, but i can't find in google a text explaining what is that? Did you have some link?</td></tr>
+<tr id="t1135A" class="h r"><td><a href="#t1135A">11:35</a></td><td class="n9">digiorgi</td><td>do*</td></tr>
+<tr id="t1136A" class="h"><td><a href="#t1136A">11:36</a></td><td class="nj">weebz</td><td>digiorgi: I don't have an answer to your question, but do you have any resources on STM in Clojure or a language other than Haskell? I would like to learn about it, but every resource I've seen explains in Haskell which I'm still not comfortable in</td></tr>
+<tr id="t1139A" class="h"><td><a href="#t1139A">11:39</a></td><td class="nd">justin_smith</td><td>digiorgi: this ppt explains it pretty well I think <a href="https://blog.itu.dk/ET20-F2013/files/2013/04/a5b-relaxed-db-kap-5-countermeasures-against-isolation-anomalies-130330.ppt">https://blog.itu.dk/ET20-F2013/files/2013/04/a5b-relaxed-db-kap-5-countermeasures-against-isolation-anomalies-130330.ppt</a> (opens OK in libreoffice)</td></tr>
+<tr id="t1140A" class="r"><td><a href="#t1140A">11:40</a></td><td class="nd">justin_smith</td><td>digiorgi: tl;dr most relevant slide &quot;The write skew anomaly is a situation where two transactions both read two different related records. Next, the two transactions each update one of the two related records. Finally, both transactions commit. If a constraint has existed between the two related records, it might have been violated.&quot;</td></tr>
+<tr id="t1141A" class="h r"><td><a href="#t1141A">11:41</a></td><td class="nd">justin_smith</td><td>digiorgi: clojure STM transactions handle this by marking not just the data you write in a transaction, but also the data you read, and there is a retry if any of it changes before commit</td></tr>
+<tr id="t1142A" class="h r"><td><a href="#t1142A">11:42</a></td><td class="nd">justin_smith</td><td>classic write skew: &quot;the gift of the magi&quot; by o henry</td></tr>
+<tr id="t1152A"><td><a href="#t1152A">11:52</a></td><td class="n9">digiorgi</td><td>justin_smith: thanks!!</td></tr>
+<tr id="t1222A"><td><a href="#t1222A">12:22</a></td><td class="na">dnolen</td><td>Bronsa: ping</td></tr>
+<tr id="t1222A" class="h"><td><a href="#t1222A">12:22</a></td><td class="nc">Bronsa</td><td>dnolen: pong</td></tr>
+<tr id="t1222A" class="h"><td><a href="#t1222A">12:22</a></td><td class="na">dnolen</td><td>Bronsa: in read* why do you use trampoline instead of recur?</td></tr>
+<tr id="t1223A" class="h"><td><a href="#t1223A">12:23</a></td><td class="nc">Bronsa</td><td>dnolen: we need to recur to target <a href="https://github.com/clojure/tools.reader/blob/master/src/main/cljs/cljs/tools/reader.cljs#L832,">https://github.com/clojure/tools.reader/blob/master/src/main/cljs/cljs/tools/reader.cljs#L832,</a> recur would jump to <a href="https://github.com/clojure/tools.reader/blob/master/src/main/cljs/cljs/tools/reader.cljs#L834">https://github.com/clojure/tools.reader/blob/master/src/main/cljs/cljs/tools/reader.cljs#L834</a></td></tr>
+<tr id="t1238A"><td><a href="#t1238A">12:38</a></td><td class="na">dnolen</td><td>Bronsa: k, makes sense, thanks. Thanks doing some more serious profiling of tools.reader via Chrome DevTools and going through the hot spots.</td></tr>
+<tr id="t1241A"><td><a href="#t1241A">12:41</a></td><td class="nc">Bronsa</td><td>dnolen: in the jvm version we don't need the trampoline since we use a macro for log-source rather than a function. I guess now that cljs supports macros we could do that aswell?</td></tr>
+<tr id="t1242A" class="h"><td><a href="#t1242A">12:42</a></td><td class="na">dnolen</td><td>Bronsa: not sure I understand, why can't use a macro in this case in ClojureScript</td></tr>
+<tr id="t1244A" class="h"><td><a href="#t1244A">12:44</a></td><td class="nc">Bronsa</td><td>dnolen: IUC using defmacro wasn't an option when andrewmcveigh ported t.r since it couldn't be loaded in cljs</td></tr>
+<tr id="t1244A" class="h r"><td><a href="#t1244A">12:44</a></td><td class="nc">Bronsa</td><td>but I might be wrong</td></tr>
+<tr id="t1245A" class="h"><td><a href="#t1245A">12:45</a></td><td class="na">dnolen</td><td>hrm ok I'll take a look at that</td></tr>
+<tr id="t1245A" class="h r"><td><a href="#t1245A">12:45</a></td><td class="na">dnolen</td><td>Bronsa: is it because this is a macro that needs to be done at runtime or something?</td></tr>
+<tr id="t1250A"><td><a href="#t1250A">12:50</a></td><td class="nc">Bronsa</td><td>dnolen: no, it's just a regular macro <a href="https://github.com/clojure/tools.reader/blob/master/src/main/clojure/clojure/tools/reader/reader_types.clj#L344-L351">https://github.com/clojure/tools.reader/blob/master/src/main/clojure/clojure/tools/reader/reader_types.clj#L344-L351</a></td></tr>
+<tr id="t1250A" class="h r"><td><a href="#t1250A">12:50</a></td><td class="nc">Bronsa</td><td>dnolen: if bootstrapped cljs can do that, then there's no point in using a function</td></tr>
+<tr id="t1251A" class="h"><td><a href="#t1251A">12:51</a></td><td class="na">dnolen</td><td>Bronsa: but I don't understand bootstrapped even matters in this context</td></tr>
+<tr id="t1251A" class="h r"><td><a href="#t1251A">12:51</a></td><td class="na">dnolen</td><td>curious as to why the macro was moved into a macro ns as usual</td></tr>
+<tr id="t1251A" class="h r"><td><a href="#t1251A">12:51</a></td><td class="na">dnolen</td><td>s/was/was not</td></tr>
+<tr id="t1252A" class="h"><td><a href="#t1252A">12:52</a></td><td class="nc">Bronsa</td><td>dnolen: probably just a misunderstanding by both me and and andrewmcveigh</td></tr>
+<tr id="t1252A" class="h"><td><a href="#t1252A">12:52</a></td><td class="na">dnolen</td><td>Bronsa: bootstrapped ClojureScript isn't going to support putting macros inline anyway</td></tr>
+<tr id="t1252A" class="h r"><td><a href="#t1252A">12:52</a></td><td class="na">dnolen</td><td>they always need to be in a macro ns</td></tr>
+<tr id="t1252A" class="h"><td><a href="#t1252A">12:52</a></td><td class="nc">Bronsa</td><td>dnolen: does it need to be a cljc or something 1.7-only?</td></tr>
+<tr id="t1253A" class="h"><td><a href="#t1253A">12:53</a></td><td class="na">dnolen</td><td>Bronsa: it's simpler than that, macro resolution happens by changing the ns</td></tr>
+<tr id="t1254A" class="h r"><td><a href="#t1254A">12:54</a></td><td class="na">dnolen</td><td>cljs.core -&gt; cljs.core$macros</td></tr>
+<tr id="t1254A" class="h r"><td><a href="#t1254A">12:54</a></td><td class="na">dnolen</td><td>so any ns that wasn't loaded via require-macros will never be used to resolve macros</td></tr>
+<tr id="t1255A" class="h"><td><a href="#t1255A">12:55</a></td><td class="nc">Bronsa</td><td>dnolen: if changing log-source to be a macro like in the jvm version doesn't *require* 1.7 then I don't see why it couldn't be done</td></tr>
+<tr id="t1256A" class="h"><td><a href="#t1256A">12:56</a></td><td class="na">dnolen</td><td>Bronsa: yeah doesn't require 1.7 at all, just a ClojureScript .clj macro file as always</td></tr>
+<tr id="t1257A" class="h"><td><a href="#t1257A">12:57</a></td><td class="nc">Bronsa</td><td>dnolen: if you're currently hacking on t.r I won't bother changing that myself -- otherwise let me know and I can do it</td></tr>
+<tr id="t1258A" class="h"><td><a href="#t1258A">12:58</a></td><td class="na">dnolen</td><td>Bronsa: currently hacking on it</td></tr>
+<tr id="t1259A" class="h"><td><a href="#t1259A">12:59</a></td><td class="nc">Bronsa</td><td>dnolen: cool then, there should be just two instances where log-source is used, should just need to unwrap the fn &amp; replace the trampoline with a recur</td></tr>
+<tr id="t1405A"><td><a href="#t1405A">14:05</a></td><td class="na">dnolen</td><td>Bronsa: approaching an order of magnitude faster than master <a href="https://github.com/swannodette/tools.reader/commits/cljs-bootstrap">https://github.com/swannodette/tools.reader/commits/cljs-bootstrap</a></td></tr>
+<tr id="t1544A"><td><a href="#t1544A">15:44</a></td><td class="nd">murdd</td><td>Trying to port an old java application that was using deprecated internal clojure apis to invoke clojure code.</td></tr>
+<tr id="t1544A" class="h r"><td><a href="#t1544A">15:44</a></td><td class="nd">murdd</td><td>One of the things it had to do was change the class loader clojure, as it runs within a class loader itself.</td></tr>
+<tr id="t1545A" class="h r"><td><a href="#t1545A">15:45</a></td><td class="nd">murdd</td><td>I can't see how to do this with the new api though.</td></tr>
+<tr id="t1655A"><td><a href="#t1655A">16:55</a></td><td class="ns">xzilend</td><td>Hi there, I'm trying to use ring-mock to test a file-upload POST to an API. Does anyone have any examples of how to write this kind of test?</td></tr>
+<tr id="t1911A"><td><a href="#t1911A">19:11</a></td><td class="ne">Matachines</td><td>join #clojurescript</td></tr>
+<tr id="t1911A" class="h r"><td><a href="#t1911A">19:11</a></td><td class="ne">Matachines</td><td>lol tahts embarassing</td></tr>
+<tr id="t1952A"><td><a href="#t1952A">19:52</a></td><td class="nm">fredfe</td><td>For anyone using Jenkins on deployment, how do you handle uberjar deployment? How do you send a jar to a server, start it; later, send the next version over, shut down old, start up new?</td></tr>
+<tr id="t2003A"><td><a href="#t2003A">20:03</a></td><td class="nd">justin_smith</td><td>fredfe: when I used jenkins we had a shell script to do the restart, and used scp or s3 upload</td></tr>
+<tr id="t2003A" class="h r"><td><a href="#t2003A">20:03</a></td><td class="nd">justin_smith</td><td>(for s3 you then need to ask the server to do the download)</td></tr>
+<tr id="t2004A" class="h r"><td><a href="#t2004A">20:04</a></td><td class="nd">justin_smith</td><td>fredfe: also, jsvc can be used with clojure, and can simplify some of the startup / shutdown / restart stuff</td></tr>
+<tr id="t2113A"><td><a href="#t2113A">21:13</a></td><td class="n6">monsta</td><td>How can I flip arguments in clojure?</td></tr>
+<tr id="t2116A" class="h"><td><a href="#t2116A">21:16</a></td><td class="nd">justin_smith</td><td>monsta: I don't know of a lib that does it, but this gist looks good <a href="https://gist.github.com/micmarsh/bcbe19c9de8bb7a471bf">https://gist.github.com/micmarsh/bcbe19c9de8bb7a471bf</a></td></tr>
+<tr id="t2120A"><td><a href="#t2120A">21:20</a></td><td class="nm">amalloy</td><td>justin_smith: if you are looking for a laugh, check out one of the first clojure libraries i wrote: <a href="https://github.com/amalloy/hot-potato">https://github.com/amalloy/hot-potato</a></td></tr>
+<tr id="t2121A" class="h"><td><a href="#t2121A">21:21</a></td><td class="nd">justin_smith</td><td>;; warning warning unhygenic macro.</td></tr>
+<tr id="t2127A" class="h"><td><a href="#t2127A">21:27</a></td><td class="n6">monsta</td><td>One more question, how can I use a thread macro inside another thread macro?</td></tr>
+<tr id="t2127A" class="h"><td><a href="#t2127A">21:27</a></td><td class="nm">amalloy</td><td>monsta: the answer is like...you just use a thread macro inside another thread macro. unless you have a more specific question it's hard to provide a userful answer</td></tr>
+<tr id="t2129A" class="h"><td><a href="#t2129A">21:29</a></td><td class="nd">justin_smith</td><td>,(-&gt; 1 list (-&gt; (map inc)))</td></tr>
+<tr id="t2129A" class="h"><td><a href="#t2129A">21:29</a></td><td class="nl">clojurebot</td><td>#&lt;IllegalArgumentException java.lang.IllegalArgumentException: Don't know how to create ISeq from: clojure.core$inc&gt;</td></tr>
+<tr id="t2129A" class="h"><td><a href="#t2129A">21:29</a></td><td class="n6">monsta</td><td>Ok, how a make work something like (-&gt;&gt; 3 (-&gt; (/ 4)))?</td></tr>
+<tr id="t2129A" class="h"><td><a href="#t2129A">21:29</a></td><td class="nd">justin_smith</td><td>oops</td></tr>
+<tr id="t2129A" class="h r"><td><a href="#t2129A">21:29</a></td><td class="nd">justin_smith</td><td>,(-&gt; 1 list (-&gt;&gt; (map inc)))</td></tr>
+<tr id="t2129A" class="h"><td><a href="#t2129A">21:29</a></td><td class="nl">clojurebot</td><td>(2)</td></tr>
+<tr id="t2129A" class="h"><td><a href="#t2129A">21:29</a></td><td class="nd">justin_smith</td><td>monsta: you can only do the opposite</td></tr>
+<tr id="t2129A" class="h"><td><a href="#t2129A">21:29</a></td><td class="n6">monsta</td><td>ok, thanks for the help</td></tr>
+<tr id="t2130A"><td><a href="#t2130A">21:30</a></td><td class="nd">justin_smith</td><td>monsta: for obvious reasons, -&gt;&gt; can be inside -&gt; but not visa-versa</td></tr>
+<tr id="t2131A" class="h r"><td><a href="#t2131A">21:31</a></td><td class="nd">justin_smith</td><td>(well, without some other trickery at least)</td></tr>
+<tr id="t2131A" class="h"><td><a href="#t2131A">21:31</a></td><td class="n4">Surgo</td><td>yeah it's important to remember that macros aren't necessarily composable</td></tr>
+<tr id="t2255A"><td><a href="#t2255A">22:55</a></td><td class="n0">clojer</td><td>`lein new reagent app` with advanced optimisation produces a 446Kb file. Are there other settings, gzip aside, which will reduce the size? I notice the file includes a minified React 13.3 but the Reagent code doesn't seem to be minified.</td></tr>
+<tr id="t2305A"><td><a href="#t2305A">23:05</a></td><td class="n9">TimMc</td><td>justin_smith: I've been using as-&gt; quite a bit recently.</td></tr>
+<tr id="t2305A" class="h"><td><a href="#t2305A">23:05</a></td><td class="nd">justin_smith</td><td>yeah, that's a handy one</td></tr>
+<tr id="t2305A" class="h"><td><a href="#t2305A">23:05</a></td><td class="n9">TimMc</td><td>The only thing I don't like is (let [d ...] (as-&gt; d d ...))</td></tr>
+<tr id="t2306A" class="h"><td><a href="#t2306A">23:06</a></td><td class="nd">justin_smith</td><td>TimMc: that syntax is like that so nesting inside -&gt; works smoothly</td></tr>
+<tr id="t2307A" class="h"><td><a href="#t2307A">23:07</a></td><td class="n9">TimMc</td><td>Sure, the part I don't like is the repeated symbol.</td></tr>
+<tr id="t2307A" class="h r"><td><a href="#t2307A">23:07</a></td><td class="n9">TimMc</td><td>I could use a different symbol as in (let [d ...] (as-&gt; d r ...)) but that feels weird too.</td></tr>
+<tr id="t2308A" class="h"><td><a href="#t2308A">23:08</a></td><td class="nd">justin_smith</td><td>given how as-&gt; macroexpands, you could just use (as-&gt; ... d ...)</td></tr>
+<tr id="t2308A" class="h"><td><a href="#t2308A">23:08</a></td><td class="n9">TimMc</td><td>(This comes up when the thing is bound, then I do some conditionals, and then I process it with as-&gt; (so it's not appropriate to inline the initial computation as the first arg to as-&gt;)</td></tr>
+<tr id="t2308A" class="h r"><td><a href="#t2308A">23:08</a></td><td class="n9">TimMc</td><td>)</td></tr>
+<tr id="t2308A" class="h"><td><a href="#t2308A">23:08</a></td><td class="nd">justin_smith</td><td>ahh</td></tr>
+<tr id="t2310A" class="r"><td><a href="#t2310A">23:10</a></td><td class="nd">justin_smith</td><td>I don't know your criteria of propriety, but as-&gt; just expands to a big let where every clause is bound to the same symbol</td></tr>
+<tr id="t2310A" class="h r"><td><a href="#t2310A">23:10</a></td><td class="nd">justin_smith</td><td>so depending on your conditionals it might still work</td></tr>
+<tr id="t2311A" class="h"><td><a href="#t2311A">23:11</a></td><td class="n9">TimMc</td><td>Nah, I usually don't want to execute the as-&gt; at all when the guards fail.</td></tr>
+<tr id="t2312A" class="h r"><td><a href="#t2312A">23:12</a></td><td class="n9">TimMc</td><td>This might just be my coding style.</td></tr>
+<tr id="t2312A" class="h"><td><a href="#t2312A">23:12</a></td><td class="nd">justin_smith</td><td>(some-&gt; .... (as-&gt; d ...)) ?</td></tr>
+<tr id="t2312A" class="h r"><td><a href="#t2312A">23:12</a></td><td class="nd">justin_smith</td><td>haha</td></tr>
+<tr id="t2312A" class="h r"><td><a href="#t2312A">23:12</a></td><td class="nd">justin_smith</td><td>yeah, this is clearly a style thing</td></tr>
+<tr id="t2312A" class="h"><td><a href="#t2312A">23:12</a></td><td class="n9">TimMc</td><td>~guards</td></tr>
+<tr id="t2312A" class="h"><td><a href="#t2312A">23:12</a></td><td class="nl">clojurebot</td><td>SEIZE HIM!</td></tr>
+<tr id="t2313A" class="h"><td><a href="#t2313A">23:13</a></td><td class="nd">justin_smith</td><td>but who watches the add-watch?</td></tr>
+</tbody></table></main></body></html>
