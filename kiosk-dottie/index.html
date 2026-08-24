@@ -16,26 +16,11 @@
       background: #fff;
     }
 
-    #frames {
-      position: fixed;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      background: #fff;
-    }
-
-    .display-frame {
-      position: absolute;
-      inset: 0;
+    #content {
       width: 100%;
       height: 100%;
       border: 0;
-      background: #fff;
-      visibility: hidden;
-    }
-
-    .display-frame.active {
-      visibility: visible;
+      display: block;
     }
 
     #status {
@@ -52,42 +37,53 @@
     }
   </style>
 </head>
-
 <body>
-  <div id="frames"></div>
+  <iframe id="content"
+          title="Display content"
+          referrerpolicy="no-referrer"></iframe>
 
   <div id="status">
-    Unable to load the display configuration.
+    Unable to load the display configuration.<br>
+    The existing display will be left unchanged.
   </div>
 
   <script>
+    /*
+     * Configuration:
+     *   config.json is expected to be in the same directory as this page.
+     *
+     * Example:
+     * {
+     *   "version": 1,
+     *   "type": "url",
+     *   "url": "https://example.com/"
+     * }
+     *
+     * Supported types:
+     *   "url"       - display the URL in an iframe
+     *   "google-doc" - display a published Google Doc in an iframe
+     */
+
     const CONFIG_URL = "./config.json";
+    const POLL_INTERVAL_MS = 60 * 1000; // 1 minute
 
-    // Check the tiny control-plane file every minute.
-    const CONFIG_POLL_INTERVAL_MS = 60 * 1000;
-
-    const frames = document.getElementById("frames");
+    const iframe = document.getElementById("content");
     const status = document.getElementById("status");
 
-    let activeFrame = null;
-    let currentConfig = null;
     let currentVersion = null;
+    let currentConfig = null;
     let lastGoodConfig = null;
-    let refreshTimer = null;
-    let refreshGeneration = 0;
-
 
     function showStatus() {
+      // Only show this if there is no content to display at all.
       if (!lastGoodConfig) {
         status.style.display = "flex";
       }
     }
 
-
     function hideStatus() {
       status.style.display = "none";
     }
-
 
     function validateConfig(config) {
       if (!config || typeof config !== "object") {
@@ -98,10 +94,7 @@
         throw new Error("Configuration has no version");
       }
 
-      if (
-        typeof config.type !== "string" ||
-        typeof config.url !== "string"
-      ) {
+      if (typeof config.type !== "string" || typeof config.url !== "string") {
         throw new Error("Configuration requires type and url");
       }
 
@@ -109,418 +102,90 @@
         throw new Error("Configuration URL must be http(s)");
       }
 
-      if (!["url", "google-doc"].includes(config.type)) {
+      const allowedTypes = ["url", "google-doc"];
+      if (!allowedTypes.includes(config.type)) {
         throw new Error("Unsupported configuration type");
       }
 
-      const minutes =
-        config.iframeRefreshMinutes === undefined
-          ? 5
-          : Number(config.iframeRefreshMinutes);
-
-      if (!Number.isFinite(minutes) || minutes <= 0) {
-        throw new Error(
-          "iframeRefreshMinutes must be greater than zero"
-        );
-      }
-
-      return {
-        ...config,
-        iframeRefreshMinutes: minutes
-      };
+      return config;
     }
 
-
-    /*
-     * Force a fresh navigation of the iframe.
-     *
-     * This is particularly useful for published Google Docs, where
-     * an iframe that remains on the same URL can continue displaying
-     * an old published version.
-     */
-    function refreshedUrl(url) {
-      const separator = url.indexOf("?") >= 0 ? "&" : "?";
-
-      return (
-        url +
-        separator +
-        "displayRefresh=" +
-        Date.now()
-      );
-    }
-
-
-    function removeFrame(frame) {
-      if (frame && frame.parentNode) {
-        frame.parentNode.removeChild(frame);
-      }
-    }
-
-
-    /*
-     * Double-buffer an iframe.
-     *
-     * The current iframe remains visible while the replacement loads.
-     *
-     * The replacement is not made visible until:
-     *
-     *   1. its load event fires
-     *   2. two animation frames have occurred
-     *   3. an additional short settling delay has elapsed
-     *
-     * This is intended to reduce visible flicker from Google Docs
-     * rendering after its iframe load event.
-     */
-    function loadBuffered(config, success, failure) {
-      const frame = document.createElement("iframe");
-
-      frame.className = "display-frame";
-      frame.title = "Display content";
-
-      /*
-       * Deliberately don't set referrerPolicy here.
-       *
-       * The original simple iframe worked in Fully Kiosk, so avoid
-       * adding request-policy differences that might affect Android
-       * WebView or Google Docs.
-       */
-
-      let finished = false;
-
-      function cleanup() {
-        frame.onload = null;
-        frame.onerror = null;
-      }
-
-
-      frame.onload = function () {
-        if (finished) {
-          return;
-        }
-
-        finished = true;
-        cleanup();
-
-        /*
-         * Wait for two rendering opportunities.
-         */
-        requestAnimationFrame(function () {
-          requestAnimationFrame(function () {
-
-            /*
-             * Small additional settling period for embedded pages
-             * such as Google Docs.
-             */
-            setTimeout(function () {
-
-              /*
-               * The old frame remains visible until this exact point.
-               */
-              const oldFrame = activeFrame;
-
-              frame.classList.add("active");
-              activeFrame = frame;
-
-              /*
-               * Let the new frame get a paint opportunity before
-               * removing the old one.
-               */
-              requestAnimationFrame(function () {
-                if (oldFrame && oldFrame !== frame) {
-                  removeFrame(oldFrame);
-                }
-              });
-
-              if (success) {
-                success(frame);
-              }
-
-            }, 500);
-
-          });
-        });
-      };
-
-
-      frame.onerror = function () {
-        if (finished) {
-          return;
-        }
-
-        finished = true;
-        cleanup();
-        removeFrame(frame);
-
-        if (failure) {
-          failure();
-        }
-      };
-
-
-      /*
-       * Insert the iframe into the document before assigning src.
-       *
-       * This tends to be a little friendlier to older WebViews than
-       * constructing an iframe with src already assigned.
-       */
-      frames.appendChild(frame);
-
-      frame.src = refreshedUrl(config.url);
-
-      return frame;
-    }
-
-
-    /*
-     * Schedule a refresh of the displayed content.
-     *
-     * The interval is controlled remotely by config.json.
-     */
-    function scheduleContentRefresh() {
-      if (refreshTimer) {
-        clearTimeout(refreshTimer);
-      }
-
-      refreshTimer = null;
-
-      if (!currentConfig) {
-        return;
-      }
-
-      const generation = ++refreshGeneration;
-
-      const delay =
-        currentConfig.iframeRefreshMinutes *
-        60 *
-        1000;
-
-
-      refreshTimer = setTimeout(function () {
-
-        if (
-          generation !== refreshGeneration ||
-          !currentConfig
-        ) {
-          return;
-        }
-
-
-        /*
-         * Double-buffer refresh.
-         *
-         * If this fails, the existing frame remains visible.
-         */
-        loadBuffered(
-
-          currentConfig,
-
-          function () {
-            scheduleContentRefresh();
-          },
-
-          function () {
-            /*
-             * Failed refresh:
-             *
-             * Leave the old content alone and try again later.
-             */
-            scheduleContentRefresh();
-          }
-
-        );
-
-      }, delay);
-    }
-
-
-    function saveLastGoodConfig(config) {
-      try {
-        localStorage.setItem(
-          "lastGoodConfig",
-          JSON.stringify(config)
-        );
-      } catch (_) {
-        /*
-         * localStorage is only an optimization.
-         * The application works without it.
-         */
-      }
-    }
-
-
-    /*
-     * Apply a new configuration.
-     *
-     * The new destination must load successfully before the old
-     * destination is replaced.
-     */
     function applyConfig(config) {
-      refreshGeneration++;
+      /*
+       * Do not change the iframe until the new configuration has been
+       * successfully fetched and validated.
+       */
+      iframe.src = config.url;
 
-      if (refreshTimer) {
-        clearTimeout(refreshTimer);
-        refreshTimer = null;
+      currentConfig = config;
+      currentVersion = config.version;
+      lastGoodConfig = config;
+
+      try {
+        localStorage.setItem("lastGoodConfig", JSON.stringify(config));
+      } catch (_) {
+        // localStorage is optional; the live page still works without it.
       }
 
-
-      /*
-       * IMPORTANT:
-       *
-       * Don't update currentConfig/currentVersion until the new
-       * destination has successfully loaded.
-       *
-       * If GitHub gives us a new config pointing to a dead URL,
-       * the existing content remains authoritative.
-       */
-      loadBuffered(
-
-        config,
-
-        function () {
-
-          currentConfig = config;
-          currentVersion = config.version;
-          lastGoodConfig = config;
-
-          saveLastGoodConfig(config);
-
-          hideStatus();
-
-          scheduleContentRefresh();
-        },
-
-
-        function () {
-
-          /*
-           * New destination failed.
-           *
-           * Nothing visible changes.
-           *
-           * Continue using the previous known-good configuration.
-           */
-          scheduleContentRefresh();
-        }
-
-      );
+      hideStatus();
     }
 
-
-    /*
-     * Restore the last known-good destination at startup.
-     */
-    function restoreLastGoodConfig() {
+    function loadLastGoodConfig() {
       try {
+        const saved = localStorage.getItem("lastGoodConfig");
+        if (!saved) return;
 
-        const saved =
-          localStorage.getItem("lastGoodConfig");
-
-        if (!saved) {
-          return;
-        }
-
-
-        const config =
-          validateConfig(JSON.parse(saved));
-
-
-        /*
-         * Remember the cached configuration immediately so that
-         * a GitHub outage doesn't cause us to abandon it.
-         */
+        const config = validateConfig(JSON.parse(saved));
         currentConfig = config;
         currentVersion = config.version;
         lastGoodConfig = config;
 
-
-        loadBuffered(
-
-          config,
-
-          function () {
-            scheduleContentRefresh();
-          },
-
-          function () {
-            if (!activeFrame) {
-              showStatus();
-            }
-          }
-
-        );
-
+        iframe.src = config.url;
         hideStatus();
-
       } catch (_) {
-        /*
-         * Ignore corrupt or incompatible localStorage data.
-         */
+        // Ignore corrupt/stale local storage.
       }
     }
 
-
-    /*
-     * Check GitHub for a new configuration.
-     *
-     * Failure is completely non-destructive:
-     * the currently displayed content stays untouched.
-     */
-    async function checkConfig() {
-
+    async function fetchConfig() {
       try {
-
         /*
-         * Cache-bust only this tiny control-plane request.
+         * Cache-busting is intentional here. We want this tiny request to
+         * check GitHub Pages for the current configuration every minute.
          */
-        const response = await fetch(
+        const url = CONFIG_URL + "?t=" + Date.now();
 
-          CONFIG_URL + "?t=" + Date.now(),
-
-          {
-            cache: "no-store",
-            credentials: "omit"
-          }
-
-        );
-
+        const response = await fetch(url, {
+          cache: "no-store",
+          credentials: "omit"
+        });
 
         if (!response.ok) {
-          throw new Error(
-            "HTTP " + response.status
-          );
+          throw new Error("HTTP " + response.status);
         }
 
-
-        const config =
-          validateConfig(
-            await response.json()
-          );
-
+        const config = validateConfig(await response.json());
 
         /*
-         * Same version = nothing to do.
+         * A successful request with the same version is a no-op.
+         * Most importantly, a failed request never causes a reload.
          */
-        if (
-          currentVersion === null ||
-          String(config.version) !==
-            String(currentVersion)
-        ) {
+        if (currentVersion === null) {
+          applyConfig(config);
+        } else if (String(config.version) !== String(currentVersion)) {
           applyConfig(config);
         }
-
-
       } catch (error) {
-
         /*
-         * GitHub outage, network outage, malformed config, etc.
+         * Fail closed:
+         * - GitHub Pages outage
+         * - network outage
+         * - malformed config
+         * - transient DNS/TLS/etc. problem
          *
-         * Never reload and never replace known-good content.
+         * All leave the currently displayed content alone.
          */
-        console.warn(
-          "Configuration check failed:",
-          error
-        );
-
+        console.warn("Configuration check failed:", error);
 
         if (!lastGoodConfig) {
           showStatus();
@@ -528,24 +193,18 @@
       }
     }
 
+    /*
+     * Restore the last known good destination immediately, then check the
+     * network for a newer configuration.
+     */
+    loadLastGoodConfig();
+    fetchConfig();
 
     /*
-     * Startup:
-     *
-     * 1. Restore the last known-good configuration.
-     * 2. Check GitHub for a newer configuration.
+     * setInterval is deliberately used instead of reloading the page.
+     * The page itself remains stable during GitHub outages.
      */
-    restoreLastGoodConfig();
-    checkConfig();
-
-
-    /*
-     * Control-plane polling.
-     */
-    setInterval(
-      checkConfig,
-      CONFIG_POLL_INTERVAL_MS
-    );
+    setInterval(fetchConfig, POLL_INTERVAL_MS);
   </script>
 </body>
 </html>
