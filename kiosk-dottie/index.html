@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Display</title>
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    #content {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+    }
+
+    #status {
+      display: none;
+      position: fixed;
+      inset: 0;
+      align-items: center;
+      justify-content: center;
+      font: 24px sans-serif;
+      text-align: center;
+      padding: 2rem;
+      box-sizing: border-box;
+      background: #fff;
+    }
+  </style>
+</head>
+<body>
+  <iframe id="content"
+          title="Display content"
+          referrerpolicy="no-referrer"></iframe>
+
+  <div id="status">
+    Unable to load the display configuration.<br>
+    The existing display will be left unchanged.
+  </div>
+
+  <script>
+    /*
+     * Configuration:
+     *   config.json is expected to be in the same directory as this page.
+     *
+     * Example:
+     * {
+     *   "version": 1,
+     *   "type": "url",
+     *   "url": "https://example.com/"
+     * }
+     *
+     * Supported types:
+     *   "url"       - display the URL in an iframe
+     *   "google-doc" - display a published Google Doc in an iframe
+     */
+
+    const CONFIG_URL = "./config.json";
+    const POLL_INTERVAL_MS = 60 * 1000; // 1 minute
+
+    const iframe = document.getElementById("content");
+    const status = document.getElementById("status");
+
+    let currentVersion = null;
+    let currentConfig = null;
+    let lastGoodConfig = null;
+
+    function showStatus() {
+      // Only show this if there is no content to display at all.
+      if (!lastGoodConfig) {
+        status.style.display = "flex";
+      }
+    }
+
+    function hideStatus() {
+      status.style.display = "none";
+    }
+
+    function validateConfig(config) {
+      if (!config || typeof config !== "object") {
+        throw new Error("Invalid configuration");
+      }
+
+      if (config.version === undefined || config.version === null) {
+        throw new Error("Configuration has no version");
+      }
+
+      if (typeof config.type !== "string" || typeof config.url !== "string") {
+        throw new Error("Configuration requires type and url");
+      }
+
+      if (!/^https?:\/\//i.test(config.url)) {
+        throw new Error("Configuration URL must be http(s)");
+      }
+
+      const allowedTypes = ["url", "google-doc"];
+      if (!allowedTypes.includes(config.type)) {
+        throw new Error("Unsupported configuration type");
+      }
+
+      return config;
+    }
+
+    function applyConfig(config) {
+      /*
+       * Do not change the iframe until the new configuration has been
+       * successfully fetched and validated.
+       */
+      iframe.src = config.url;
+
+      currentConfig = config;
+      currentVersion = config.version;
+      lastGoodConfig = config;
+
+      try {
+        localStorage.setItem("lastGoodConfig", JSON.stringify(config));
+      } catch (_) {
+        // localStorage is optional; the live page still works without it.
+      }
+
+      hideStatus();
+    }
+
+    function loadLastGoodConfig() {
+      try {
+        const saved = localStorage.getItem("lastGoodConfig");
+        if (!saved) return;
+
+        const config = validateConfig(JSON.parse(saved));
+        currentConfig = config;
+        currentVersion = config.version;
+        lastGoodConfig = config;
+
+        iframe.src = config.url;
+        hideStatus();
+      } catch (_) {
+        // Ignore corrupt/stale local storage.
+      }
+    }
+
+    async function fetchConfig() {
+      try {
+        /*
+         * Cache-busting is intentional here. We want this tiny request to
+         * check GitHub Pages for the current configuration every minute.
+         */
+        const url = CONFIG_URL + "?t=" + Date.now();
+
+        const response = await fetch(url, {
+          cache: "no-store",
+          credentials: "omit"
+        });
+
+        if (!response.ok) {
+          throw new Error("HTTP " + response.status);
+        }
+
+        const config = validateConfig(await response.json());
+
+        /*
+         * A successful request with the same version is a no-op.
+         * Most importantly, a failed request never causes a reload.
+         */
+        if (currentVersion === null) {
+          applyConfig(config);
+        } else if (String(config.version) !== String(currentVersion)) {
+          applyConfig(config);
+        }
+      } catch (error) {
+        /*
+         * Fail closed:
+         * - GitHub Pages outage
+         * - network outage
+         * - malformed config
+         * - transient DNS/TLS/etc. problem
+         *
+         * All leave the currently displayed content alone.
+         */
+        console.warn("Configuration check failed:", error);
+
+        if (!lastGoodConfig) {
+          showStatus();
+        }
+      }
+    }
+
+    /*
+     * Restore the last known good destination immediately, then check the
+     * network for a newer configuration.
+     */
+    loadLastGoodConfig();
+    fetchConfig();
+
+    /*
+     * setInterval is deliberately used instead of reloading the page.
+     * The page itself remains stable during GitHub outages.
+     */
+    setInterval(fetchConfig, POLL_INTERVAL_MS);
+  </script>
+</body>
+</html>
