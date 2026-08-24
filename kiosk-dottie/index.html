@@ -16,11 +16,19 @@
       background: #fff;
     }
 
-    #content {
+    .display-frame {
+      position: fixed;
+      inset: 0;
       width: 100%;
       height: 100%;
       border: 0;
       display: block;
+      background: #fff;
+    }
+
+    .display-frame.hidden {
+      visibility: hidden;
+      pointer-events: none;
     }
 
     #status {
@@ -37,53 +45,42 @@
     }
   </style>
 </head>
+
 <body>
-  <iframe id="content"
-          title="Display content"
-          referrerpolicy="no-referrer"></iframe>
+  <div id="frames"></div>
 
   <div id="status">
-    Unable to load the display configuration.<br>
-    The existing display will be left unchanged.
+    Unable to load the display configuration.
   </div>
 
   <script>
-    /*
-     * Configuration:
-     *   config.json is expected to be in the same directory as this page.
-     *
-     * Example:
-     * {
-     *   "version": 1,
-     *   "type": "url",
-     *   "url": "https://example.com/"
-     * }
-     *
-     * Supported types:
-     *   "url"       - display the URL in an iframe
-     *   "google-doc" - display a published Google Doc in an iframe
-     */
-
     const CONFIG_URL = "./config.json";
-    const POLL_INTERVAL_MS = 60 * 1000; // 1 minute
 
-    const iframe = document.getElementById("content");
+    // The control plane is checked every minute.
+    const CONFIG_POLL_INTERVAL_MS = 60 * 1000;
+
+    const frames = document.getElementById("frames");
     const status = document.getElementById("status");
 
-    let currentVersion = null;
     let currentConfig = null;
+    let currentVersion = null;
     let lastGoodConfig = null;
+    let activeFrame = null;
+    let refreshTimer = null;
+    let refreshGeneration = 0;
+
 
     function showStatus() {
-      // Only show this if there is no content to display at all.
       if (!lastGoodConfig) {
         status.style.display = "flex";
       }
     }
 
+
     function hideStatus() {
       status.style.display = "none";
     }
+
 
     function validateConfig(config) {
       if (!config || typeof config !== "object") {
@@ -94,7 +91,8 @@
         throw new Error("Configuration has no version");
       }
 
-      if (typeof config.type !== "string" || typeof config.url !== "string") {
+      if (typeof config.type !== "string" ||
+          typeof config.url !== "string") {
         throw new Error("Configuration requires type and url");
       }
 
@@ -102,63 +100,267 @@
         throw new Error("Configuration URL must be http(s)");
       }
 
-      const allowedTypes = ["url", "google-doc"];
-      if (!allowedTypes.includes(config.type)) {
+      if (!["url", "google-doc"].includes(config.type)) {
         throw new Error("Unsupported configuration type");
       }
 
-      return config;
-    }
+      const refreshMinutes =
+        config.iframeRefreshMinutes === undefined
+          ? 5
+          : Number(config.iframeRefreshMinutes);
 
-    function applyConfig(config) {
-      /*
-       * Do not change the iframe until the new configuration has been
-       * successfully fetched and validated.
-       */
-      iframe.src = config.url;
-
-      currentConfig = config;
-      currentVersion = config.version;
-      lastGoodConfig = config;
-
-      try {
-        localStorage.setItem("lastGoodConfig", JSON.stringify(config));
-      } catch (_) {
-        // localStorage is optional; the live page still works without it.
+      if (!Number.isFinite(refreshMinutes) || refreshMinutes <= 0) {
+        throw new Error(
+          "iframeRefreshMinutes must be greater than zero"
+        );
       }
 
-      hideStatus();
+      return {
+        ...config,
+        iframeRefreshMinutes: refreshMinutes
+      };
     }
 
+
+    /*
+     * Force a new navigation of the iframe.
+     *
+     * This is particularly useful for published Google Docs, where
+     * simply leaving the existing iframe alive can leave an old
+     * published version displayed indefinitely.
+     */
+    function buildRefreshUrl(url) {
+      const separator = url.includes("?") ? "&" : "?";
+      return url + separator + "displayRefresh=" + Date.now();
+    }
+
+
+    function discardFrame(frame) {
+      if (frame && frame.parentNode) {
+        frame.parentNode.removeChild(frame);
+      }
+    }
+
+
+    /*
+     * Double-buffer an iframe.
+     *
+     * The existing iframe remains visible while the new iframe loads.
+     * Only after the new iframe's load event fires do we make it visible
+     * and remove the old one.
+     */
+    function loadIntoNewFrame(config, onSuccess, onFailure) {
+      const frame = document.createElement("iframe");
+
+      frame.className = "display-frame hidden";
+      frame.title = "Display content";
+      frame.referrerPolicy = "no-referrer";
+
+      let settled = false;
+
+      function cleanup() {
+        frame.onload = null;
+        frame.onerror = null;
+      }
+
+      frame.onload = function () {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        cleanup();
+
+        const oldFrame = activeFrame;
+
+        frame.classList.remove("hidden");
+        activeFrame = frame;
+
+        /*
+         * Let the browser paint the new frame before removing the old one.
+         */
+        if (oldFrame && oldFrame !== frame) {
+          setTimeout(function () {
+            discardFrame(oldFrame);
+          }, 100);
+        }
+
+        if (onSuccess) {
+          onSuccess(frame);
+        }
+      };
+
+      frame.onerror = function () {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        cleanup();
+        discardFrame(frame);
+
+        if (onFailure) {
+          onFailure();
+        }
+      };
+
+      frames.appendChild(frame);
+
+      frame.src = buildRefreshUrl(config.url);
+
+      return frame;
+    }
+
+
+    /*
+     * Schedule a refresh of the currently displayed content.
+     *
+     * The interval comes from config.json, so it can be changed remotely.
+     */
+    function scheduleIframeRefresh() {
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+        refreshTimer = null;
+      }
+
+      if (!currentConfig) {
+        return;
+      }
+
+      const generation = ++refreshGeneration;
+
+      refreshTimer = setTimeout(function () {
+        if (generation !== refreshGeneration || !currentConfig) {
+          return;
+        }
+
+        /*
+         * Important:
+         *
+         * The current frame remains visible while this new one loads.
+         * A failure therefore cannot blank the display.
+         */
+        loadIntoNewFrame(
+          currentConfig,
+
+          function () {
+            scheduleIframeRefresh();
+          },
+
+          function () {
+            /*
+             * The refresh failed. Keep the existing frame and try again
+             * later. Nothing visible changes.
+             */
+            scheduleIframeRefresh();
+          }
+        );
+
+      }, currentConfig.iframeRefreshMinutes * 60 * 1000);
+    }
+
+
+    /*
+     * Apply a new configuration.
+     *
+     * The new destination must successfully load before the old
+     * destination is replaced.
+     */
+    function applyConfig(config) {
+      refreshGeneration++;
+
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+        refreshTimer = null;
+      }
+
+      loadIntoNewFrame(
+        config,
+
+        function () {
+          currentConfig = config;
+          currentVersion = config.version;
+          lastGoodConfig = config;
+
+          try {
+            localStorage.setItem(
+              "lastGoodConfig",
+              JSON.stringify(config)
+            );
+          } catch (_) {
+            // localStorage is optional.
+          }
+
+          hideStatus();
+          scheduleIframeRefresh();
+        },
+
+        function () {
+          /*
+           * New configuration failed.
+           *
+           * The previous configuration and its iframe remain untouched.
+           */
+          scheduleIframeRefresh();
+        }
+      );
+    }
+
+
+    /*
+     * Restore the last known-good destination immediately at startup.
+     */
     function loadLastGoodConfig() {
       try {
         const saved = localStorage.getItem("lastGoodConfig");
-        if (!saved) return;
+
+        if (!saved) {
+          return;
+        }
 
         const config = validateConfig(JSON.parse(saved));
+
         currentConfig = config;
         currentVersion = config.version;
         lastGoodConfig = config;
 
-        iframe.src = config.url;
+        loadIntoNewFrame(
+          config,
+
+          function () {
+            scheduleIframeRefresh();
+          },
+
+          function () {
+            if (!activeFrame) {
+              showStatus();
+            }
+          }
+        );
+
         hideStatus();
+
       } catch (_) {
-        // Ignore corrupt/stale local storage.
+        // Ignore corrupt or incompatible local storage.
       }
     }
 
+
+    /*
+     * Check the control-plane configuration.
+     *
+     * Failure is deliberately harmless:
+     * the currently displayed content is left alone.
+     */
     async function fetchConfig() {
       try {
-        /*
-         * Cache-busting is intentional here. We want this tiny request to
-         * check GitHub Pages for the current configuration every minute.
-         */
-        const url = CONFIG_URL + "?t=" + Date.now();
-
-        const response = await fetch(url, {
-          cache: "no-store",
-          credentials: "omit"
-        });
+        const response = await fetch(
+          CONFIG_URL + "?t=" + Date.now(),
+          {
+            cache: "no-store",
+            credentials: "omit"
+          }
+        );
 
         if (!response.ok) {
           throw new Error("HTTP " + response.status);
@@ -166,24 +368,18 @@
 
         const config = validateConfig(await response.json());
 
-        /*
-         * A successful request with the same version is a no-op.
-         * Most importantly, a failed request never causes a reload.
-         */
-        if (currentVersion === null) {
-          applyConfig(config);
-        } else if (String(config.version) !== String(currentVersion)) {
+        if (
+          currentVersion === null ||
+          String(config.version) !== String(currentVersion)
+        ) {
           applyConfig(config);
         }
+
       } catch (error) {
         /*
-         * Fail closed:
-         * - GitHub Pages outage
-         * - network outage
-         * - malformed config
-         * - transient DNS/TLS/etc. problem
+         * GitHub Pages outage, network outage, malformed config, etc.
          *
-         * All leave the currently displayed content alone.
+         * Never reload or replace known-good content.
          */
         console.warn("Configuration check failed:", error);
 
@@ -193,18 +389,13 @@
       }
     }
 
-    /*
-     * Restore the last known good destination immediately, then check the
-     * network for a newer configuration.
-     */
+
+    // Startup.
     loadLastGoodConfig();
     fetchConfig();
 
-    /*
-     * setInterval is deliberately used instead of reloading the page.
-     * The page itself remains stable during GitHub outages.
-     */
-    setInterval(fetchConfig, POLL_INTERVAL_MS);
+    // Control-plane polling: once per minute.
+    setInterval(fetchConfig, CONFIG_POLL_INTERVAL_MS);
   </script>
 </body>
 </html>
